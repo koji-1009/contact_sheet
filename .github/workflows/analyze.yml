@@ -1,0 +1,61 @@
+name: Analyze
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: koji-1009/setup-flutter@158060745e545426c27a6e9814e5c5486a5f7dd8 # v1.4.2
+      - run: dart pub get
+      # The examples are analyzed from the root too, once resolved.
+      - run: flutter pub get
+        working-directory: example/shop_app
+      - run: flutter pub get
+        working-directory: example/shop_app/contact_sheet
+      - run: flutter pub get
+        working-directory: example/notes_app
+      - run: flutter pub get
+        working-directory: example/tabs_app
+      - run: flutter pub get
+        working-directory: example/tabs_app/contact_sheet
+      - run: dart analyze
+
+  format:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: koji-1009/setup-flutter@158060745e545426c27a6e9814e5c5486a5f7dd8 # v1.4.2
+      - run: dart pub get
+      - run: dart format --output=none --set-exit-if-changed lib bin tool test
+
+  generated:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: koji-1009/setup-flutter@158060745e545426c27a6e9814e5c5486a5f7dd8 # v1.4.2
+      - run: dart pub get
+      - run: dart run tool/gen_messages.dart
+      - run: dart run build_runner build
+      - run: git diff --exit-code
+
+  test:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: koji-1009/setup-flutter@158060745e545426c27a6e9814e5c5486a5f7dd8 # v1.4.2
+      - run: dart pub get
+      - run: dart test

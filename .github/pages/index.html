@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contact Sheet examples</title>
+<meta name="description" content="The maps Contact Sheet draws of its example apps: every page of each, from its widget previews.">
+<style>
+:root { color-scheme: light dark; --bg: #f6f7f9; --surface: #ffffff; --text: #1b1d21; --muted: #5f6672; --line: #d9dde3; --accent: #0a84ff; --hover: #eef5ff; }
+@media (prefers-color-scheme: dark) { :root { --bg: #15171a; --surface: #1f2226; --text: #e6e8eb; --muted: #a0a7b2; --line: #363b42; --accent: #3d9bff; --hover: #1d2a3a; } }
+body { margin: 0; font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif; background: var(--bg); color: var(--text); }
+main { max-width: 880px; margin: 0 auto; padding: 32px 16px 48px; }
+h1 { font-size: 24px; margin: 0 0 8px; }
+.lead { color: var(--muted); margin: 0 0 24px; }
+a { color: var(--accent); }
+ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+li { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; cursor: pointer; }
+li:hover { border-color: var(--accent); background: var(--hover); }
+li:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+h2 { font-size: 17px; margin: 0 0 4px; }
+h2 a { text-decoration: none; }
+h2 a:focus { outline: none; }
+h2 a::after { content: ""; position: absolute; inset: 0; border-radius: 10px; }
+dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 8px 0; font-size: 13px; }
+dt { color: var(--muted); }
+dd { margin: 0; }
+.files { font-size: 13px; color: var(--muted); margin: 0; }
+.files a { position: relative; z-index: 1; text-decoration: none; }
+.files a:hover { text-decoration: underline; }
+code { font-size: 12px; background: var(--hover); border-radius: 4px; padding: 0 4px; }
+footer { margin-top: 32px; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Contact Sheet examples</h1>
+<p class="lead">Every page of a Flutter app as one map: each state of each page as an image, each transition as an arrow. Below are the maps of the three example apps, exported from this repository's <code>main</code>.</p>
+<ul>
+<li>
+<h2><a href="shop_app_contact_sheet/index.html">shop_app</a></h2>
+<dl>
+<dt>Navigation</dt><dd>go_router: a redirect for guests, a deep link, pages pushed over others</dd>
+<dt>State</dt><dd>riverpod</dd>
+<dt>Previews</dt><dd>none in the app: all in the sheet package, started through the app's router</dd>
+</dl>
+<p class="files"><a href="shop_app_contact_sheet/index.html">index.html</a> · <a href="shop_app_contact_sheet/map.svg">map.svg</a> · <a href="shop_app_contact_sheet/map-dev.svg">map-dev.svg</a> · <a href="shop_app_contact_sheet/sheet.json">sheet.json</a></p>
+</li>
+<li>
+<h2><a href="notes_app_contact_sheet/index.html">notes_app</a></h2>
+<dl>
+<dt>Navigation</dt><dd>Navigator 1.0: named routes with arguments, a new note as a full-screen dialog</dd>
+<dt>State</dt><dd>an <code>InheritedNotifier</code></dd>
+<dt>Previews</dt><dd>all the app's own, each a <code>MultiPreview</code> of a phone and a tablet: no sheet package. Shot in three variants: iPhone, Android, tablet</dd>
+</dl>
+<p class="files"><a href="notes_app_contact_sheet/index.html">index.html</a> · <a href="notes_app_contact_sheet/map.svg">map.svg</a> · <a href="notes_app_contact_sheet/map-dev.svg">map-dev.svg</a> · <a href="notes_app_contact_sheet/sheet.json">sheet.json</a></p>
+</li>
+<li>
+<h2><a href="tabs_app_contact_sheet/index.html">tabs_app</a></h2>
+<dl>
+<dt>Navigation</dt><dd>Bottom tabs, <code>Navigator.push</code> without route names</dd>
+<dt>State</dt><dd>a global service locator</dd>
+<dt>Previews</dt><dd>the app's for the tabs and the post; the sheet package's for signing in, a full-screen dialog over the profile tab</dd>
+</dl>
+<p class="files"><a href="tabs_app_contact_sheet/index.html">index.html</a> · <a href="tabs_app_contact_sheet/map.svg">map.svg</a> · <a href="tabs_app_contact_sheet/map-dev.svg">map-dev.svg</a> · <a href="tabs_app_contact_sheet/sheet.json">sheet.json</a></p>
+</li>
+</ul>
+<footer>The sheets and the apps are in <a href="https://github.com/koji-1009/contact_sheet/tree/main/example">example/</a> of <a href="https://github.com/koji-1009/contact_sheet">koji-1009/contact_sheet</a>.</footer>
+</main>
+</body>
+</html>
