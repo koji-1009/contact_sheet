@@ -1,0 +1,295 @@
+import 'dart:collection';
+
+import 'package:contact_sheet/src/messages.g.dart';
+import 'package:contact_sheet/src/sheet.dart';
+
+/// What the sheet itself tells may be missing or written twice, in [m]'s
+/// words: hints for the agent that writes it, not errors. The sheet is not
+/// checked against the app; only against itself.
+///
+/// - a page no arrow reaches from the first page, and no deep link opens;
+/// - a state of a page whose arrows name the states they leave from, that
+///   none of them names: nothing happens from it, or an arrow is missing;
+/// - a state, not a page's first nor one what it loads decides (`data`),
+///   that nothing arrives in: no arrow (by its `then`, or from a state of
+///   its name) nor deep link;
+/// - an arrow written twice, or twice for other states where one with
+///   `then` by the state it leaves says it; a deep link written twice;
+/// - of the conditions: a value nothing gives but the launch, or nothing
+///   names; a page with states of the conditions that has none for some of
+///   their values, or two for the same; the first page with none for the
+///   launch's; an arrow whose `if` no history meets where it happens, or
+///   that names in `when` a state its `if` leaves out.
+List<String> lintSheet(Sheet sheet, Messages m) {
+  final findings = <String>[];
+  if (sheet.pages.isEmpty) return findings;
+  final reached = <String>{
+    sheet.pages.first.id,
+    for (final e in sheet.entries) e.to,
+  };
+  // The bar a page is shown in: reached, every tab of it is, by a switch.
+  final barPages = <String, SheetTabBar>{
+    for (final bar in sheet.tabBars)
+      for (final page in sheet.pages)
+        if (bar.tabs.any(
+          (t) => t.page == page.id || page.tabs.contains(t.page),
+        ))
+          page.id: bar,
+  };
+  final queue = Queue.of(reached);
+  while (queue.isNotEmpty) {
+    final id = queue.removeFirst();
+    for (final e in sheet.edges) {
+      if (e.from == id && reached.add(e.to)) queue.add(e.to);
+    }
+    for (final tab in barPages[id]?.tabs ?? const <SheetTab>[]) {
+      if (reached.add(tab.page)) queue.add(tab.page);
+    }
+  }
+  for (final page in sheet.pages) {
+    if (!reached.contains(page.id)) {
+      findings.add(m.lintUnreachable(page.label, page.id));
+    }
+  }
+  for (final page in sheet.pages) {
+    // An item from every page is not the page's own.
+    final out = [
+      for (final e in sheet.edges)
+        if (e.from == page.id && !e.anywhere) e,
+    ];
+    if (!out.any((e) => e.when.isNotEmpty)) continue;
+    // An arrow in every state leaves from each; so does a switch, in a bar.
+    if (out.any((e) => e.when.isEmpty) || barPages.containsKey(page.id)) {
+      continue;
+    }
+    final named = {for (final e in out) ...e.when};
+    for (final state in page.states) {
+      if (!named.contains(state.name)) {
+        findings.add(m.lintUnusedState(state.name, page.label));
+      }
+    }
+  }
+  for (final page in sheet.pages) {
+    final into = [
+      for (final e in sheet.edges)
+        if (e.to == page.id) e,
+    ];
+    // A tab's first page opens, switched to, as nothing says which.
+    final tab = sheet.tabOf(page.id);
+    bool arrives(String state) =>
+        (tab != null &&
+            sheet.router.opening(page.id, null, tab.guard).contains(state)) ||
+        sheet.entries.any(
+          (e) => e.to == page.id && sheet.opening(e).contains(state),
+        ) ||
+        into.any(
+          (e) => sheet.arrivals(e).values.any((to) => to.contains(state)),
+        );
+    for (final state in page.states.skip(1)) {
+      if (!state.data && !arrives(state.name)) {
+        findings.add(m.lintUnarrivedState(state.name, page.label));
+      }
+    }
+  }
+  // By the items of `edges`, as written: an item from several pages is
+  // told once.
+  final told = <(int, int)>{};
+  final seen = <String, int>{};
+  final split = <String, SheetEdge>{};
+  for (final e in sheet.edges) {
+    final first = seen.putIfAbsent(e.key, () => e.item);
+    if (first != e.item && told.add((first, e.item))) {
+      findings.add(m.lintDuplicateEdge(first, e.item));
+      continue;
+    }
+    if (e.when.isEmpty) continue;
+    // Two that differ by the conditions they happen while are two.
+    final other = split.putIfAbsent(
+      [
+        e.from,
+        e.to,
+        '${e.trigger}',
+        guardKey(e.guard),
+        e.kind.name,
+      ].join('\u0001'),
+      () => e,
+    );
+    if (other.item != e.item &&
+        other.key != e.key &&
+        told.add((other.item, e.item))) {
+      findings.add(m.lintSplitEdge(other.item, e.item));
+    }
+  }
+  final entries = <String, int>{};
+  for (final (i, e) in sheet.entries.indexed) {
+    final first = entries.putIfAbsent(e.key, () => i);
+    if (first != i) findings.add(m.lintDuplicateEntry(first, i));
+  }
+  return [
+    ...findings,
+    ..._lintConditions(sheet, m, reached),
+    ..._lintTabs(sheet, m),
+  ];
+}
+
+/// The hints of the tab bars whose tabs keep their histories.
+List<String> _lintTabs(Sheet sheet, Messages m) {
+  final findings = <String>[];
+  for (final (i, bar) in sheet.tabBars.indexed) {
+    if (bar.tabs.length < 2) findings.add(m.lintOneTab(i));
+  }
+  // The tabs a page is shown in, by their first pages.
+  List<String> tabsOf(String page) => [
+    if (sheet.tabOf(page) != null) page,
+    ...sheet.pageOf(page)!.tabs,
+  ];
+  final told = <int>{};
+  for (final e in sheet.edges) {
+    if (!told.add(e.item)) continue;
+    final from = tabsOf(e.from);
+    final to = tabsOf(e.to);
+    final fromTab = sheet.tabOf(e.from);
+    final toTab = sheet.tabOf(e.to);
+    final page = sheet.pageOf(e.to)!.label;
+    if (fromTab != null &&
+        toTab != null &&
+        sheet.barOf(fromTab) == sheet.barOf(toTab)) {
+      findings.add(m.lintTabEdge(e.item));
+    } else if (to.isNotEmpty && toTab == null) {
+      final push =
+          e.kind == NavigationKind.push || e.kind == NavigationKind.redirect;
+      if (push && from.isNotEmpty && !from.any(to.contains)) {
+        findings.add(m.lintNotInTab(e.item, page));
+      } else if ((push || e.kind == NavigationKind.replace) && from.isEmpty) {
+        findings.add(m.lintTabFromOutside(e.item, page));
+      } else if (e.kind == NavigationKind.go &&
+          to.length > 1 &&
+          e.tab == null) {
+        findings.add(m.lintWhichTab(e.item, page, to.first));
+      }
+    }
+  }
+  for (final (i, e) in sheet.entries.indexed) {
+    final to = tabsOf(e.to);
+    if (sheet.tabOf(e.to) == null && to.length > 1 && e.tab == null) {
+      findings.add(m.lintEntryWhichTab(i, sheet.pageOf(e.to)!.label, to.first));
+    }
+  }
+  return findings;
+}
+
+/// The hints of the conditions; [reached], the pages an arrow leads to
+/// from the first or a deep link opens (those not, already told).
+List<String> _lintConditions(Sheet sheet, Messages m, Set<String> reached) {
+  final findings = <String>[];
+  String said(Map<String, String> values) =>
+      [for (final MapEntry(:key, :value) in values.entries) '$key: $value']
+          .join(', ');
+  SheetState stateOf(String page, String name) =>
+      sheet.pageOf(page)!.states.firstWhere((s) => s.name == name);
+  // The values something gives: a set, or a then of a state of them.
+  final given = <(String, String)>{
+    for (final e in sheet.edges) ...[
+      for (final MapEntry(:key, :value) in e.sets.entries) (key, value),
+      for (final then in [?e.then, ...e.thenBy.values])
+        for (final MapEntry(:key, :value) in stateOf(
+          e.to,
+          then,
+        ).conditions.entries)
+          (key, value),
+    ],
+    for (final entry in sheet.entries)
+      if (entry.then case final then?)
+        for (final MapEntry(:key, :value) in stateOf(
+          entry.to,
+          then,
+        ).conditions.entries)
+          (key, value),
+  };
+  final named = <(String, String)>{
+    ...given,
+    for (final page in sheet.pages)
+      for (final state in page.states)
+        for (final MapEntry(:key, :value) in state.conditions.entries)
+          (key, value),
+    for (final guard in [
+      for (final e in sheet.edges) e.guard,
+      for (final e in sheet.entries) e.guard,
+    ])
+      for (final MapEntry(:key, :value) in guard.entries)
+        for (final v in value) (key, v),
+  };
+  for (final c in sheet.conditions) {
+    for (final (i, value) in c.values.indexed) {
+      if (!named.contains((c.name, value))) {
+        findings.add(m.lintValueUnused(value, c.name));
+      } else if (i > 0 && !given.contains((c.name, value))) {
+        findings.add(m.lintValueNeverSet(value, c.name));
+      }
+    }
+  }
+  // Where nothing says which state, the page shows its first, its data
+  // states and its states of the conditions, those the values allow.
+  bool shows(SheetPage page, Map<String, String> values) =>
+      page.states.indexed.any(
+        (s) =>
+            (s.$1 == 0 || s.$2.data || s.$2.conditions.isNotEmpty) &&
+            s.$2.conditions.entries.every((e) => values[e.key] == e.value),
+      );
+  final first = sheet.pages.first;
+  if (!shows(first, {for (final c in sheet.conditions) c.name: c.values[0]})) {
+    findings.add(m.lintNoLaunchState(first.label));
+  }
+  for (final page in sheet.pages) {
+    final of = [
+      for (final c in sheet.conditions)
+        if (page.states.any((s) => s.conditions.containsKey(c.name))) c,
+    ];
+    if (of.isEmpty) continue;
+    // Each valuation of the conditions its states name.
+    var valuations = [<String, String>{}];
+    for (final c in of) {
+      valuations = [
+        for (final g in valuations)
+          for (final v in c.values) {...g, c.name: v},
+      ];
+    }
+    for (final g in valuations) {
+      if (!shows(page, g)) {
+        findings.add(m.lintNoStateUnder(page.label, said(g)));
+      }
+    }
+    final looks = <String, SheetState>{};
+    for (final state in page.states) {
+      if (state.data || state.conditions.isEmpty) continue;
+      final key = guardKey({
+        for (final MapEntry(:key, :value) in state.conditions.entries)
+          key: [value],
+      });
+      final other = looks.putIfAbsent(key, () => state);
+      if (other != state) {
+        findings.add(m.lintTwoStatesUnder(other.name, state.name, page.label));
+      }
+    }
+  }
+  final happening = sheet.router.happening([
+    for (final e in sheet.entries)
+      (to: e.to, then: e.then, guard: e.guard, tab: e.tab),
+  ]);
+  final told = <String>{};
+  for (final (i, e) in sheet.edges.indexed) {
+    if (e.guard.isEmpty) continue;
+    final from = sheet.pageOf(e.from)!;
+    for (final state in from.states) {
+      if (e.when.contains(state.name) &&
+          !state.allowedBy(e.guard) &&
+          told.add('${e.item}\u0000${state.name}')) {
+        findings.add(m.lintIfExcludesWhen(e.item, state.name));
+      }
+    }
+    if (reached.contains(e.from) && !happening.contains(i)) {
+      findings.add(m.lintGuardUnsatisfied(e.item, from.label));
+    }
+  }
+  return findings;
+}
