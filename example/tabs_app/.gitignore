@@ -1,0 +1,5 @@
+.dart_tool/
+build/
+
+# Contact Sheet: the map exported for the demo
+contact_sheet/map/

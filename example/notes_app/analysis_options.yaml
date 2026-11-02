@@ -1,0 +1,12 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - contact_sheet/**
+    - build/**
+
+linter:
+  rules:
+    always_use_package_imports: true
+    migrate_design_widgets: true
+    prefer_single_quotes: true

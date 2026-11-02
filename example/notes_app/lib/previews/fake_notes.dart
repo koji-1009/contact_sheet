@@ -1,0 +1,45 @@
+import 'package:material_ui/material_ui.dart';
+
+import 'package:notes_app/data/notes.dart';
+import 'package:notes_app/routes.dart';
+
+// The team's preview wrappers: each page in the app's theme, with a
+// NotesStore on fixed notes, as main.dart gives the real one.
+
+const previewNotes = [
+  Note(id: 'n1', title: '買い物', body: '牛乳、卵、パン'),
+  Note(id: 'n2', title: '会議のメモ', body: '来週までに見積もりを出す'),
+  Note(id: 'n3', title: '本', body: '読みたい本のリスト'),
+];
+
+class _FakeApi implements NotesApi {
+  @override
+  Future<List<Note>> fetch() async => previewNotes;
+
+  @override
+  Future<void> save(Note note) async {}
+
+  @override
+  Future<void> delete(String id) async {}
+}
+
+Widget _with(Widget page, {List<Note> notes = previewNotes, bool loading = false}) {
+  final store = NotesStore(_FakeApi())
+    ..notes = notes
+    ..loading = loading;
+  return NotesScope(
+    store: store,
+    child: MaterialApp(
+      theme: notesTheme,
+      debugShowCheckedModeBanner: false,
+      home: page,
+    ),
+  );
+}
+
+Widget threeNotes(Widget page) => _with(page);
+
+Widget noNotes(Widget page) => _with(page, notes: const []);
+
+Widget loadingNotes(Widget page) =>
+    _with(page, notes: const [], loading: true);

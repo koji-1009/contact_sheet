@@ -1,0 +1,70 @@
+# The transition structure of notes_app, written by reading its code
+# (lib/routes.dart and lib/pages/). Navigator 1.0: named routes, a note's id
+# as the route's argument. Every state is a preview of the app's own
+# (lib/pages/*_preview.dart): there is no sheet package.
+
+# Each page is shot as an iPhone, as Android, and as the app's own Devices
+# MultiPreview gives its Tablet preview (lib/previews/devices.dart).
+variants:
+  - {name: iPhone}
+  - {name: Android, platform: android}
+  - {name: タブレット, preview: Tablet}
+
+dependencies:
+  - name: NotesApi
+    target: NotesScope (NotesStore)
+    source: lib/data/notes.dart
+
+pages:
+  - id: notes
+    label: メモ一覧
+    widget: NotesPage
+    source: lib/pages/notes_page.dart
+    path: /
+    dependencies: [NotesApi]
+    states:
+      - {name: 3件, preview: lib/pages/notes_page_preview.dart#notesPage, uses: {NotesApi: 3件}}
+      # What the API gives decides these, not the arrow.
+      - {name: 空, preview: lib/pages/notes_page_preview.dart#notesPage@1, uses: {NotesApi: 0件}, data: true}
+      - {name: 読み込み中, preview: lib/pages/notes_page_preview.dart#notesPage@2, uses: {NotesApi: 応答待ち}, data: true}
+
+  - id: note
+    label: メモ
+    widget: NotePage
+    source: lib/pages/note_page.dart
+    path: /note
+    dependencies: [NotesApi]
+    states:
+      - {name: 標準, preview: lib/pages/note_page_preview.dart#notePage, uses: {NotesApi: 3件}}
+
+  - id: edit
+    label: 編集
+    widget: EditPage
+    source: lib/pages/edit_page.dart
+    path: /edit
+    memo: 新しいメモはフルスクリーンのダイアログで開く（id なしの /edit）。
+    dependencies: [NotesApi]
+    states:
+      - {name: 新規, preview: lib/pages/edit_page_preview.dart#newNote, uses: {NotesApi: 3件}}
+      - {name: 編集, preview: lib/pages/edit_page_preview.dart#editNote, uses: {NotesApi: 3件}}
+
+  - id: settings
+    label: 設定
+    widget: SettingsPage
+    source: lib/pages/settings_page.dart
+    path: /settings
+    states:
+      - {name: 標準, preview: lib/pages/settings_page_preview.dart#settingsPage}
+
+edges:
+  # Each note's ListTile opens it.
+  - {from: notes, to: note, trigger: other:メモをタップ, when: 3件, source: lib/pages/notes_page.dart}
+  # /edit without an argument is a new note; with the note's id, that note.
+  - {from: notes, to: edit, trigger: label:新しいメモ, then: 新規, source: lib/pages/notes_page.dart}
+  - {from: notes, to: settings, trigger: label:設定, source: lib/pages/notes_page.dart}
+  - {from: note, to: edit, trigger: label:編集, then: 編集, source: lib/pages/note_page.dart}
+  # Deleting pops back to the list.
+  - {from: note, to: notes, trigger: label:削除, kind: pop, source: lib/pages/note_page.dart}
+  # Saving pops back to where the editor was opened from.
+  - {from: edit, to: notes, trigger: text:保存, when: 新規, kind: pop, source: lib/pages/edit_page.dart}
+  - {from: edit, to: note, trigger: text:保存, when: 編集, kind: pop, source: lib/pages/edit_page.dart}

@@ -1,0 +1,26 @@
+name: shop_app_sheet
+description: The map of shop_app's pages for Contact Sheet. Its previews start each page in each state.
+publish_to: none
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # The app, imported as is.
+  shop_app:
+    path: ..
+  # The app's own dependencies that the fakes and previews use directly.
+  flutter_riverpod: ^3.0.0
+  go_router: ^16.0.0
+  material_ui: ^1.9.0
+
+dev_dependencies:
+  # shutter shoots the previews in flutter test.
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
