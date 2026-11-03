@@ -11,6 +11,14 @@ class CartPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cart = ref.watch(cartRepositoryProvider);
+    // As the cart changes (a product added, over this page).
+    return ListenableBuilder(
+      listenable: cart,
+      builder: (context, _) => _cart(context, cart),
+    );
+  }
+
+  Widget _cart(BuildContext context, CartRepository cart) {
     return Scaffold(
       appBar: AppBar(title: const Text('カート')),
       body: Column(

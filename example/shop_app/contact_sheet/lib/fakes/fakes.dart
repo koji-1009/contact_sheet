@@ -45,7 +45,7 @@ class FakeProductRepository implements ProductRepository {
       products.firstWhere((p) => p.id == id);
 }
 
-class FakeCartRepository implements CartRepository {
+class FakeCartRepository extends CartRepository {
   FakeCartRepository({int items = 0})
     : _items = [
         for (final p in FakeProductRepository.products.take(items))
@@ -58,9 +58,14 @@ class FakeCartRepository implements CartRepository {
   List<CartItem> get items => List.unmodifiable(_items);
 
   @override
-  void add(Product product) =>
-      _items.add(CartItem(product: product, quantity: 1));
+  void add(Product product) {
+    _items.add(CartItem(product: product, quantity: 1));
+    notifyListeners();
+  }
 
   @override
-  void clear() => _items.clear();
+  void clear() {
+    _items.clear();
+    notifyListeners();
+  }
 }
