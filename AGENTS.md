@@ -1,7 +1,7 @@
 # AGENTS.md
 
 For AI coding agents (Claude Code, Codex, ...) working on this repository.
-Read [README.md](README.md) first.
+Read [README.md](README.md) and [doc/development.md](doc/development.md) first.
 [doc/agent.md](doc/agent.md) and [doc/manual.md](doc/manual.md) are a different thing: the playbook and the reference for the agent that writes a target app's sheet, which `contact_sheet agent` and `contact_sheet manual` print (the usage's footer points an agent to them).
 
 ## What matters
@@ -45,7 +45,8 @@ Decisions already made; do not reintroduce what they removed:
 | `lib/src/lint.dart` | `contact_sheet lint`, and the hints `export` tells: what the sheet itself shows may be missing or written twice |
 | `lib/src/l10n/*.arb`, `lib/src/messages.g.dart` | The command's words; generated from them by `dart run tool/gen_messages.dart` |
 | `doc/agent.md`, `doc/manual.md` | For the AI agent writing a sheet: the playbook and the reference |
-| `lib/src/docs.dart` | Them, as the command prints them: kept the same as `doc/` by `test/docs_test.dart`, so edit both |
+| `doc/development.md` | For people working on this repository: running it from a clone, the checks, the examples |
+| `lib/src/docs.dart` | `doc/agent.md` and `doc/manual.md`, as the command prints them: kept the same by `test/docs_test.dart`, so edit both |
 | `test/` | `support.dart`: flutter answered as done, git run for real; `export_test.dart` fakes shutter's `shot`; `bin_test.dart` runs the command itself |
 | `example/*_app/` | The example apps; `contact_sheet/` in each holds its sheet (and, for shop_app and tabs_app, its sheet package) |
 | `CHANGELOG.md` | What each version changed, for its users |

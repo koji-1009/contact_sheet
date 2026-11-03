@@ -3,6 +3,11 @@ description: Every page of a Flutter app as one map, from its widget previews sh
 version: 0.1.0
 repository: https://github.com/koji-1009/contact_sheet
 issue_tracker: https://github.com/koji-1009/contact_sheet/issues
+screenshots:
+  - description: The map of the shop example, its pages and the transitions between them.
+    path: doc/images/map.png
+  - description: Code and specifications, looked into by an AI agent, become the sheet, and contact_sheet draws the map.
+    path: doc/images/flow.png
 topics:
   - flutter
   - preview

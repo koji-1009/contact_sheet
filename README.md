@@ -1,30 +1,41 @@
-# Contact Sheet
-
 Every page of a Flutter app as one map: each state of each page as an image, each transition as an arrow.
-The images are the app's own `@Preview`s, shot with [shutter](https://pub.dev/packages/shutter) (as a library, drawn as iOS).
-The map is written as HTML, SVG and JSON, to be opened without any tool and shared with the people outside the code: product managers, designers, marketing, support.
+The map is HTML, SVG and JSON, opened without any tool, for everyone who works on the app, whether in its code or not: product managers, designers, marketing, support.
+
+![The map of the shop example: its pages, each as its preview, and the transitions between them](https://raw.githubusercontent.com/koji-1009/contact_sheet/main/doc/images/map.png)
+
+**See it:** [the maps of the example apps](https://koji-1009.github.io/contact_sheet/), exported from the examples in [the repository](https://github.com/koji-1009/contact_sheet).
+
+## How it works
+
+![Code, specifications and the like, looked into by an AI agent, become the sheet; contact_sheet shoots the previews and draws the map](https://raw.githubusercontent.com/koji-1009/contact_sheet/main/doc/images/flow.png)
+
+1. An AI agent finds out the screen transitions that actually happen in the app, from whatever tells how the app works (its code, its specifications), and writes them as the app's **sheet** (`contact_sheet/sheet.yaml`), naming a `@Preview` for each state of each page.
+2. `contact_sheet export` shoots those previews with [shutter](https://pub.dev/packages/shutter), drawn as iOS (or Android, where the sheet asks for it), and draws the map.
+
+The previews are the app's own where it has them (a team on shutter or the Widget Previewer has one per page).
+For the pages and states the app has none of, the agent writes them in the **sheet package**, a small Flutter package in `contact_sheet/` that imports the app.
 The app's code is never changed.
-
-An AI agent does the writing.
-It looks into what tells how the app works, such as its code and its specifications, and writes the app's **sheet** (`contact_sheet/sheet.yaml`): the screen transitions that actually happen, naming a `@Preview` for each state of each page, then turns it into the map with the `contact_sheet` command.
-The previews are the app's own where it has them (a team on shutter or the Widget Previewer has one per page); for the pages and states it has none of, the agent writes them in the **sheet package**, a small Flutter package in `contact_sheet/` that imports the app.
-
-The sheet is the app's transition structure as data, found out from what tells how it works, such as its code and its specifications, and kept in git with the app:
-
-- pages: their widget and file, route path, and the states each one starts in (a `@Preview` each; those what it loads decides, such as empty or loading, marked);
-- what the app keeps across its pages, shown on them or not (signed in, what is in the cart): its values, the states of a page each is the look of, the transitions that happen only for some (a redirect for a guest) and those that change it (logging in);
-- transitions: from which pages (one, several: the bottom tabs, or every page: a session that expires), to which (or, saving a form, back to whichever page opened it), what the user does, in the screen's words (a button's text, a tooltip, back, "tap a product"), in which states, the state it arrives in (by the state it leaves, or, unsaid, the one of the same name, or the one of what the app keeps: signed in stays signed in), how the code moves (push, go, replace, pop, redirect) and where in the code;
-- tab bars whose tabs each keep their own history (go_router's `StatefulShellRoute`, iOS's tab bar): the pages each tab shows, switched between as the bar does, each tab found as it was left;
-- deep links, apart from the transitions: they come from no page, and may say the state they open in;
-- for reference: what each page depends on that its previews replace, and which fake each state uses;
-- for the people reading the map, optional: a memo on each page and links to more about it, written by the AI or by hand;
-- optional, the variants every state is shot in, to switch between in the HTML: as iOS or Android, and as the other sizes a `MultiPreview` of devices gives (phone, tablet, desktop).
-
 Contact Sheet draws the sheet as it is: it does not check it against the app.
+
+## What the map shows
+
+- Every page, grouped by section, with the transitions between them and the deep links into them; each page's first state on the map, all its states (as a guest or signed in; empty; loading) when it is chosen and in the list.
+- A page chosen: its memo, its links, its states, and its transitions as sentences ("When Guest, tap “Log in” → Log in (From home)").
+- The route between two pages: the fewest steps as the app's navigator goes. It follows redirects, what the app keeps across its pages (signed in, the cart) and the tabs' own histories.
+- A list of the pages, a table of the transitions, search, and an address to pass around for each page, state and route.
+- Variants, where the sheet names them: iOS or Android, phone or tablet.
+- What only developers read (the code's names and files) is behind “For developers”.
+- Light and dark, a phone's width, and print.
+
+`contact_sheet/map/` holds:
+
+- `index.html`, with the images in `images/` next to it: opened from disk or served anywhere.
+- `map.svg`: the whole map as one picture; `map-dev.svg`, with what developers read too.
+- `sheet.json`: what they are drawn from, for other tools and AI agents.
 
 ## Requirements
 
-- Flutter 3.47 or later (Dart 3.13 or later).
+- Flutter 3.47 or later (Dart 3.13 or later), as shutter needs.
 - `flutter_test` in the app's `dev_dependencies`, as shutter shoots the previews in `flutter test` (the sheet package has it).
 - An AI agent to write the sheet: any that runs commands, such as [Claude Code](https://claude.com/claude-code) or [Codex](https://github.com/openai/codex).
 
@@ -38,122 +49,42 @@ shutter comes with the command: nothing else to install.
    dart install contact_sheet
    ```
 
-2. In the app's directory, ask the AI agent to run `contact_sheet agent` and follow it. `contact_sheet -h` points an agent there too.
+2. In the app's directory, ask the AI agent to run `contact_sheet agent` and follow it.
 3. Open `contact_sheet/map/index.html`.
-
-From a clone of this repository, `dart install 'contact_sheet@{path: <the clone>}'` installs it as it is, and `dart run contact_sheet <command>` in the clone runs it without installing.
 
 ## Commands
 
 | Command | What |
 | --- | --- |
-| `contact_sheet agent` | Prints the playbook for the AI agent: turn the app's previews into the map ([doc/agent.md](doc/agent.md)) |
-| `contact_sheet manual` | Prints the reference: the sheet's fields, the map, the runs, the exit codes ([doc/manual.md](doc/manual.md)) |
-| `contact_sheet init` | Writes an empty sheet (`contact_sheet/sheet.yaml`); with `--package`, the sheet package's skeleton too |
-| `contact_sheet export` | Shoots the previews the sheet names with shutter and writes the map into `contact_sheet/map/`. `--out <folder>`: into `<app>_contact_sheet/` there. `--only <page id>`: those pages' previews alone, the others keeping their images. `--locale <en\|ja>`: the map in that language, not the machine's. `--strict`: fails while a state has no image (for CI) |
-| `contact_sheet lint` | Tells what the sheet itself shows may be missing (a page no arrow leads to, a state nothing leaves from or arrives in) or written twice |
-| `contact_sheet basis` | Records the app as it is now as what the sheet was written against (`contact_sheet/basis.json`) |
-| `contact_sheet changed` | Lists the app's files changed since then: the sheet may need bringing up to date for them. `--by-page`: by the pages the sheet names them for, then those on no page |
-| `contact_sheet prune` | Deletes the runs of shutter's that Contact Sheet left: the sheet package's, and those an interrupted export left in the app |
+| `contact_sheet agent` | Prints the playbook the AI agent follows to write the sheet |
+| `contact_sheet manual` | Prints the reference: the sheet's fields, the map, the exit codes |
+| `contact_sheet init` | Writes an empty sheet; with `--package`, the sheet package's skeleton too |
+| `contact_sheet export` | Shoots the previews the sheet names and writes the map into `contact_sheet/map/` |
+| `contact_sheet lint` | Tells what the sheet may be missing or have written twice |
+| `contact_sheet basis` | Records the app as it is now as what the sheet was written against |
+| `contact_sheet changed` | Lists the app's files changed since then: the sheet may need bringing up to date for them |
+| `contact_sheet prune` | Deletes shutter's runs that Contact Sheet left |
 
-Each but `agent` and `manual` runs on the app directory given last, the current one by default.
-`contact_sheet help <command>` (or `<command> --help`) tells a command's options; `contact_sheet --version`, the version; `--verbose`, where an unexpected error came from.
+`contact_sheet help <command>` tells a command's options.
+An export deletes the runs of shutter's it made, so the team's own runs in the app stay as they were.
 
-The exit codes are sysexits':
+## In the app's repository
 
-| Code | When |
-| --- | --- |
-| 0 | Done |
-| 64 | A wrong use: the message and the usage on stderr; `export --only`: no such page |
-| 65 | The sheet cannot be read (said with where); `changed`: git does not have the basis's commit; `export --strict`: a state has no image |
-| 66 | No app (`pubspec.yaml`) or no sheet; `changed`: no basis yet |
-| 69 | `export`: no `flutter` to run (`FLUTTER_ROOT`, else the PATH), `flutter pub get` failed, or shutter cannot run |
-| 70 | An unexpected error |
-| 78 | `basis`: not a git repository; `export`: the app or the sheet package is not set up for shutter (no `flutter_test` in `dev_dependencies`) |
+Contact Sheet adds `contact_sheet/` to the app, and with `init --package`, a line to its `.gitignore`:
 
-## The map
+- `sheet.yaml` and `basis.json`, and the sheet package where there is one: kept in git.
+- `map/`: the map, mostly images (about 1.3 MB for the shop example's 11 states). Commit it, or ignore it and export it where it is shared (`export --out <folder>`), or have CI export it.
+- `.dart_tool/`: what an export keeps between runs, and the sheet package's shots: out of git. Flutter's `.gitignore` ignores `.dart_tool/` at any depth; where the app's `.gitignore` does not, `init --package` adds `contact_sheet/.dart_tool/` to it.
 
-`contact_sheet/map/` holds:
+## More
 
-- `index.html`: one file, the images in `images/` next to it, to be opened from disk or served anywhere (a static host, CI's artifacts).
-- `map.svg`: the whole map as one picture, the images in it, its labels what anyone reads, each page a link to it in `index.html`; `map-dev.svg`, with what developers read too.
-- `sheet.json`: what they are drawn from (with `schemaVersion`), for other tools and AI agents.
+- [The manual](https://github.com/koji-1009/contact_sheet/blob/main/doc/manual.md): the sheet's fields, the map, `sheet.json`, the commands' options and exit codes.
+- [The playbook](https://github.com/koji-1009/contact_sheet/blob/main/doc/agent.md): what the AI agent follows.
+- [The examples](https://github.com/koji-1009/contact_sheet/tree/main/example): three apps and their sheets (go_router, Navigator 1.0, bottom tabs), each with its previews from a different place.
+- [The changelog](https://github.com/koji-1009/contact_sheet/blob/main/CHANGELOG.md).
+- Problems and ideas: [the issues](https://github.com/koji-1009/contact_sheet/issues).
+- Working on Contact Sheet itself: [doc/development.md](https://github.com/koji-1009/contact_sheet/blob/main/doc/development.md).
 
-`index.html` has two views of the same pages, and more:
+## License
 
-- **The map**: each section an island, the flow left to right in it; a large app's islands in rows, their names to go into from far out. A page chosen (on the map, or by searching) brings the map to it and the pages next to it, the rest faint, with its memo, links and states beside it, and its transitions as sentences ("When Guest, tap “Log in” → Log in (From home)"). A state chosen there is shown on the map with only the arrows that can happen in it, and the pages they arrive at in the state they arrive in. Twice on a page, its image large.
-- **The list**: one page under the other, by section, each with all its states and the pages it goes to and comes from, which lead to theirs.
-- **The transitions**: a table by page: in which state, doing what, it leads where.
-- **The route** between two pages: the fewest steps from one to the other as the app's navigator goes (the back of every page put over another included), following the states and what the app keeps across its pages (a guest is sent to log in, even from a page that does not show it), and the tabs' own histories (a tab switched back to as it was left), each as a sentence; it starts as the app's start reaches the first page, in the state and with what the app keeps chosen, and names the pages under it.
-- **Search**: pages by their names, memo, states, links and what is done on them (a button's words find the page it is on); the table narrows as it is typed.
-- **Addresses** to pass around, for each view, page, state, route and page's details: `index.html#map/checkout`, `#map/home/Member`, `#route/home/checkout`, `#route/home/Member/checkout`, `#route/cart/checkout/Login=Member`, `#list/checkout`, `#page/checkout`, `#table`.
-- **Which app and how current**: the app's version and branch, when the map was exported, and, with a basis, how many of its code changes the sheet names for no page (a page the map does not have yet may be among them).
-- **How much the map shows**: the pages alone (to look at the screens), with the arrows (to see how they lead to each other), or with what each arrow says (the default), chosen under the map (`?show=pages` or `?show=flow` in the address); a page chosen, or a route, shows its own arrows whatever.
-- **Variants**, where the sheet names them: iOS or Android, phone or tablet, chosen in the header (`?variant=Android` in the address); every image follows.
-- **For developers**, when ticked: the code's names, files, fakes and commit, how the code keeps its pages (go, replace). Without it, the map reads in the screen's words.
-- Light or dark as the browser is set, one column on a phone (pinch to zoom the map), and the list or the table on paper.
-
-A state shutter could not draw has no image: its error is told by the command and shown in the HTML.
-The pages whose files changed since the sheet's basis are marked for developers: a hint, as a change does not make the sheet wrong.
-
-## What goes into the app's git
-
-| Path | What | In git |
-| --- | --- | --- |
-| `contact_sheet/sheet.yaml` | The sheet | yes |
-| `contact_sheet/basis.json` | What the sheet was written against | yes |
-| `contact_sheet/pubspec.yaml`, `analysis_options.yaml`, `lib/` | The sheet package, when the app lacks previews: how those pages start in each state | yes |
-| `contact_sheet/map/` | The map | as you choose |
-| `contact_sheet/.dart_tool/` | Generated: what an export keeps between runs (in every app), and the sheet package's shots | no |
-
-`contact_sheet init --package` adds `contact_sheet/.dart_tool/` to the app's `.gitignore` unless it ignores `.dart_tool/` already; without a sheet package, Flutter's `.gitignore` (`.dart_tool/`, at any depth) keeps it out.
-The app's own previews are shot in the app, the sheet package's in it; once their images are copied into `map/`, the export deletes the runs of shutter's it made, so the team's own runs in the app stay as they were.
-`contact_sheet prune` deletes any an interrupted export left.
-
-The map is mostly images: in the shop example (11 states, shot on a Mac) it is about 1.3 MB, of which `images/` is 350 KB, `map.svg` and `map-dev.svg` 330 KB each, as they hold the images too, and `index.html` 230 KB.
-If that is too much for the app's git, add `contact_sheet/map/` to its `.gitignore`, and export where the map is to be shared (`--out <folder>`), or have CI export it.
-
-## Examples
-
-Three apps, each with its sheet written as the playbook says, one for each place the previews can come from:
-
-| App | Navigation | State | Previews |
-| --- | --- | --- | --- |
-| `example/shop_app` | go_router: a redirect for guests, a deep link, pages pushed over others | riverpod | none in the app: all in the sheet package, started through the app's router |
-| `example/notes_app` | Navigator 1.0: named routes with arguments, a new note as a full-screen dialog | an `InheritedNotifier` | all the app's own, one file per page (`lib/pages/*_preview.dart`), each a `MultiPreview` of a phone and a tablet: no sheet package. Shot in three variants: iPhone, Android, tablet |
-| `example/tabs_app` | Bottom tabs, `Navigator.push` without route names | a global service locator | the app's for the tabs and the post; the sheet package's for signing in, a full-screen dialog over the profile tab |
-
-To draw them, from this repository:
-
-```sh
-dart run contact_sheet export example/shop_app
-dart run contact_sheet export example/notes_app
-dart run contact_sheet export example/tabs_app
-```
-
-Each map is then in `example/<app>/contact_sheet/map/`.
-
-## This repository
-
-| Path | What |
-| --- | --- |
-| `bin/`, `lib/` | Package `contact_sheet`, pure Dart: the command, the sheet's reading, the map's layout, HTML, SVG and JSON, shutter's shots, the basis from git |
-| `lib/src/l10n/` | The words (ARB): the command speaks English; the map, English or Japanese |
-| `doc/` | The playbook and the reference for AI agents, as `agent` and `manual` print them |
-| `example/` | The example apps and their sheet packages |
-| `test/`, `tool/` | The tests; the generators of the command's words from the ARB files, and of the HTML's route from `lib/src/route.dart`, compiled to JavaScript |
-| `AGENTS.md` | For AI agents working on this repository |
-| `CHANGELOG.md` | What each version changed |
-
-## Tests
-
-```sh
-dart test
-```
-
-And `flutter analyze` in each example app, and in its `contact_sheet/` where it is a package (shop_app, tabs_app).
-
-## Issues and license
-
-Report problems and ideas in [the issues](https://github.com/koji-1009/contact_sheet/issues).
-Contact Sheet is under the MIT license ([LICENSE](LICENSE)).
+MIT ([LICENSE](https://github.com/koji-1009/contact_sheet/blob/main/LICENSE)).
