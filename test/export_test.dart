@@ -337,6 +337,28 @@ void main() {
     );
   });
 
+  test('what the sheet says cannot end the JSON blocks of index.html, and '
+      'reads back as it was', () async {
+    const memo = 'See </script><script>alert(1)</script> and <!--<script>';
+    repo.sheetFile.writeAsStringSync(
+      _sheet.replaceFirst('memo: The product list.', "memo: '$memo'"),
+    );
+    final (dir: out, missing: _) = await SheetExport(
+      repo,
+      runner: Tools(),
+      shoot: _Shutter(shots.path).shot,
+      m: Messages.of('en'),
+    ).run();
+    final html = File(p.join(out, 'index.html')).readAsStringSync();
+    final block = RegExp(
+      r'<script id="sheet" type="application/json">(.*?)</script>',
+      dotAll: true,
+    ).firstMatch(html)![1]!;
+    expect(block, isNot(contains('<')));
+    final data = jsonDecode(block) as Map<String, Object?>;
+    expect(((data['pages']! as List).first as Map)['memo'], memo);
+  });
+
   test('the pages whose files changed since the basis are marked', () async {
     File(p.join(app.path, 'lib', 'home.dart'))
       ..createSync(recursive: true)

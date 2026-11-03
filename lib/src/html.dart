@@ -111,7 +111,7 @@ String exportHtml(
   // No `<` at all in a block: it only comes inside JSON strings, where its
   // `\u` escape means the same; so neither `</script>` nor `<!--` can end
   // or escape it.
-  String block(Object data) => jsonEncode(data).replaceAll('<', r'<');
+  String block(Object data) => jsonEncode(data).replaceAll('<', '\\u003c');
   final filled = {
     'TITLE': const HtmlEscape().convert('${sheet['app']}'),
     'LANG': const HtmlEscape().convert('${sheet['locale']}'),
