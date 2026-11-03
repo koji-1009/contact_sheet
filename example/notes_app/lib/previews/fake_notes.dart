@@ -23,7 +23,11 @@ class _FakeApi implements NotesApi {
   Future<void> delete(String id) async {}
 }
 
-Widget _with(Widget page, {List<Note> notes = previewNotes, bool loading = false}) {
+Widget _with(
+  Widget page, {
+  List<Note> notes = previewNotes,
+  bool loading = false,
+}) {
   final store = NotesStore(_FakeApi())
     ..notes = notes
     ..loading = loading;
@@ -41,5 +45,4 @@ Widget threeNotes(Widget page) => _with(page);
 
 Widget noNotes(Widget page) => _with(page, notes: const []);
 
-Widget loadingNotes(Widget page) =>
-    _with(page, notes: const [], loading: true);
+Widget loadingNotes(Widget page) => _with(page, notes: const [], loading: true);

@@ -13,7 +13,12 @@ Widget guestServices(Widget child) {
   return child;
 }
 
-@Preview(group: 'ログイン', name: '標準', size: Size(390, 844), wrapper: guestServices)
+@Preview(
+  group: 'ログイン',
+  name: '標準',
+  size: Size(390, 844),
+  wrapper: guestServices,
+)
 Widget signIn() => MaterialApp(
   theme: tabsTheme,
   debugShowCheckedModeBanner: false,

@@ -30,8 +30,11 @@ class NotesPage extends StatelessWidget {
                     key: ValueKey('note-${note.id}'),
                     title: Text(note.title),
                     subtitle: Text(note.body, maxLines: 1),
-                    onTap: () =>
-                        Navigator.pushNamed(context, '/note', arguments: note.id),
+                    onTap: () => Navigator.pushNamed(
+                      context,
+                      '/note',
+                      arguments: note.id,
+                    ),
                   ),
               ],
             ),

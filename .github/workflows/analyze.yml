@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: koji-1009/setup-flutter@158060745e545426c27a6e9814e5c5486a5f7dd8 # v1.4.2
       - run: dart pub get
-      - run: dart format --output=none --set-exit-if-changed lib bin tool test
+      - run: dart format --output=none --set-exit-if-changed lib bin tool test example
 
   generated:
     runs-on: ubuntu-slim

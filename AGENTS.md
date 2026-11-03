@@ -68,7 +68,7 @@ Decisions already made; do not reintroduce what they removed:
 Each on its own:
 
 ```sh
-dart format lib bin tool test
+dart format lib bin tool test example
 dart analyze
 dart test
 ```

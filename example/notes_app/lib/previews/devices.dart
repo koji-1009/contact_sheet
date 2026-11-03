@@ -15,7 +15,17 @@ final class Devices extends MultiPreview {
 
   @override
   List<Preview> get previews => [
-    Preview(group: group, name: 'Phone', size: const Size(390, 844), wrapper: wrapper),
-    Preview(group: group, name: 'Tablet', size: const Size(1180, 820), wrapper: wrapper),
+    Preview(
+      group: group,
+      name: 'Phone',
+      size: const Size(390, 844),
+      wrapper: wrapper,
+    ),
+    Preview(
+      group: group,
+      name: 'Tablet',
+      size: const Size(1180, 820),
+      wrapper: wrapper,
+    ),
   ];
 }

@@ -41,8 +41,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   Text(user),
                   const SizedBox(height: 24),
                   OutlinedButton(
-                    onPressed: () =>
-                        setState(() => Services.session.signOut()),
+                    onPressed: () => setState(() => Services.session.signOut()),
                     child: const Text('ログアウト'),
                   ),
                 ],
