@@ -344,13 +344,14 @@ class _PruneCommand extends _AppCommand {
   @override
   Future<int> runOn(SheetRepo repo) async {
     // The sheet package's runs are all Contact Sheet's; of the app's, only
-    // those an export listed and did not get to delete (the rest are the
-    // team's). Without a sheet package, shutter would take the app's.
+    // those an export listed and did not get to delete, or left half made
+    // (the rest are the team's). Without a sheet package, shutter would
+    // take the app's.
     final removed =
         (repo.sheetPubspecFile.existsSync()
             ? prune(repo.sheetDir, keep: 0).removed.length
             : 0) +
-        ExportRuns(repo).deleteAll();
+        ExportRuns(repo).deleteAll(halfMade: true);
     cli.out(m.pruneDone(removed));
     return ExitCode.success.code;
   }

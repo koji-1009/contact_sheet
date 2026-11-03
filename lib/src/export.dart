@@ -271,6 +271,8 @@ class SheetExport {
       // A run shutter stops for one file (one with no @Preview): each file
       // on its own, that one told and the others shot.
       Future<List<ShotResult>> shootFiles(List<String> files) async {
+        // So that prune finds the run, should the shot be cut short.
+        runs.shooting(dir);
         try {
           final run = await shoot(
             dir,

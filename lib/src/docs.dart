@@ -339,7 +339,7 @@ A mark is a hint: a change does not make the sheet wrong.
 
 shutter writes each shot into a run (`.dart_tool/shutter/runs/` of the project it shoots in).
 Once the images are copied into the map, the export deletes the runs it made, so the team's own runs in the app stay as they were.
-`contact_sheet prune` deletes what an interrupted export left: every run in the sheet package, and in the app only those an export listed (`contact_sheet/.dart_tool/contact_sheet/runs`).
+`contact_sheet prune` deletes what an interrupted export left: every run in the sheet package, and in the app only those an export listed (`contact_sheet/.dart_tool/contact_sheet/runs`) or left half made, cut short while shutter shot it (a run with no manifest that was not there before the export shot).
 
 ## What goes into the app's git
 

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:contact_sheet/contact_sheet.dart';
+import 'package:contact_sheet/src/runs.dart';
 import 'package:path/path.dart' as p;
 import 'package:shutter/shutter.dart';
 import 'package:test/test.dart';
@@ -230,6 +231,22 @@ void main() {
     expect(out.last, 'Deleted shutter\'s runs Contact Sheet left: 2');
     expect(package.existsSync(), isFalse);
     expect(left.existsSync(), isFalse);
+    expect(team.existsSync(), isTrue);
+
+    // A shot cut short: its run has no manifest yet. The team's own run
+    // still being shot, there before the export shot, is not Contact
+    // Sheet's.
+    final runs = '${app.path}/.dart_tool/shutter/runs';
+    final teams = Directory('$runs/20260103T000000Z')
+      ..createSync(recursive: true);
+    ExportRuns(SheetRepo(app.path)).shooting(app.path);
+    final half = Directory('$runs/20260104T000000Z')..createSync();
+    final claim = File('$runs/.20260104T000000Z')..createSync();
+    expect(await cli(['prune', app.path]), 0);
+    expect(out.last, 'Deleted shutter\'s runs Contact Sheet left: 1');
+    expect(half.existsSync(), isFalse);
+    expect(claim.existsSync(), isFalse);
+    expect(teams.existsSync(), isTrue);
     expect(team.existsSync(), isTrue);
   });
 }
