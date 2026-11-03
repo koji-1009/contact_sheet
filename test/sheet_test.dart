@@ -141,6 +141,25 @@ pages:
       () => _parse('pages: [oops'),
       _fails(startsWith('contact_sheet/sheet.yaml is not YAML')),
     );
+    // A field misspelt, or where it does not go, is not left out unread.
+    expect(
+      () => _parse('pages: [$page]\nedges: [{from: a, to: a, wehn: s}]'),
+      _fails(
+        'contact_sheet/sheet.yaml, edges[0].wehn: wehn is not a field here: '
+        'from, to, trigger, when, if, set, then, kind, tab, source',
+      ),
+    );
+    expect(
+      () => _parse('page: [$page]'),
+      _fails(startsWith('contact_sheet/sheet.yaml, sheet.yaml.page: page is')),
+    );
+    expect(
+      () => _parse(
+        'pages: [{id: a, label: A, states: [{name: s, preview: a.dart#a, '
+        'when: x}]}]',
+      ),
+      _fails(startsWith('contact_sheet/sheet.yaml, pages[0].states[0].when:')),
+    );
   });
 
   test('variants: a platform, and a Preview by its name; a preview may be '

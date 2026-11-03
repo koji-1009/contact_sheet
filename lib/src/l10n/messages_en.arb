@@ -152,6 +152,8 @@
   "fromAnywhere": "From any page",
   "sheetUnknownDependency": "{name} is not in dependencies",
   "@sheetUnknownDependency": {"placeholders": {"name": {}}},
+  "sheetUnknownField": "{field} is not a field here: {fields}",
+  "@sheetUnknownField": {"placeholders": {"field": {}, "fields": {}}},
   "sheetBadPreview": "{value} is not a preview: write <file>#<declaration>, or <file>#<declaration>@<n> for its n-th annotation (from 0)",
   "@sheetBadPreview": {"placeholders": {"value": {}}},
   "sheetBadTrigger": "{value} is not a trigger: write text:, key:, label:, type: or other: with what, or back",

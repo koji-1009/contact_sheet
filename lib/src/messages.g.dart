@@ -110,6 +110,7 @@ abstract class Messages {
   String sheetTabNotOf(Object tab, Object page);
   String get fromAnywhere;
   String sheetUnknownDependency(Object name);
+  String sheetUnknownField(Object field, Object fields);
   String sheetBadPreview(Object value);
   String sheetBadTrigger(Object value);
   String sheetBadKind(Object value);
@@ -540,6 +541,10 @@ class MessagesEn extends Messages {
   @override
   String sheetUnknownDependency(Object name) =>
       "${name} is not in dependencies";
+
+  @override
+  String sheetUnknownField(Object field, Object fields) =>
+      "${field} is not a field here: ${fields}";
 
   @override
   String sheetBadPreview(Object value) =>
@@ -1137,6 +1142,10 @@ class MessagesJa extends Messages {
 
   @override
   String sheetUnknownDependency(Object name) => "${name} が dependencies にありません";
+
+  @override
+  String sheetUnknownField(Object field, Object fields) =>
+      "${field} はここに書けるフィールドではありません: ${fields}";
 
   @override
   String sheetBadPreview(Object value) =>

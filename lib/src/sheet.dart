@@ -543,8 +543,15 @@ class _Parser {
     } on YamlException catch (e) {
       throw SheetException(m.sheetNotYaml(e.message));
     }
-    final root = yaml ?? YamlMap();
-    if (root is! YamlMap) _fail('sheet.yaml', m.sheetNotMap);
+    final root = _map(yaml ?? YamlMap(), 'sheet.yaml', const {
+      'conditions',
+      'tabs',
+      'pages',
+      'edges',
+      'entries',
+      'dependencies',
+      'variants',
+    });
     final dependencies = [
       for (final (i, d) in _list(root, 'dependencies', 'sheet.yaml').indexed)
         _dependency(d, 'dependencies[$i]'),
@@ -771,7 +778,7 @@ class _Parser {
   }
 
   SheetCondition _condition(Object? yaml, String where) {
-    final map = _map(yaml, where);
+    final map = _map(yaml, where, const {'name', 'values', 'source'});
     final values = _strings(map, 'values', where);
     if (values.isEmpty) _fail('$where.values', m.sheetNoValues);
     final seen = <String>{};
@@ -822,7 +829,7 @@ class _Parser {
       };
 
   SheetVariant _variant(Object? yaml, String where) {
-    final map = _map(yaml, where);
+    final map = _map(yaml, where, const {'name', 'platform', 'preview'});
     final platform = _optional(map, 'platform', where);
     return SheetVariant(
       name: _required(map, 'name', where),
@@ -835,7 +842,20 @@ class _Parser {
   }
 
   SheetPage _page(Object? yaml, String where, Set<String> dependencyNames) {
-    final map = _map(yaml, where);
+    final map = _map(yaml, where, const {
+      'id',
+      'label',
+      'section',
+      'widget',
+      'source',
+      'path',
+      'route',
+      'dependencies',
+      'memo',
+      'links',
+      'states',
+      'tab',
+    });
     final states = [
       for (final (i, s) in _list(map, 'states', where).indexed)
         _state(s, '$where.states[$i]'),
@@ -876,7 +896,7 @@ class _Parser {
   }
 
   SheetLink _link(Object? yaml, String where) {
-    final map = _map(yaml, where);
+    final map = _map(yaml, where, const {'label', 'url'});
     return SheetLink(
       _required(map, 'label', where),
       _required(map, 'url', where),
@@ -891,7 +911,13 @@ class _Parser {
   );
 
   SheetState _state(Object? yaml, String where) {
-    final map = _map(yaml, where);
+    final map = _map(yaml, where, const {
+      'name',
+      'preview',
+      'uses',
+      'data',
+      'if',
+    });
     final preview = _required(map, 'preview', where);
     final match = _preview.firstMatch(preview);
     if (match == null) _fail('$where.preview', m.sheetBadPreview(preview));
@@ -920,7 +946,18 @@ class _Parser {
   /// `from` names (every page, for `*`), to its `to` (each page it can be
   /// put over, for a pop without one).
   _EdgeItem _edges(Object? yaml, String where, int item) {
-    final map = _map(yaml, where);
+    final map = _map(yaml, where, const {
+      'from',
+      'to',
+      'trigger',
+      'when',
+      'if',
+      'set',
+      'then',
+      'kind',
+      'tab',
+      'source',
+    });
     final trigger = _optional(map, 'trigger', where);
     final kind = _optional(map, 'kind', where);
     // One page, a list of them (the same transition from each), or `*`.
@@ -991,7 +1028,14 @@ class _Parser {
   }
 
   SheetEntry _entry(Object? yaml, String where) {
-    final map = _map(yaml, where);
+    final map = _map(yaml, where, const {
+      'to',
+      'via',
+      'then',
+      'if',
+      'tab',
+      'source',
+    });
     return SheetEntry(
       to: _required(map, 'to', where),
       via: _required(map, 'via', where),
@@ -1003,7 +1047,7 @@ class _Parser {
   }
 
   SheetTabBar _tabBar(Object? yaml, String where) {
-    final map = _map(yaml, where);
+    final map = _map(yaml, where, const {'pages', 'retap', 'source'});
     final items = _list(map, 'pages', where);
     if (items.isEmpty) _fail(where, m.sheetMissing('pages'));
     final retap = _optional(map, 'retap', where);
@@ -1012,7 +1056,7 @@ class _Parser {
         for (final (i, item) in items.indexed)
           () {
             final at = '$where.pages[$i]';
-            final tab = _map(item, at);
+            final tab = _map(item, at, const {'page', 'trigger', 'if'});
             final trigger = _required(tab, 'trigger', at);
             return SheetTab(
               _required(tab, 'page', at),
@@ -1032,7 +1076,7 @@ class _Parser {
   }
 
   SheetDependency _dependency(Object? yaml, String where) {
-    final map = _map(yaml, where);
+    final map = _map(yaml, where, const {'name', 'target', 'source'});
     return SheetDependency(
       _required(map, 'name', where),
       target: _optional(map, 'target', where),
@@ -1040,8 +1084,17 @@ class _Parser {
     );
   }
 
-  YamlMap _map(Object? yaml, String where) =>
-      yaml is YamlMap ? yaml : _fail(where, m.sheetNotMap);
+  /// [yaml] as a map of [fields] only: a key misspelt, or put where it does
+  /// not go, is told rather than left out unread.
+  YamlMap _map(Object? yaml, String where, Set<String> fields) {
+    if (yaml is! YamlMap) _fail(where, m.sheetNotMap);
+    for (final key in yaml.keys) {
+      if (!fields.contains('$key')) {
+        _fail('$where.$key', m.sheetUnknownField('$key', fields.join(', ')));
+      }
+    }
+    return yaml;
+  }
 
   List<Object?> _list(YamlMap map, String key, String where) =>
       switch (map[key]) {
