@@ -1,4 +1,5 @@
 import 'package:contact_sheet/contact_sheet.dart';
+import 'package:contact_sheet/src/layout.dart';
 import 'package:contact_sheet/src/map.dart';
 import 'package:contact_sheet/src/svg.dart';
 import 'package:test/test.dart';
@@ -59,5 +60,46 @@ edges:
     expect(svg, contains('class="blbl"'));
     expect(svg, contains('>Home ×3</text>'));
     expect(svg, contains('<a class="page-link" href="index.html#map/home">'));
+  });
+
+  test('an arrow runs behind no page but its own two', () {
+    // A flow of four columns, a second row under it, and arrows past the
+    // columns between, forward and back, and from the row under.
+    final sheet = Sheet.parse('''
+pages:
+  - ${_page('home', '')}
+  - ${_page('a', '')}
+  - ${_page('b', '')}
+  - ${_page('c', '')}
+  - ${_page('a2', '')}
+  - ${_page('b2', '')}
+edges:
+  - {from: home, to: a, trigger: text:A}
+  - {from: a, to: b, trigger: text:B}
+  - {from: b, to: c, trigger: text:C}
+  - {from: home, to: a2, trigger: text:A2}
+  - {from: a2, to: b2, trigger: text:B2}
+  - {from: home, to: c, trigger: text:Far}
+  - {from: a2, to: c, trigger: text:Up}
+  - {from: c, to: home, trigger: text:Home, kind: go}
+  - {from: b2, to: home, trigger: text:Back, kind: go}
+''', m);
+    final layout = SheetMap(sheet, shots: const {}, m: m).layout;
+    final nodes = layout.nodes;
+    for (final edge in sheet.edges) {
+      final (a, b, c, d) = layout.curveOf(edge)!;
+      for (var i = 1; i < 64; i++) {
+        final p = MapLayout.bezier(a, b, c, d, i / 64);
+        for (final MapEntry(key: id, value: box) in nodes.entries) {
+          if (id == edge.from || id == edge.to) continue;
+          final behind =
+              p.x > box.left &&
+              p.x < box.right &&
+              p.y > box.top &&
+              p.y < box.bottom + MapLayout.labelHeight;
+          expect(behind, isFalse, reason: '${edge.key} behind $id');
+        }
+      }
+    }
   });
 }

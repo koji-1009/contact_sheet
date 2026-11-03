@@ -64,6 +64,16 @@ enum _Side { left, right, top, bottom }
 /// leaves and comes in at.
 enum _Route {
   forward(_Side.right, _Side.left),
+
+  /// Over the pages between, or under them, clear of them: from the top to
+  /// the top (the bottom to the bottom), or from the side towards the other
+  /// page into its side facing back, by the room beside the pages.
+  clearOver(_Side.top, _Side.top),
+  clearUnder(_Side.bottom, _Side.bottom),
+  laneOverRight(_Side.right, _Side.left),
+  laneUnderRight(_Side.right, _Side.left),
+  laneOverLeft(_Side.left, _Side.right),
+  laneUnderLeft(_Side.left, _Side.right),
   backFromBelow(_Side.left, _Side.bottom),
   over(_Side.top, _Side.top),
   aroundDown(_Side.right, _Side.right),
@@ -279,6 +289,7 @@ class MapLayout {
     final placed = MapLayout._(nodes, sections, width, height, sheet, bundles);
     var top = 0.0;
     var right = width;
+    var bottom = height;
     for (final e in sheet.edges) {
       final curve = placed.curveOf(e);
       if (curve == null) continue;
@@ -286,6 +297,7 @@ class MapLayout {
       final mid = bezier(s, c1, c2, end, 0.5);
       top = math.min(top, mid.y - 20);
       right = math.max(right, mid.x + margin);
+      bottom = math.max(bottom, mid.y + 20);
     }
     for (final entry in sheet.entries) {
       final (s, _) = placed.entryOf(entry);
@@ -304,7 +316,7 @@ class MapLayout {
       },
       [for (final s in sections) (name: s.name, box: s.box.shift(shift))],
       right,
-      height - top,
+      bottom - top,
       sheet,
       bundles,
     );
@@ -373,8 +385,10 @@ class MapLayout {
   /// An arrow goes right to a later column; back to an earlier one over the
   /// top, or, from lower down, from its left into the page's bottom; within
   /// a column straight to the next page, or round the side past the pages
-  /// between. The arrows at one side of a page are spread along it, in the
-  /// order of the pages at their other ends, so they do not meet in a point.
+  /// between; and where that would run behind a page, over the pages or
+  /// under them, clear. The arrows at one side of a page are spread along
+  /// it, in the order of the pages at their other ends, so they do not meet
+  /// in a point.
   late final Map<SheetEdge, Curve> _curves = () {
     final routes = <SheetEdge, _Route>{
       for (final edge in _sheet.edges)
@@ -420,12 +434,141 @@ class MapLayout {
     }
     return {
       for (final MapEntry(key: edge, value: route) in routes.entries)
-        edge: _curve(route, points[(edge, true)]!, points[(edge, false)]!),
+        edge: _curveBetween(
+          edge,
+          route,
+          points[(edge, true)]!,
+          points[(edge, false)]!,
+        ),
     };
   }();
 
-  /// How [edge] runs; null for one from a page to itself.
+  /// The routes over or under the pages between, and those of them over.
+  static const _clearing = {
+    _Route.clearOver,
+    _Route.clearUnder,
+    _Route.laneOverRight,
+    _Route.laneUnderRight,
+    _Route.laneOverLeft,
+    _Route.laneUnderLeft,
+  };
+  static const _over = {
+    _Route.clearOver,
+    _Route.laneOverRight,
+    _Route.laneOverLeft,
+  };
+
+  /// The curve of [edge] by [route] from [s] to [e]: over or under the
+  /// pages, clear of them.
+  Curve _curveBetween(SheetEdge edge, _Route route, Point s, Point e) =>
+      _clearing.contains(route)
+      ? _clearCurve(route, s, e, {edge.from, edge.to})
+      : _curve(route, s, e);
+
+  /// The curve by [route] (over or under) from [s] to [e] that runs as
+  /// near as it can and behind none of the pages but [ends], raised (or
+  /// lowered) past each it would run behind, a few times at most.
+  Curve _clearCurve(_Route route, Point s, Point e, Set<String> ends) {
+    final over = _over.contains(route);
+    var clear = over
+        ? math.min(s.y, e.y) - rowGap / 2
+        : math.max(s.y, e.y) + rowGap / 2;
+    var curve = _curve(route, s, e, clear: clear);
+    for (var i = 0; i < 8; i++) {
+      final hit = _behind(curve, ends);
+      if (hit.isEmpty) break;
+      // Past the pages it runs behind, and on by half a row at least: near
+      // its ends, where it turns, it lags behind its middle.
+      clear = over
+          ? math.min(
+              [for (final id in hit) _bodies[id]!.top].reduce(math.min) - 12,
+              clear - rowGap / 2,
+            )
+          : math.max(
+              [for (final id in hit) _bodies[id]!.bottom].reduce(math.max) + 12,
+              clear + rowGap / 2,
+            );
+      curve = _curve(route, s, e, clear: clear);
+    }
+    return curve;
+  }
+
+  /// Each page as it covers the map: its marks above, its image, its label.
+  late final Map<String, Box> _bodies = {
+    for (final MapEntry(key: id, value: box) in nodes.entries)
+      id: Box(
+        box.left,
+        box.top - marksHeight,
+        box.width,
+        marksHeight + box.height + labelHeight,
+      ),
+  };
+
+  /// The pages but [ends] that [curve] runs behind.
+  Iterable<String> _behind(Curve curve, Set<String> ends) {
+    final (a, b, c, d) = curve;
+    final line = [for (var i = 1; i < 32; i++) bezier(a, b, c, d, i / 32)];
+    return [
+      for (final MapEntry(key: id, value: box) in _bodies.entries)
+        if (!ends.contains(id) &&
+            line.any(
+              (p) =>
+                  p.x > box.left &&
+                  p.x < box.right &&
+                  p.y > box.top &&
+                  p.y < box.bottom,
+            ))
+          id,
+    ];
+  }
+
+  /// The middle of [side] of the page [id], where an arrow at it is drawn
+  /// about.
+  Point _sidePoint(String id, _Side side) {
+    final box = nodes[id]!;
+    return switch (side) {
+      _Side.left => Point(box.left, box.center.y),
+      _Side.right => Point(box.right, box.center.y),
+      _Side.top => Point(box.center.x, box.top),
+      _Side.bottom => Point(box.center.x, box.bottom + labelHeight),
+    };
+  }
+
+  /// How [edge] runs; null for one from a page to itself. As the pages lie,
+  /// unless that runs behind a page between: then over the pages or under
+  /// them, whichever runs behind the fewest.
   _Route? _routeOf(SheetEdge edge) {
+    final route = _plainRouteOf(edge);
+    if (route == null) return null;
+    final ends = {edge.from, edge.to};
+    int behind(_Route route) {
+      final s = _sidePoint(edge.from, route.from);
+      final e = _sidePoint(edge.to, route.to);
+      return _behind(
+        _clearing.contains(route)
+            ? _clearCurve(route, s, e, ends)
+            : _curve(route, s, e),
+        ends,
+      ).length;
+    }
+
+    final plain = behind(route);
+    if (plain == 0) return route;
+    final dx = nodes[edge.to]!.center.x - nodes[edge.from]!.center.x;
+    return [
+      (route, plain),
+      for (final other in [
+        if (dx > 1) ...[_Route.laneOverRight, _Route.laneUnderRight],
+        if (dx < -1) ...[_Route.laneOverLeft, _Route.laneUnderLeft],
+        _Route.clearOver,
+        _Route.clearUnder,
+      ])
+        (other, behind(other)),
+    ].reduce((a, b) => b.$2 < a.$2 ? b : a).$1;
+  }
+
+  /// How [edge] runs as its pages lie; null for one from a page to itself.
+  _Route? _plainRouteOf(SheetEdge edge) {
     if (edge.from == edge.to) return null;
     final from = nodes[edge.from]!;
     final to = nodes[edge.to]!;
@@ -451,11 +594,27 @@ class MapLayout {
     return down ? _Route.down : _Route.up;
   }
 
-  static Curve _curve(_Route route, Point s, Point e) {
+  /// The curve by [route] from [s] to [e]; over or under the pages between,
+  /// its middle at [clear].
+  static Curve _curve(_Route route, Point s, Point e, {double? clear}) {
     switch (route) {
       case _Route.forward:
         final d = (e.x - s.x) / 2;
         return (s, s + Point(d, 0), e - Point(d, 0), e);
+      case _Route.clearOver || _Route.clearUnder:
+        // A cubic's middle is an eighth of its ends and three quarters of
+        // its controls' way.
+        final y = (clear! - (s.y + e.y) / 8) / 0.75;
+        return (s, Point(s.x, y), Point(e.x, y), e);
+      case _Route.laneOverRight ||
+          _Route.laneUnderRight ||
+          _Route.laneOverLeft ||
+          _Route.laneUnderLeft:
+        // Out of the side into the room beside the page, then along.
+        final y = (clear! - (s.y + e.y) / 8) / 0.75;
+        final out =
+            (e.x - s.x).sign * math.min(columnGap / 2, (e.x - s.x).abs() / 3);
+        return (s, Point(s.x + out, y), Point(e.x - out, y), e);
       case _Route.backFromBelow:
         return (s, Point((s.x + e.x) / 2, s.y), Point(e.x, (s.y + e.y) / 2), e);
       case _Route.over:
