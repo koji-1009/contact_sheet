@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:contact_sheet/contact_sheet.dart';
 import 'package:contact_sheet/src/docs.dart';
 import 'package:test/test.dart';
 
@@ -14,4 +15,13 @@ void main() {
       expect(text, File(file).readAsStringSync());
     });
   }
+
+  test('the playbook\'s sheet is one the command reads', () {
+    final yaml = RegExp(
+      r'## Writing the sheet\n\n```yaml\n(.*?)```',
+      dotAll: true,
+    ).firstMatch(agentText)![1]!;
+    final sheet = Sheet.parse(yaml, Messages.of('en'));
+    expect(sheet.pages.map((p) => p.id), contains('product_detail'));
+  });
 }

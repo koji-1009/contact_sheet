@@ -37,7 +37,7 @@ Decisions already made; do not reintroduce what they removed:
 | `lib/src/map.dart` | The sheet with its shots: the arrows' labels, `sheet.json` |
 | `lib/src/layout.dart` | Where pages, arrows, bundles and labels go |
 | `lib/src/route.dart` | The route between two pages, as the navigator goes: what the HTML's route runs |
-| `tool/route_js.dart`, `lib/src/route_js.g.dart` | It for the HTML: compiled to JavaScript by `dart run tool/gen_route_js.dart`, with the hash of what it was compiled from |
+| `tool/route_js.dart`, `lib/src/route_js.g.dart` | It for the HTML: compiled to JavaScript by `dart run tool/gen_route_js.dart`, with the hash of what it was compiled from (`tool/route_sources.dart`: which files, and their hash) |
 | `lib/src/svg.dart`, `lib/src/html.dart` | The drawing and its palette (light and dark); `index.html`, its words from the ARB files |
 | `lib/src/runs.dart` | The runs of shutter's an export made in the app, deleted after it or by `prune` |
 | `lib/src/basis.dart`, `lib/src/process.dart` | The basis and what changed since, from git; running flutter and git |
@@ -49,6 +49,7 @@ Decisions already made; do not reintroduce what they removed:
 | `test/` | `support.dart`: flutter answered as done, git run for real; `export_test.dart` fakes shutter's `shot`; `bin_test.dart` runs the command itself |
 | `example/*_app/` | The example apps; `contact_sheet/` in each holds its sheet (and, for shop_app and tabs_app, its sheet package) |
 | `CHANGELOG.md` | What each version changed, for its users |
+| `.github/` | CI: the checks below (`analyze.yml`), the examples' maps exported and on GitHub Pages (`deploy.yml`, `pages/index.html` their top page), Dependabot for the actions |
 
 ## Rules
 

@@ -104,13 +104,13 @@ The pages whose files changed since the sheet's basis are marked for developers:
 | `contact_sheet/basis.json` | What the sheet was written against | yes |
 | `contact_sheet/pubspec.yaml`, `analysis_options.yaml`, `lib/` | The sheet package, when the app lacks previews: how those pages start in each state | yes |
 | `contact_sheet/map/` | The map | as you choose |
-| `contact_sheet/.dart_tool/` | Generated, with the sheet package's shots | no |
+| `contact_sheet/.dart_tool/` | Generated: what an export keeps between runs (in every app), and the sheet package's shots | no |
 
-`contact_sheet init --package` adds `contact_sheet/.dart_tool/` to the app's `.gitignore` unless it ignores `.dart_tool/` already.
+`contact_sheet init --package` adds `contact_sheet/.dart_tool/` to the app's `.gitignore` unless it ignores `.dart_tool/` already; without a sheet package, Flutter's `.gitignore` (`.dart_tool/`, at any depth) keeps it out.
 The app's own previews are shot in the app, the sheet package's in it; once their images are copied into `map/`, the export deletes the runs of shutter's it made, so the team's own runs in the app stay as they were.
 `contact_sheet prune` deletes any an interrupted export left.
 
-The map is mostly images: in the shop example (12 states) it is 1.1 MB, of which `images/` is 408 KB and `map.svg` and `map-dev.svg` 324 KB each, as they hold the images too.
+The map is mostly images: in the shop example (11 states, shot on a Mac) it is about 1.3 MB, of which `images/` is 350 KB, `map.svg` and `map-dev.svg` 330 KB each, as they hold the images too, and `index.html` 230 KB.
 If that is too much for the app's git, add `contact_sheet/map/` to its `.gitignore`, and export where the map is to be shared (`--out <folder>`), or have CI export it.
 
 ## Examples

@@ -6,7 +6,7 @@ import 'package:shop_app_sheet/preview/start.dart';
 
 // One page = one file = one node on the map. Each @Preview is a state of
 // the page. The preview returns the app's own router started at the page,
-// so the live page walks real transitions.
+// so the page shows as the app shows it there, over the page under it.
 
 @Preview(group: 'ホーム', name: '未ログイン', size: Size(390, 844), wrapper: guest)
 @Preview(group: 'ホーム', name: 'ログイン済み', size: Size(390, 844), wrapper: loggedIn)

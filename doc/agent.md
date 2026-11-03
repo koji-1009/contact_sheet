@@ -82,6 +82,15 @@ pages:
         preview: contact_sheet/lib/preview/login.dart#login       # the sheet package's
       - name: From home
         preview: contact_sheet/lib/preview/login.dart#loginFromHome
+  - id: product_detail                   # each page the edges name, with a state at least
+    label: Product
+    states: [{name: Standard, preview: contact_sheet/lib/preview/product.dart#product}]
+  - id: cart
+    label: Cart
+    states: [{name: Standard, preview: contact_sheet/lib/preview/cart.dart#cart}]
+  - id: checkout
+    label: Checkout
+    states: [{name: Standard, preview: contact_sheet/lib/preview/checkout.dart#checkout}]
 edges:
   - from: home
     to: product_detail

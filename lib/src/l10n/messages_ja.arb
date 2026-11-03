@@ -9,7 +9,7 @@
   "descManual": "AI エージェント向けの参照を出す: sheet の各項目・地図・撮影結果・終了コード",
   "descInit": "空の sheet（contact_sheet/sheet.yaml）を書く",
   "helpPackage": "アプリにない Preview を置く sheet パッケージの雛形も書く",
-  "descExport": "sheet が指す Preview を shutter で撮り、地図（index.html・map.svg・sheet.json・images/）を contact_sheet/map/ に書き出す",
+  "descExport": "sheet が指す Preview を shutter で撮り、地図（index.html・map.svg・map-dev.svg・sheet.json・images/）を contact_sheet/map/ に書き出す",
   "helpOut": "代わりにこのフォルダの中の <app>_contact_sheet/ に書き出す",
   "helpOnly": "この画面の Preview だけを撮る（画面ごとに繰り返し指定できる）。他の画面は、書き出し先の地図にある画像を使う",
   "helpLocale": "地図の言語（省略時はこの機械の言語）",
@@ -105,7 +105,7 @@
   "sheetUnknownDependency": "{name} が dependencies にありません",
   "sheetPreviewPath": "{file}: ファイルはアプリからの相対パスで、/ で区切り、./ や ../ を使わずに書きます（lib/preview/home.dart、contact_sheet/lib/preview/home.dart）",
   "sheetUnknownField": "{field} はここに書けるフィールドではありません: {fields}",
-  "sheetBadPreview": "{value} は Preview の指定になっていません: <ファイル>#<宣言>、その宣言の n 番目（0 から）の注釈なら <ファイル>#<宣言>@<n> と書きます",
+  "sheetBadPreview": "{value} は Preview の指定になっていません: <ファイル>#<宣言>、その宣言の n 番目（0 から）の注釈なら <ファイル>#<宣言>@<n>、MultiPreview が作る k 番目の Preview なら @<n>.<k> と書きます",
   "sheetBadTrigger": "{value} は操作の指定になっていません: text:・key:・label:・type:・other: に続けて対象を書くか、back と書きます",
   "sheetBadKind": "{value} は移動の種類ではありません: push・go・replace・pop・redirect のどれかです",
 

@@ -60,7 +60,7 @@ A state:
 | Field | | What |
 | --- | --- | --- |
 | `from` | required | A page id, or a list of them (`[feed, search]`): the same transition from each, as the bottom tabs or a button in each page's app bar; or `'*'`: from every page but `to`, as a session that expires anywhere (with `if`, not `when`), drawn once, from outside |
-| `to` | required | A page id. A `pop` may leave it out: back to the page under it, whichever opened it (`text:Save` on a form opened from several pages), an edge to each page it can be put over |
+| `to` | required | A page id. A `pop` may leave it out (not from `'*'`): back to the page under it, whichever opened it (`text:Save` on a form opened from several pages), an edge to each page it can be put over |
 | `trigger` | | What the user does: `text:` a `Text`, `label:` a semantics label, `key:` a `ValueKey<String>`, `type:` a widget class (as shutter names a target), `back` (the app bar's back or the system's), or `other:<what>` for anything else (a swipe, a timer). None when nothing does: the router alone |
 | `when` | | The states of `from` it happens in: one, or a list (`[Guest, Member]`); none: any. With a list of `from`s, a state each of them has |
 | `if` | | The values of the `conditions` it happens while, whatever `from` shows: `{Login: Guest}`, or a list of values (`{Login: [Guest, Banned]}`); a condition not named: any. Two edges for one action that leads apart by a condition (a redirect for a guest) each say theirs |
@@ -104,7 +104,7 @@ Switching tabs is not written as an edge: the bar does it, from every page shown
 
 | Field | | What |
 | --- | --- | --- |
-| `pages` | required | Its tabs, in order: `page`, the tab's first page; `trigger`, what switches to it, in the screen's words; `if`, the values of the conditions it can be switched to while |
+| `pages` | required | Its tabs, in order: `page`, the tab's first page; `trigger` (required), what switches to it, in the screen's words; `if`, the values of the conditions it can be switched to while |
 | `retap` | | `first`: tapping the tab shown again goes back to its first page; `stay` (the default): it does nothing |
 | `source` | | Where the app declares it |
 
@@ -162,7 +162,7 @@ Each export replaces `images/`.
 
 The layout: each section is an island of its own. In it, the flow runs left to right from where it comes in (the first page, an arrow from another section, a deep link, in that order); the pages nothing in the section leads to are a row under the rest. The islands are laid in rows. Three or more arrows from other sections into one page that say the same (and all go back, dashed, or none) are drawn as one short arrow into it, `<label> ×<n>`; those from every page always, `<label> From any page`. A tab's first page has its bar drawn under it, its own tab lit; the first pages of one bar's tabs stand in one column.
 - `sheet.json`: what they are drawn from, for other tools and AI agents.
-- `images/`: each state's shot, named by its shot id (`sheet-` before it for the sheet package's).
+- `images/`: each state's shot, named by its shot id (`sheet-` before it for the sheet package's, then `android-` for an Android variant's).
 
 A state shutter could not draw has no image: its error is told by the command and shown in the HTML (`error` in `sheet.json`); so is one whose preview file does not exist, is not under `lib/`, or has no `@Preview`.
 The export goes on for the rest.
@@ -173,7 +173,7 @@ The export goes on for the rest.
 Top level: `app`, `locale`, `generatedAt`, `conditions` (`name`, `values`, `source`), `tabs` (each `pages`, with `page`, `trigger` and `if`; `retap`, `first` or `stay`; `source`), `variants` (`name`, `platform`, `preview`; one, unnamed, when the sheet names none), `release` (`version`, the app's pubspec's; `commit` and `branch`, where git knows them), `basis` (when there is one: `commit`, `found`, `changed`, `unmapped`: what changed in `lib/` that the sheet names for no page, nor as a preview), `canvas` (`width`, `height`, `labelHeight`), `sections` (`name` and its island's box), `pages`, `edges`, `entries`, `bundles`.
 
 - A page: the sheet's fields (`tab` a list, empty for none), its `dependencies` in full, `sheetChanged` (its files changed since the basis), its box (`x`, `y`, `width`, `height`; its label is the bottom `labelHeight` of it), and `states`: `name`, `preview`, `project` (`app` or `sheet`, the sheet package), `uses`, `data`, `if` (`{}` for none), and as the first variant draws it, `shot` (shutter's id), `width`, `height`, `image` (relative to `sheet.json`, or null), `error` (or null); `variants`: those five in each variant, in order.
-- An edge: `key`, which transition it is, the same from one export to the next while its pages, trigger, `when`, `if` and kind stay (`home>cart label:Cart push`, `cart>checkout text:Buy [Full] {Login=Member} push`; ` #2` after one written twice); the sheet's fields, one edge for each page a list of `from`s names (every page for `'*'`; `anywhere` true then) and, for a pop without `to`, for each page it can be over (`under` true); `item`, its place in the sheet's `edges` (`when` a list, empty for any state; `if` a list of values by condition, `{}` for none; `set`, `{}` for none; `tab` or null; `then` as written: a state, a map by the state it leaves, or null); `arrive`, the states of `to` it can arrive in from each state of `from` it happens in, under any values of the conditions it can happen while (one where said or kept by its name; else `to`'s first, its `data` states and its states of the conditions, those the values allow; empty for a state it cannot happen in); `label` (as a developer reads it), its three parts in order (`labelCode`: what only the code names; `labelPlain`: what anyone reads; `labelKind`: `go` or `replace`), and either `curve` (a cubic Bézier's 4 points, flattened) and `labelAt`, or `bundle`: the bundle it is drawn in.
+- An edge: `key`, which transition it is, the same from one export to the next while its pages, trigger, `when`, `if` and kind stay (`home>cart label:Cart push`, `cart>checkout text:Buy [Full] {Login=Member} push`; ` #2` after one written twice); the sheet's fields, one edge for each page a list of `from`s names (every page for `'*'`; `anywhere` true then) and, for a pop without `to`, for each page it can be over (`under` true); `item`, its place in the sheet's `edges` (`when` a list, empty for any state; `if` a list of values by condition, `{}` for none; `set`, `{}` for none; `tab` or null; `then` as written: a state, a map by the state it leaves, or null); `arrive`, the states of `to` it can arrive in from each state of `from` its `when` names (all, without one), under any values of the conditions it can happen while (one where said or kept by its name; else `to`'s first, its `data` states and its states of the conditions, those the values allow; a pop back to the page under it, in the state that page can be in there; empty for a state no values let it happen in); `label` (as a developer reads it), its three parts in order (`labelCode`: what only the code names; `labelPlain`: what anyone reads; `labelKind`: `go` or `replace`), and either `curve` (a cubic Bézier's 4 points, flattened) and `labelAt`, or `bundle`: the bundle it is drawn in; neither for an edge from a page to itself, which is not drawn.
 - An entry: `key` (`product_detail</products/:id`, then its `if` as an edge's), the sheet's fields (`then` or null; `if`, `{}` for none; `tab` or null), `line` (2 points, flattened) and `labelAt`.
 - A bundle: `to`, `edges` (their places in `edges`), `label`, `line` and `labelAt`.
 
@@ -226,3 +226,14 @@ Once the images are copied into the map, the export deletes the runs it made, so
 
 Each but `agent` and `manual` runs on the app directory given last, the current one by default.
 `contact_sheet help <command>` tells a command's options; `--version`, the version.
+
+## What `lint` tells
+
+Hints, not errors, each saying what to look at; `export` tells them too.
+
+- Pages: one no arrow leads to from the first page and no deep link opens; the first page with no state of the conditions' first values.
+- States: one none of the page's arrows leaves from; one nothing arrives in (not `data`); two of the same values of the conditions; a page with no state of some values.
+- Edges: one written twice; one written again in other states (one edge, `when` both's, `then` by the state it leaves); a `when` state of other values than the `if`; an `if` no way through the app meets there.
+- Conditions: a value nothing names; one nothing gives, not the first.
+- Deep links: one written twice.
+- Tabs: a bar of one tab; an edge between two tabs of a bar (the bar switches them); a page opened from a tab it is not shown in, or from over the bar; a go or a deep link to a page in several tabs that names none.

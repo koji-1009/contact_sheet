@@ -246,7 +246,7 @@ class MessagesEn extends Messages {
 
   @override
   String get descExport =>
-      "Shoot the previews the sheet names with shutter and write the map into contact_sheet/map/ (index.html, map.svg, sheet.json, images/).";
+      "Shoot the previews the sheet names with shutter and write the map into contact_sheet/map/ (index.html, map.svg, map-dev.svg, sheet.json, images/).";
 
   @override
   String get helpOut =>
@@ -578,7 +578,7 @@ class MessagesEn extends Messages {
 
   @override
   String sheetBadPreview(Object value) =>
-      "${value} is not a preview: write <file>#<declaration>, or <file>#<declaration>@<n> for its n-th annotation (from 0)";
+      "${value} is not a preview: write <file>#<declaration>, <file>#<declaration>@<n> for its n-th annotation (from 0), or @<n>.<k> for the k-th Preview a MultiPreview gives";
 
   @override
   String sheetBadTrigger(Object value) =>
@@ -890,7 +890,7 @@ class MessagesJa extends Messages {
 
   @override
   String get descExport =>
-      "sheet が指す Preview を shutter で撮り、地図（index.html・map.svg・sheet.json・images/）を contact_sheet/map/ に書き出す";
+      "sheet が指す Preview を shutter で撮り、地図（index.html・map.svg・map-dev.svg・sheet.json・images/）を contact_sheet/map/ に書き出す";
 
   @override
   String get helpOut => "代わりにこのフォルダの中の <app>_contact_sheet/ に書き出す";
@@ -1207,7 +1207,7 @@ class MessagesJa extends Messages {
 
   @override
   String sheetBadPreview(Object value) =>
-      "${value} は Preview の指定になっていません: <ファイル>#<宣言>、その宣言の n 番目（0 から）の注釈なら <ファイル>#<宣言>@<n> と書きます";
+      "${value} は Preview の指定になっていません: <ファイル>#<宣言>、その宣言の n 番目（0 から）の注釈なら <ファイル>#<宣言>@<n>、MultiPreview が作る k 番目の Preview なら @<n>.<k> と書きます";
 
   @override
   String sheetBadTrigger(Object value) =>
