@@ -100,7 +100,7 @@ States name the values they are of (`if`), edges the values they happen while (`
 ### `tabs`
 
 Tab bars whose tabs each keep their own history: go_router's `StatefulShellRoute`, a `UITabBarController` with a navigation controller in each tab. A bar that switches pages in place and keeps no history is not one: write its tabs as edges with `kind: replace`.
-Switching tabs is not written as an edge: the bar does it, from every page shown in its tabs, and finds each tab as it was left (at its first page, the first time). A page pushed from a page in a tab, and shown in that tab (its `tab`), goes on that tab's history; one that is not goes over the whole bar, which does not switch until it is gone. A `go` to a page in a tab opens it alone in that tab's history, the other tabs as they were; a `go` elsewhere leaves the bar.
+Switching tabs is not written as an edge: the bar does it, from every page shown in its tabs, and finds each tab as it was left (at its first page, the first time). A page pushed from a page in a tab, and shown in that tab (its `tab`), goes on that tab's history; one that is not goes over the whole bar, which does not switch until it is gone. A `replace` by a page not shown in the tab goes over the bar too, the tab's page kept under it. A `pop` that lands on another page than the one under it takes that page's place, in the tab's history if that page was in it, whichever page it is. A `go` to a page in a tab opens it alone in that tab's history, the other tabs as they were; a `go` elsewhere leaves the bar.
 
 | Field | | What |
 | --- | --- | --- |

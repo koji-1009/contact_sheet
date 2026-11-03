@@ -450,6 +450,153 @@ edges:
     expect(route.bounded, isFalse);
   });
 
+  group('past a tab\'s bound, the navigator goes as within it', () {
+    RoutePage page(String id, {List<String> tabs = const []}) =>
+        RoutePage(id, [const RouteState('s')], tabs: tabs);
+    final bars = [
+      const RouteTabBar([RouteTab('feed'), RouteTab('search')]),
+    ];
+    // Three pages deep in the feed tab.
+    final pages = [
+      page('feed'),
+      page('search'),
+      page('a', tabs: ['feed']),
+      page('b', tabs: ['feed']),
+      page('c', tabs: ['feed']),
+      page('sheet'),
+      page('x'),
+    ];
+    const deep = [
+      RouteEdge(from: 'feed', to: 'a', move: RouteMove.push),
+      RouteEdge(from: 'a', to: 'b', move: RouteMove.push),
+      RouteEdge(from: 'b', to: 'c', move: RouteMove.push),
+    ];
+    List<String> said(Route route) => [
+      route.start.map((f) => f.page).join(' '),
+      for (final s in route.steps ?? const <RouteStep>[])
+        '${s.edge ?? s.move} => ${s.to.page}',
+    ];
+
+    test('a go to another tab, from a page over the tab\'s history, keeps '
+        'it: past the bound, it is not taken', () {
+      const edges = [
+        ...deep,
+        RouteEdge(from: 'c', to: 'sheet', move: RouteMove.push),
+        RouteEdge(from: 'sheet', to: 'search', move: RouteMove.reset),
+        // The sheet's back asks first: it does not go back.
+        RouteEdge(
+          from: 'sheet',
+          to: 'sheet',
+          move: RouteMove.replace,
+          back: true,
+        ),
+      ];
+      final within = Router(pages, edges, tabBars: bars, tabDepth: 4);
+      expect(said(within.route('sheet', null, 'b')), [
+        'feed a b c sheet',
+        '4 => search',
+        'switch => c',
+        'back => b',
+      ]);
+      // The switch back shows c, not b: past the bound, none is found, and
+      // the route says one might be.
+      final past = Router(pages, edges, tabBars: bars);
+      final route = past.route('sheet', null, 'b');
+      expect(route.steps, isNull);
+      expect(route.bounded, isTrue);
+    });
+
+    test('a replace by a page not in the tab puts it over the bar, the '
+        'tab\'s top kept', () {
+      const edges = [
+        ...deep,
+        RouteEdge(from: 'c', to: 'sheet', move: RouteMove.replace),
+      ];
+      for (final depth in [2, 3, 4, 5]) {
+        final router = Router(pages, edges, tabBars: bars, tabDepth: depth);
+        expect(said(router.route('sheet', null, 'b')), [
+          'feed a b c sheet',
+          'back => c',
+          'back => b',
+        ], reason: 'depth $depth');
+      }
+    });
+
+    test('a pop to another page than the one under it lands in the tab\'s '
+        'history, whichever page', () {
+      const edges = [
+        ...deep,
+        RouteEdge(from: 'c', to: 'sheet', move: RouteMove.push),
+        RouteEdge(from: 'sheet', to: 'x', move: RouteMove.pop),
+      ];
+      for (final depth in [2, 3, 4, 5]) {
+        final router = Router(pages, edges, tabBars: bars, tabDepth: depth);
+        expect(said(router.route('x', null, 'search')), [
+          'feed a b x',
+          'switch => search',
+        ], reason: 'depth $depth');
+        expect(said(router.route('x', null, 'b')), [
+          'feed a b x',
+          'back => b',
+        ], reason: 'depth $depth');
+      }
+    });
+
+    test('a start the app\'s launch reaches only past the bound says so', () {
+      final router = Router(
+        [
+          ...pages.take(5),
+          page('t', tabs: ['search']),
+        ],
+        const [
+          ...deep,
+          RouteEdge(
+            from: 'c',
+            to: 'c',
+            move: RouteMove.replace,
+            sets: {'Login': 'Member'},
+          ),
+          // c's back asks first, and nothing on c goes back.
+          RouteEdge(from: 'c', to: 'c', move: RouteMove.replace, back: true),
+          RouteEdge(
+            from: 'search',
+            to: 't',
+            move: RouteMove.push,
+            guard: {
+              'Login': ['Member'],
+            },
+          ),
+        ],
+        tabBars: bars,
+        conditions: const [
+          RouteCondition('Login', ['Guest', 'Member']),
+        ],
+      );
+      // Signing in is past the bound: within it, t starts alone.
+      expect(router.route('t', null, 'feed').bounded, isTrue);
+      expect(router.route('t', null, 'search').bounded, isTrue);
+    });
+  });
+
+  test('a pop back to the page under it arrives in the state that page is '
+      'in there', () {
+    final router = Router(
+      const [
+        RoutePage('list', [RouteState('A'), RouteState('B')]),
+        RoutePage('edit', [RouteState('s')]),
+      ],
+      const [
+        RouteEdge(from: 'list', to: 'list', move: RouteMove.replace, then: 'B'),
+        // Only in B does the list open the editor.
+        RouteEdge(from: 'list', to: 'edit', move: RouteMove.push, when: ['B']),
+        RouteEdge(from: 'edit', to: 'list', move: RouteMove.pop, under: true),
+      ],
+    );
+    expect(router.arrivals(2), {
+      's': ['B'],
+    });
+  });
+
   test('a page the app\'s start does not reach starts alone', () {
     final sheet = Sheet.parse('''
 pages:
@@ -528,7 +675,7 @@ edges:
       // a tab is left only within the bound); none found is none, unless the
       // route says one past the bound might be.
       const limit = 6;
-      for (var seed = 1; seed <= 10; seed++) {
+      for (var seed = 1; seed <= 30; seed++) {
         final sheet = _random(Random(seed), tabs: true);
         for (final depth in [1, 2, 3]) {
           final router = Router(
@@ -863,14 +1010,19 @@ Map<String, int> _searched(
               } else {
                 add((shell: shell, above: [(frame: f, tab: null)], g: after));
               }
+            // Past the bound as within it: a page not in the tab, over it.
+            case RouteMove.replace
+                when above.last.tab != null && !inTab(f.page, above.last.tab!):
+              add((
+                shell: shell,
+                above: [...above, (frame: f, tab: null)],
+                g: after,
+              ));
             case RouteMove.replace:
               final t = above.last.tab;
               add((
                 shell: shell,
-                above: [
-                  ...above.take(above.length - 1),
-                  (frame: f, tab: t != null && inTab(f.page, t) ? t : null),
-                ],
+                above: [...above.take(above.length - 1), (frame: f, tab: t)],
                 g: after,
               ));
             case RouteMove.reset:
@@ -878,8 +1030,9 @@ Map<String, int> _searched(
               if (t == null) {
                 add((shell: null, above: [(frame: f, tab: null)], g: after));
               } else if (shell != null && barOf[t] == barOf[shell.active]) {
-                // Past the bound, the tab shown is not left for another.
-                if (!onShell && above.last.tab != null && t != shell.active) {
+                // Past the bound, the tab shown is not left for another,
+                // from its history or over it.
+                if (above.any((a) => a.tab != null) && t != shell.active) {
                   continue;
                 }
                 add(withStack([f], after, active: t));
@@ -921,15 +1074,10 @@ Map<String, int> _searched(
       } else if (above.length >= 2) {
         final b = above[above.length - 2];
         below = b.frame;
+        // In the tab's history past the bound, whichever page.
         landed = (f, g2) => (
           shell: shell,
-          above: [
-            ...above.take(above.length - 2),
-            (
-              frame: f,
-              tab: b.tab != null && inTab(f.page, b.tab!) ? b.tab : null,
-            ),
-          ],
+          above: [...above.take(above.length - 2), (frame: f, tab: b.tab)],
           g: g2,
         );
       } else if (shell != null) {

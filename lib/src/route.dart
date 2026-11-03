@@ -382,11 +382,24 @@ class Router {
         _decided.add(i == 0 || s.data || s.conditions.isNotEmpty);
       }
     }
-    // A page's frames in each tab it is shown in, past the bound.
+    // A page's frames in each tab it is shown in, past the bound; a page a
+    // pop lands on in place of the page under it takes that page's place in
+    // its tab's history, whichever tab, so it has a frame in each.
+    final landed = {
+      for (final e in edges)
+        if (e.move == RouteMove.pop && !e.under) e.to,
+    };
     final canonical = _frames.length;
     for (var f = 0; f < canonical; f++) {
       final page = _frames[f].page;
-      for (final t in [?_rootTab[page], ..._inTabs[page]!]) {
+      final tabs = {
+        ?_rootTab[page],
+        ..._inTabs[page]!,
+        if (landed.contains(page))
+          for (var t = 0; t < _tabRoots.length; t++) t,
+      };
+      _deepTabs.add(tabs.toList());
+      for (final t in tabs) {
         _deep[(f, t)] = _frames.length;
         _addFrame(_frames[f], t, f);
         _requires.add(_requires[f]);
@@ -483,6 +496,9 @@ class Router {
   final _frameTab = <int?>[];
   final _canon = <int>[];
   final _deep = <(int, int), int>{};
+
+  /// For each canonical frame, the tabs it has a frame in past the bound.
+  final _deepTabs = <List<int>>[];
   final _ids = <String, int>{};
   final _pageFrames = <String, List<int>>{};
 
@@ -689,13 +705,22 @@ class Router {
 
   /// [h], of a canonical frame, put where [like]'s frame is (not a shell):
   /// in the same tab's history past the bound when [like] is and [h]'s page
-  /// is shown in that tab; else over the bar.
-  int _keep(int like, int h) {
+  /// is shown in that tab, or [landing] in [like]'s place (as a pop lands
+  /// in the tab's history within the bound, whatever the page); else over
+  /// the bar.
+  int _keep(int like, int h, {bool landing = false}) {
     final t = _frameTab[_frameOf(like)];
     final f = _frameOf(h);
-    if (t == null || !_inTab(_frames[f].page, t)) return h;
-    return _node(_deep[(f, t)]!, _gOf(h));
+    if (t == null || (!landing && !_inTab(_frames[f].page, t))) return h;
+    final deep = _deep[(f, t)];
+    return deep == null ? h : _node(deep, _gOf(h));
   }
+
+  /// Whether a replace from [f] by which [h] arrives puts [h] over the bar
+  /// instead: [f] in a tab's history past the bound, [h] not shown in it
+  /// (as within the bound, the tab's top stays).
+  bool _overBar(int f, int h) =>
+      _frameTab[_frameOf(f)] != null && _frameTab[_frameOf(h)] == null;
 
   /// The nodes that take [below]'s place (its frame read; the conditions
   /// are the top's) when [top] is taken off by the pop [j] (null: the
@@ -712,7 +737,10 @@ class Router {
           ], _gOf(l)),
       ];
     }
-    return [for (final l in _landOn(_frameOf(below), top, j)) _keep(below, l)];
+    return [
+      for (final l in _landOn(_frameOf(below), top, j))
+        _keep(below, l, landing: true),
+    ];
   }
 
   /// The nodes, of canonical frames, landed on in place of the frame
@@ -996,7 +1024,7 @@ class Router {
         }
         // A page of a tab, past the bound in it: tapping it again, and a
         // switch, from here and back to here.
-        final tabs = [?_rootTab[page], ..._inTabs[page]!];
+        final tabs = _deepTabs[f];
         for (final t in tabs) {
           if (tabBars[_tabBar[t]].retapFirst && _guarded(_tabGuards[t], g)) {
             for (final x in _unsaid(_tabRoots[t], g)) {
@@ -1005,7 +1033,9 @@ class Router {
           }
           leaveDeep(t, f);
         }
-        if (tabs.isNotEmpty) switches(id, -1, _tabBar[tabs.first], g);
+        for (final bar in {for (final t in tabs) _tabBar[t]}) {
+          switches(id, -1, bar, g);
+        }
         // Its pops landing on the tab states under it.
         for (final under in _over[page] ?? const <String>{}) {
           (byUnder[under] ??= []).add(id);
@@ -1172,7 +1202,7 @@ class Router {
         if (move == RouteMove.pop || move == RouteMove.reset) continue;
         for (final arrived in _arrive(i, f)) {
           final h = _keep(f, arrived);
-          if (move == RouteMove.replace) {
+          if (move == RouteMove.replace && !_overBar(f, h)) {
             relax(d + 1, g, h, _Via(f, edge: i));
             continue;
           }
@@ -1216,6 +1246,17 @@ class Router {
     final heap = _Heap<(int, _At, _At?, _Hop?)>();
     final seen = <_At, (_At?, _Hop?)>{};
     int? deep;
+    // Whether [stack]'s first k frames hold one past a tab's bound.
+    final pastUnder = [false];
+    for (final n in stack) {
+      pastUnder.add(pastUnder.last || _frameTab[_frameOf(n)] != null);
+    }
+    // Whether the tab shown's history goes on past the bound at [f], at k:
+    // [f] is in it, or is over a frame that is.
+    bool past(int f, int k) =>
+        _frameTab[_frameOf(f)] != null ||
+        k == _abovePast ||
+        (k > 0 && pastUnder[k]);
     void relax(int d, int f, int k, int ctx, _At at, _Hop how) {
       if (_isShell(f)) ctx = f;
       final left = bound(f);
@@ -1265,15 +1306,17 @@ class Router {
         continue;
       }
       final tab = _frameTab[_frameOf(f)];
+      final isPast = past(f, k);
       for (final i in _outs(f)) {
         final move = edges[i].move;
         if (move == RouteMove.pop) continue;
         for (final arrived in _arrive(i, f)) {
           if (move == RouteMove.reset) {
             // Past the bound, the tab shown is not left by a go to another
-            // tab of its bar: its history would have to be kept.
+            // tab of its bar, from a page in its history or over it: that
+            // history would have to be kept.
             final to = _startAt(arrived, ctx, named: edges[i].tab);
-            if (tab != null &&
+            if (isPast &&
                 _isShell(to) &&
                 _shellAt(to).bar == _shellAt(ctx).bar &&
                 _shellAt(to).active != _shellAt(ctx).active) {
@@ -1284,10 +1327,10 @@ class Router {
             continue;
           }
           final h = _keep(f, arrived);
-          if (move == RouteMove.replace) {
+          if (move == RouteMove.replace && !_overBar(f, h)) {
             relax(d + 1, h, k, ctx, at, _Step(_Op.replace, i, h));
           } else {
-            _push(d, at, i, h, relax);
+            _push(d, at, i, h, relax, past: isPast);
           }
         }
       }
@@ -1323,17 +1366,19 @@ class Router {
   }
 
   /// From [at] after [d]: the push by [i] of [h], and each summary of it
-  /// left again.
+  /// left again; [past]: from a page in a tab's history past the bound, or
+  /// over one.
   void _push(
     int d,
     _At at,
     int i,
     int h,
-    void Function(int, int, int, int, _At, _Hop) relax,
-  ) {
+    void Function(int, int, int, int, _At, _Hop) relax, {
+    bool past = false,
+  }) {
     final (f, k, ctx) = at;
     final dist = _summaries.dist;
-    relax(d + 1, h, -1, ctx, at, _Step(_Op.push, i, h));
+    relax(d + 1, h, past ? _abovePast : -1, ctx, at, _Step(_Op.push, i, h));
     for (final MapEntry(key: x, value: dh) in dist[h].entries) {
       for (final j in _pops(x)) {
         for (final f2 in _land(f, x, j)) {
@@ -1592,8 +1637,10 @@ class Router {
   /// from the app's launch reach it with, in [state] when it has one of
   /// that name, under the conditions' values [chosen] names; a page the
   /// launch does not reach so, alone (in its tab, if it is in one), under
-  /// the launch's values but those [chosen] and its state name.
-  (List<int>, bool) _start(
+  /// the launch's values but those [chosen] and its state name. With it,
+  /// whether the search stopped short, and whether a switch from past a
+  /// tab's bound might have reached it.
+  (List<int>, bool, bool) _start(
     String from,
     String? state,
     Map<String, String> chosen,
@@ -1608,11 +1655,12 @@ class Router {
         chosen,
       );
 
-  /// The starts found, by page, state and values, and whether their search
-  /// stopped short: one for every route from them.
-  final _starts = <String, (List<int>, bool)>{};
+  /// The starts found, by page, state and values, whether their search
+  /// stopped short, and whether it went past a tab's bound: one for every
+  /// route from them.
+  final _starts = <String, (List<int>, bool, bool)>{};
 
-  (List<int>, bool) _startOf(
+  (List<int>, bool, bool) _startOf(
     String from,
     String? state,
     Map<String, String> chosen,
@@ -1620,21 +1668,30 @@ class Router {
     final named = state == null ? null : _frame(from, state);
     final want = _values(chosen);
     final launch = [_launch];
-    final (steps, _, short, searched) = _search(launch, (n) {
+    final (steps, deep, short, searched) = _search(launch, (n) {
       final f = _canon[_frameOf(n)];
       return _frames[f].page == from &&
           (named == null || f == named) &&
           _holds(want, _gOf(n));
     });
-    if (steps != null) return (_replay(searched, steps).$1, false);
+    if (steps != null) return (_replay(searched, steps).$1, false, false);
+    // Not reached within the bound: alone, unless a switch from past it
+    // might have reached it.
+    final bounded = deep != null;
     final g = _apply(want, 0);
     if (named != null) {
-      return ([_startAt(_node(named, _apply(_requires[named], g)), -1)], short);
+      return (
+        [_startAt(_node(named, _apply(_requires[named], g)), -1)],
+        short,
+        bounded,
+      );
     }
     final unsaid = _unsaid(from, g);
-    if (unsaid.isNotEmpty) return ([_startAt(unsaid.first, -1)], short);
+    if (unsaid.isNotEmpty) {
+      return ([_startAt(unsaid.first, -1)], short, bounded);
+    }
     final f = _pageFrames[from]!.first;
-    return ([_startAt(_node(f, _apply(_requires[f], g)), -1)], short);
+    return ([_startAt(_node(f, _apply(_requires[f], g)), -1)], short, bounded);
   }
 
   /// The frames [stack] holds, bottom first: a shell's tab shown's history.
@@ -1663,7 +1720,7 @@ class Router {
     String to, [
     Map<String, String> valuation = const {},
   ]) {
-    final (started, startShort) = _start(from, state, valuation);
+    final (started, startShort, startBounded) = _start(from, state, valuation);
     final (steps, deep, short, stack) = from == to
         ? (<_Step>[], null, false, started)
         : _search(started, (n) => _frames[_frameOf(n)].page == to);
@@ -1682,7 +1739,11 @@ class Router {
               frames: [for (final f in shell.stacks[_tabPos[t]]) _frames[f]],
             ),
     ];
-    final bounded = deep != null && (steps == null || deep < steps.length);
+    // Past a tab's bound, a switch might have made it shorter, or have
+    // reached the start some other way.
+    final bounded =
+        startBounded ||
+        (deep != null && (steps == null || deep < steps.length));
     if (steps == null) {
       return Route(
         start,
@@ -1728,18 +1789,60 @@ class Router {
   /// its `from` it leaves (those its `when` names, else all), under any
   /// values of the conditions it can happen while; empty for a state no
   /// such values allow.
+  ///
+  /// A pop back to the page under it lands as the route does: in the state
+  /// that page can be in under it, unless the pop or the conditions say
+  /// another; a pop that names its page may land elsewhere too.
   Map<String, List<String>> arrivals(int i) {
     final e = edges[i];
+    List<int> arriving(int node) {
+      if (e.move != RouteMove.pop) return _arrive(i, node);
+      return [
+        for (final u in _overFrames[e.from] ?? const <int>{})
+          if (_frames[u].page == e.to) ..._landOn(u, node, i),
+        if (!e.under) ..._arrive(i, node),
+      ];
+    }
+
     return {
       for (final f in _pageFrames[e.from] ?? const <int>[])
         if (e.can(_frames[f].state))
           _frames[f].state: _states([
             for (var g = 0; g < _valuations; g++)
               if (_holds(_requires[f], g) && _guarded(_guards[i], g))
-                ..._arrive(i, _node(f, g)),
+                ...arriving(_node(f, g)),
           ]),
     };
   }
+
+  /// The frames each page can be put over, as [_over] has their pages: of
+  /// a push's, the states it happens in.
+  late final Map<String, Set<int>> _overFrames = () {
+    final over = <String, Set<int>>{};
+    List<int> leaving(RouteEdge e) => [
+      for (final f in _pageFrames[e.from] ?? const <int>[])
+        if (e.can(_frames[f].state)) f,
+    ];
+    for (var grew = true; grew;) {
+      grew = false;
+      for (final e in edges) {
+        final under = switch (e.move) {
+          RouteMove.push => {...leaving(e)},
+          RouteMove.replace => {...leaving(e), ...?over[e.from]},
+          RouteMove.pop when !e.under => {
+            for (final b in over[e.from] ?? const <int>{})
+              ...?over[_frames[b].page],
+          },
+          _ => const <int>{},
+        };
+        final known = over[e.to] ??= {};
+        for (final f in under) {
+          if (known.add(f)) grew = true;
+        }
+      }
+    }
+    return over;
+  }();
 
   /// The states [page] can open in from outside the app (a deep link): the
   /// one [then] names, else those nothing says under any values the
@@ -1816,9 +1919,14 @@ class Router {
 typedef _Summaries = ({List<Map<int, int>> dist, List<Map<int, _Via?>> pred});
 
 /// A node of the search: the top, how many of the start's frames are under
-/// it (-1: a level pushed and not left again), and the shell at the bottom
-/// (-1 for none).
+/// it (-1: a level pushed and not left again; [_abovePast], such a level
+/// over a page in a tab's history past the bound), and the shell at the
+/// bottom (-1 for none).
 typedef _At = (int, int, int);
+
+/// A level pushed and not left again over a page in a tab's history past
+/// the bound: the tab shown is not left from it for another (see [_At]).
+const _abovePast = -2;
 
 enum _Op { push, replace, reset, pop }
 
