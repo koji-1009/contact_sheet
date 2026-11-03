@@ -8,5 +8,10 @@ import 'package:shop_app_sheet/preview/start.dart';
 // the page. The preview returns the app's own router started at the page,
 // so the page shows as the app shows it there, over the page under it.
 
-@Preview(group: '購入完了', name: '標準', size: Size(390, 844), wrapper: loggedIn)
+@Preview(
+  group: 'Order complete',
+  name: 'Default',
+  size: Size(390, 844),
+  wrapper: loggedIn,
+)
 Widget complete() => startAt('/complete');

@@ -9,6 +9,11 @@ import 'package:shop_app_sheet/preview/start.dart';
 // so the page shows as the app shows it there, over the page under it.
 
 // It looks the same signed in or not: one state.
-@Preview(group: '商品詳細', name: '標準', size: Size(390, 844), wrapper: guest)
+@Preview(
+  group: 'Product',
+  name: 'Default',
+  size: Size(390, 844),
+  wrapper: guest,
+)
 // home_page.dart pushes it from the home page.
 Widget productDetail() => startAt('/products/p1', from: '/');

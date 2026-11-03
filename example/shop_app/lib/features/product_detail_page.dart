@@ -13,7 +13,7 @@ class ProductDetailPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final product = ref.watch(productProvider(productId));
-    final appBar = AppBar(title: const Text('商品詳細'));
+    final appBar = AppBar(title: const Text('Product'));
     return product.when(
       // The details scroll, the buy button stays at the bottom: it fits a
       // phone held either way, a tablet and a desktop window.
@@ -61,13 +61,13 @@ class ProductDetailPage extends ConsumerWidget {
               ref.read(cartRepositoryProvider).add(p);
               context.push('/checkout');
             },
-            child: const Text('購入する'),
+            child: const Text('Buy now'),
           ),
         ),
       ),
       error: (e, _) => Scaffold(
         appBar: appBar,
-        body: Center(child: Text('読み込めませんでした: $e')),
+        body: Center(child: Text('Could not load: $e')),
       ),
       loading: () => Scaffold(
         appBar: appBar,

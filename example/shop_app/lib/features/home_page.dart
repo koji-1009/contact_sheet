@@ -26,22 +26,22 @@ class HomePage extends ConsumerWidget {
   ) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ショップ'),
+        title: const Text('Shop'),
         actions: [
           IconButton(
-            tooltip: 'カート',
+            tooltip: 'Cart',
             icon: const Icon(Icons.shopping_cart_outlined),
             onPressed: () => context.push('/cart'),
           ),
           if (auth.isLoggedIn)
             Padding(
               padding: const EdgeInsets.only(right: 16),
-              child: Center(child: Text('${auth.userName} さん')),
+              child: Center(child: Text('Hi, ${auth.userName}')),
             )
           else
             TextButton(
               onPressed: () => context.push('/login'),
-              child: const Text('ログイン'),
+              child: const Text('Log in'),
             ),
         ],
       ),
@@ -58,7 +58,7 @@ class HomePage extends ConsumerWidget {
               ),
           ],
         ),
-        error: (e, _) => Center(child: Text('読み込めませんでした: $e')),
+        error: (e, _) => Center(child: Text('Could not load: $e')),
         loading: () => const Center(child: CircularProgressIndicator()),
       ),
     );

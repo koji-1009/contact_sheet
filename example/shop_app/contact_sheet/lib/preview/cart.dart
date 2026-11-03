@@ -9,11 +9,11 @@ import 'package:shop_app_sheet/preview/start.dart';
 // so the page shows as the app shows it there, over the page under it.
 
 @Preview(
-  group: 'カート',
-  name: 'カート2件',
+  group: 'Cart',
+  name: 'Two items',
   size: Size(390, 844),
   wrapper: loggedInCart2,
 )
-@Preview(group: 'カート', name: '空のカート', size: Size(390, 844), wrapper: loggedIn)
+@Preview(group: 'Cart', name: 'Empty', size: Size(390, 844), wrapper: loggedIn)
 // home_page.dart pushes it from the app bar's cart button.
 Widget cart() => startAt('/cart', from: '/');

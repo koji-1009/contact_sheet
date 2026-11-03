@@ -28,20 +28,18 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('ログイン')),
+      appBar: AppBar(title: const Text('Log in')),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const TextField(
-                decoration: InputDecoration(labelText: 'メールアドレス'),
-              ),
+              const TextField(decoration: InputDecoration(labelText: 'Email')),
               const SizedBox(height: 12),
               const TextField(
                 obscureText: true,
-                decoration: InputDecoration(labelText: 'パスワード'),
+                decoration: InputDecoration(labelText: 'Password'),
               ),
               const SizedBox(height: 24),
               SizedBox(
@@ -55,7 +53,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('ログイン'),
+                      : const Text('Log in'),
                 ),
               ),
             ],

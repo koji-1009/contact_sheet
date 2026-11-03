@@ -8,10 +8,20 @@ import 'package:shop_app_sheet/preview/start.dart';
 // the page. The preview returns the app's own router started at the page,
 // so the page shows as the app shows it there, over the page under it.
 
-@Preview(group: 'ログイン', name: '決済から', size: Size(390, 844), wrapper: guest)
+@Preview(
+  group: 'Log in',
+  name: 'From checkout',
+  size: Size(390, 844),
+  wrapper: guest,
+)
 // A guest's push of /checkout from the product detail is redirected here.
 Widget login() => startAt('/login?from=/checkout', from: '/products/p1');
 
-@Preview(group: 'ログイン', name: 'ホームから', size: Size(390, 844), wrapper: guest)
-// The home's ログイン button pushes /login, with no `from`.
+@Preview(
+  group: 'Log in',
+  name: 'From home',
+  size: Size(390, 844),
+  wrapper: guest,
+)
+// The home's Log in button pushes /login, with no `from`.
 Widget loginFromHome() => startAt('/login', from: '/');

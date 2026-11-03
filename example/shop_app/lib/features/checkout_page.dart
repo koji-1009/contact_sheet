@@ -15,12 +15,12 @@ class CheckoutPage extends ConsumerWidget {
       (sum, item) => sum + item.product.price * item.quantity,
     );
     return Scaffold(
-      appBar: AppBar(title: const Text('決済')),
+      appBar: AppBar(title: const Text('Checkout')),
       body: Column(
         children: [
           Expanded(
             child: cart.items.isEmpty
-                ? const Center(child: Text('カートは空です'))
+                ? const Center(child: Text('Your cart is empty'))
                 : ListView(
                     children: [
                       for (final item in cart.items)
@@ -43,7 +43,7 @@ class CheckoutPage extends ConsumerWidget {
                         cart.clear();
                         context.go('/complete');
                       },
-                child: Text('¥$total を支払う'),
+                child: Text('Pay ¥$total'),
               ),
             ),
           ),

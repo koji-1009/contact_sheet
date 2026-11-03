@@ -10,9 +10,9 @@ abstract class ProductRepository {
 /// The app's own implementation. A real app would call its backend here.
 class ApiProductRepository implements ProductRepository {
   static const _catalog = [
-    Product(id: 'p1', name: 'テーブルランプ', price: 1200),
-    Product(id: 'p2', name: 'マグカップ', price: 800),
-    Product(id: 'p3', name: 'ノート', price: 300),
+    Product(id: 'p1', name: 'Table lamp', price: 1200),
+    Product(id: 'p2', name: 'Mug', price: 800),
+    Product(id: 'p3', name: 'Notebook', price: 300),
   ];
 
   @override

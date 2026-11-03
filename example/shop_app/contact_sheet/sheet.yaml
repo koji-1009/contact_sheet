@@ -18,152 +18,152 @@ dependencies:
 # What the app keeps across its pages: signing in, and the cart, which
 # starts empty. The pages that show them have a state of each value.
 conditions:
-  - name: ログイン
-    values: [未ログイン, ログイン済み]
+  - name: Login
+    values: [Guest, Signed in]
     source: lib/data/auth_repository.dart
-  - name: カート
-    values: [空, 商品あり]
+  - name: Cart
+    values: [Empty, Has items]
     source: lib/data/cart_repository.dart
 
 pages:
   - id: home
-    label: ホーム
-    section: 購入フロー
+    label: Home
+    section: Shopping
     widget: HomePage
     source: lib/features/home_page.dart
     path: /
     memo: |-
-      商品の一覧。ゲストもここから買い物を始められる。
-      検索と並べ替えはまだない。
+      The products. A guest can start shopping here too.
+      No search or sorting yet.
     links:
-      - label: 仕様
+      - label: Spec
         url: https://example.com/specs/home
-      - label: デザイン
+      - label: Design
         url: https://example.com/designs/home
     dependencies: [AuthRepository, ProductRepository]
     states:
-      - name: 未ログイン
-        if: {ログイン: 未ログイン}
+      - name: Guest
+        if: {Login: Guest}
         preview: contact_sheet/lib/preview/home.dart#home
-        uses: {AuthRepository: ゲスト, ProductRepository: 3商品}
-      - name: ログイン済み
-        if: {ログイン: ログイン済み}
+        uses: {AuthRepository: guest, ProductRepository: 3 products}
+      - name: Signed in
+        if: {Login: Signed in}
         preview: contact_sheet/lib/preview/home.dart#home@1
-        uses: {AuthRepository: ログイン済み, ProductRepository: 3商品}
+        uses: {AuthRepository: signed in, ProductRepository: 3 products}
 
   # It looks the same signed in or not: only the router's redirect, when
-  # 購入する is tapped, reads AuthRepository.
+  # Buy now is tapped, reads AuthRepository.
   - id: product_detail
-    label: 商品詳細
-    section: 購入フロー
+    label: Product
+    section: Shopping
     widget: ProductDetailPage
     source: lib/features/product_detail_page.dart
     path: /products/:id
     dependencies: [ProductRepository, CartRepository]
     states:
-      - name: 標準
+      - name: Default
         preview: contact_sheet/lib/preview/product_detail.dart#productDetail
-        uses: {ProductRepository: 3商品, CartRepository: 空}
+        uses: {ProductRepository: 3 products, CartRepository: empty}
 
   - id: cart
-    label: カート
-    section: 購入フロー
+    label: Cart
+    section: Shopping
     widget: CartPage
     source: lib/features/cart_page.dart
     path: /cart
     dependencies: [CartRepository]
     states:
-      - name: カート2件
-        if: {カート: 商品あり}
+      - name: Two items
+        if: {Cart: Has items}
         preview: contact_sheet/lib/preview/cart.dart#cart
-        uses: {CartRepository: 2件}
-      - name: 空のカート
-        if: {カート: 空}
+        uses: {CartRepository: 2 items}
+      - name: Empty
+        if: {Cart: Empty}
         preview: contact_sheet/lib/preview/cart.dart#cart@1
-        uses: {CartRepository: 空}
+        uses: {CartRepository: empty}
 
   - id: checkout
-    label: 決済
-    section: 購入フロー
+    label: Checkout
+    section: Shopping
     widget: CheckoutPage
     source: lib/features/checkout_page.dart
     path: /checkout
     dependencies: [CartRepository]
     states:
-      - name: カート2件
-        if: {カート: 商品あり}
+      - name: Two items
+        if: {Cart: Has items}
         preview: contact_sheet/lib/preview/checkout.dart#checkout
-        uses: {CartRepository: 2件}
-      - name: 空のカート
-        if: {カート: 空}
+        uses: {CartRepository: 2 items}
+      - name: Empty
+        if: {Cart: Empty}
         preview: contact_sheet/lib/preview/checkout.dart#checkout@1
-        uses: {CartRepository: 空}
+        uses: {CartRepository: empty}
 
   - id: complete
-    label: 購入完了
-    section: 購入フロー
+    label: Order complete
+    section: Shopping
     widget: CompletePage
     source: lib/features/complete_page.dart
     path: /complete
     states:
-      - name: 標準
+      - name: Default
         preview: contact_sheet/lib/preview/complete.dart#complete
 
   - id: login
-    label: ログイン
-    section: アカウント
+    label: Log in
+    section: Account
     widget: LoginPage
     source: lib/features/login_page.dart
     path: /login
     dependencies: [AuthRepository]
     states:
-      - name: 決済から
+      - name: From checkout
         preview: contact_sheet/lib/preview/login.dart#login
-        uses: {AuthRepository: ゲスト}
-      - name: ホームから
+        uses: {AuthRepository: guest}
+      - name: From home
         preview: contact_sheet/lib/preview/login.dart#loginFromHome
-        uses: {AuthRepository: ゲスト}
+        uses: {AuthRepository: guest}
 
   - id: orders
-    label: 注文履歴
-    section: アカウント
+    label: Orders
+    section: Account
     widget: OrdersPage
     source: lib/features/orders_page.dart
     path: /orders
     states:
-      - name: 標準
+      - name: Default
         preview: contact_sheet/lib/preview/orders.dart#orders
 
 edges:
   # Each product's ListTile pushes /products/:id.
-  - {from: home, to: product_detail, trigger: other:商品をタップ, source: lib/features/home_page.dart}
+  - {from: home, to: product_detail, trigger: other:Tap a product, source: lib/features/home_page.dart}
   # The app bar's cart button: an icon, told by its tooltip.
-  - {from: home, to: cart, trigger: label:カート, source: lib/features/home_page.dart}
+  - {from: home, to: cart, trigger: label:Cart, source: lib/features/home_page.dart}
   # A product in the cart (CartItemTile) opens it.
-  - {from: cart, to: product_detail, trigger: other:商品をタップ, when: カート2件, source: lib/features/cart_page.dart}
-  # 購入手続きへ is disabled when the cart is empty. The router's redirect
+  - {from: cart, to: product_detail, trigger: other:Tap a product, when: Two items, source: lib/features/cart_page.dart}
+  # Check out is disabled when the cart is empty. The router's redirect
   # sends a guest to log in instead.
-  - {from: cart, to: checkout, trigger: text:購入手続きへ, when: カート2件, if: {ログイン: ログイン済み}, source: lib/features/cart_page.dart}
-  - {from: cart, to: login, trigger: text:購入手続きへ, when: カート2件, if: {ログイン: 未ログイン}, then: 決済から, kind: redirect, source: lib/router.dart}
-  # The ログイン button is shown only to a guest.
-  - {from: home, to: login, trigger: text:ログイン, when: 未ログイン, then: ホームから, source: lib/features/home_page.dart}
-  # 購入する puts the product in the cart, then pushes /checkout; the
+  - {from: cart, to: checkout, trigger: text:Check out, when: Two items, if: {Login: Signed in}, source: lib/features/cart_page.dart}
+  - {from: cart, to: login, trigger: text:Check out, when: Two items, if: {Login: Guest}, then: From checkout, kind: redirect, source: lib/router.dart}
+  # The Log in button is shown only to a guest.
+  - {from: home, to: login, trigger: text:Log in, when: Guest, then: From home, source: lib/features/home_page.dart}
+  # Buy now puts the product in the cart, then pushes /checkout; the
   # router's redirect sends a guest to /login?from=/checkout instead.
-  - {from: product_detail, to: checkout, trigger: text:購入する, if: {ログイン: ログイン済み}, set: {カート: 商品あり}, source: lib/features/product_detail_page.dart}
-  - {from: product_detail, to: login, trigger: text:購入する, if: {ログイン: 未ログイン}, set: {カート: 商品あり}, then: 決済から, kind: redirect, source: lib/router.dart}
+  - {from: product_detail, to: checkout, trigger: text:Buy now, if: {Login: Signed in}, set: {Cart: Has items}, source: lib/features/product_detail_page.dart}
+  - {from: product_detail, to: login, trigger: text:Buy now, if: {Login: Guest}, set: {Cart: Has items}, then: From checkout, kind: redirect, source: lib/router.dart}
   # Pay, disabled when the cart is empty, empties it. Its text has the total
   # in it.
-  - {from: checkout, to: complete, trigger: other:支払う, when: カート2件, set: {カート: 空}, kind: go, source: lib/features/checkout_page.dart}
+  - {from: checkout, to: complete, trigger: other:Pay, when: Two items, set: {Cart: Empty}, kind: go, source: lib/features/checkout_page.dart}
   # Logging in goes to `from`, or home without one. The app bar says
-  # ログイン too: the button is the one pressed.
-  - {from: login, to: checkout, trigger: text:ログイン, when: 決済から, set: {ログイン: ログイン済み}, kind: go, source: lib/features/login_page.dart}
-  - {from: login, to: home, trigger: text:ログイン, when: ホームから, set: {ログイン: ログイン済み}, kind: go, source: lib/features/login_page.dart}
-  - {from: complete, to: home, trigger: text:ホームへ, kind: go, source: lib/features/complete_page.dart}
+  # Log in too: the button is the one pressed.
+  - {from: login, to: checkout, trigger: text:Log in, when: From checkout, set: {Login: Signed in}, kind: go, source: lib/features/login_page.dart}
+  - {from: login, to: home, trigger: text:Log in, when: From home, set: {Login: Signed in}, kind: go, source: lib/features/login_page.dart}
+  - {from: complete, to: home, trigger: text:Back to home, kind: go, source: lib/features/complete_page.dart}
   # pushReplacement: the history takes the completed page's place.
-  - {from: complete, to: orders, trigger: text:注文履歴, kind: replace, source: lib/features/complete_page.dart}
-  - {from: orders, to: home, trigger: text:ホームへ, kind: go, source: lib/features/orders_page.dart}
+  - {from: complete, to: orders, trigger: text:Orders, kind: replace, source: lib/features/complete_page.dart}
+  - {from: orders, to: home, trigger: text:Back to home, kind: go, source: lib/features/orders_page.dart}
   # No back is written for login: a guest sent there goes back to the page
-  # under it, where 購入する or 購入手続きへ was tapped (not to checkout),
+  # under it, where Buy now or Check out was tapped (not to checkout),
   # which is the back of the redirect's push.
 
 # Deep links, from no page of the app: a link to a product, which go_router

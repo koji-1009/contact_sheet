@@ -32,9 +32,9 @@ class FakeAuthRepository extends AuthRepository {
 
 class FakeProductRepository implements ProductRepository {
   static const products = [
-    Product(id: 'p1', name: 'テーブルランプ', price: 1200),
-    Product(id: 'p2', name: 'マグカップ', price: 800),
-    Product(id: 'p3', name: 'ノート', price: 300),
+    Product(id: 'p1', name: 'Table lamp', price: 1200),
+    Product(id: 'p2', name: 'Mug', price: 800),
+    Product(id: 'p3', name: 'Notebook', price: 300),
   ];
 
   @override

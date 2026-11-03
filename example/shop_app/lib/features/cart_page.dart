@@ -20,12 +20,12 @@ class CartPage extends ConsumerWidget {
 
   Widget _cart(BuildContext context, CartRepository cart) {
     return Scaffold(
-      appBar: AppBar(title: const Text('カート')),
+      appBar: AppBar(title: const Text('Cart')),
       body: Column(
         children: [
           Expanded(
             child: cart.items.isEmpty
-                ? const Center(child: Text('カートは空です'))
+                ? const Center(child: Text('Your cart is empty'))
                 : ListView(
                     children: [
                       for (final item in cart.items) CartItemTile(item: item),
@@ -40,7 +40,7 @@ class CartPage extends ConsumerWidget {
                 onPressed: cart.items.isEmpty
                     ? null
                     : () => context.push('/checkout'),
-                child: const Text('購入手続きへ'),
+                child: const Text('Check out'),
               ),
             ),
           ),
@@ -59,7 +59,7 @@ class CartItemTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListTile(
     title: Text(item.product.name),
-    subtitle: Text('${item.quantity} 点'),
+    subtitle: Text('Qty ${item.quantity}'),
     trailing: Text('¥${item.product.price * item.quantity}'),
     onTap: () => context.push('/products/${item.product.id}'),
   );
