@@ -359,10 +359,15 @@ class SheetExport {
           final name = map.imageNameOf(state, variant);
           if (png == null || name == null) continue;
           final file = File(p.join(images.path, name));
-          // Two variants may share an image.
-          if (file.existsSync()) continue;
-          final bytes = File(png).readAsBytesSync();
-          file.writeAsBytesSync(bytes);
+          // Two states, or two variants, may share an image: written once,
+          // and in the SVGs for each page whose first it is.
+          final List<int> bytes;
+          if (file.existsSync()) {
+            bytes = file.readAsBytesSync();
+          } else {
+            bytes = File(png).readAsBytesSync();
+            file.writeAsBytesSync(bytes);
+          }
           if (state == page.states.first &&
               variant == map.sheet.variants.first) {
             firsts[state] = bytes;

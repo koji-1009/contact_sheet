@@ -648,6 +648,27 @@ pages:
     expect((states.first as Map)['image'], isNotNull);
   });
 
+  test('two pages whose first states share an image each hold it in the '
+      'SVGs', () async {
+    repo.sheetFile.writeAsStringSync('''
+pages:
+  - {id: a, label: A, states: [{name: s, preview: lib/preview/home.dart#home}]}
+  - {id: b, label: B, states: [{name: s, preview: lib/preview/home.dart#home}]}
+''');
+    final (dir: out, :missing) = await SheetExport(
+      repo,
+      runner: Tools(),
+      shoot: _Shutter(shots.path).shot,
+      m: Messages.of('en'),
+    ).run();
+    expect(missing, 0);
+    expect(Directory(p.join(out, 'images')).listSync(), hasLength(1));
+    for (final name in ['map.svg', 'map-dev.svg']) {
+      final svg = File(p.join(out, name)).readAsStringSync();
+      expect('data:image/png;base64,'.allMatches(svg), hasLength(2));
+    }
+  });
+
   test('an export that fails after a shot deletes that run too', () async {
     final shutter = _Shutter(
       shots.path,
