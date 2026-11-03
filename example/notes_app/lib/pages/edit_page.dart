@@ -15,10 +15,15 @@ class EditPage extends StatefulWidget {
 class _EditPageState extends State<EditPage> {
   late final TextEditingController _title;
   late final TextEditingController _body;
+  var _started = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // The note as it is when the editor opens: once, not again each time
+    // the notes change (saving changes them).
+    if (_started) return;
+    _started = true;
     final id = widget.id;
     final note = id == null ? null : NotesScope.of(context).byId(id);
     _title = TextEditingController(text: note?.title);
