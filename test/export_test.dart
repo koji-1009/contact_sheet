@@ -531,10 +531,123 @@ pages:
     expect(lines, contains('Images kept from the map before: 1'));
     expect(detail.existsSync(), isTrue);
     expect(again.missing, 2);
+    // What the map before says of a state it could not shoot stays, and one
+    // it has nothing of is told as not shot.
+    const notShot =
+        '詳細 (Gone) has no image: not shot, as --only leaves it out, and the '
+        'map before has none';
+    expect(
+      lines,
+      containsAll([
+        'Could not shoot 詳細 (Broken): Overflow by 12 pixels',
+        notShot,
+      ]),
+    );
+    final data = jsonDecode(
+      File(p.join(again.dir, 'sheet.json')).readAsStringSync(),
+    ) as Map<String, Object?>;
+    final states =
+        ((data['pages']! as List).last as Map<String, Object?>)['states']!
+            as List;
+    expect((states[1] as Map)['error'], 'Overflow by 12 pixels');
     await expectLater(
       SheetExport(repo, m: Messages.of('en')).run(null, {'nowhere'}),
       throwsA(isA<ExportException>().having((e) => e.exitCode, 'exitCode', 64)),
     );
+  });
+
+  test('with only some pages, the others keep each variant\'s image, one '
+      'shot two variants\' too', () async {
+    // The Desktop variant names the second Preview, which the second state
+    // names too: one shot, a variant's and a state's.
+    repo.sheetFile.writeAsStringSync('''
+variants:
+  - {name: Desktop, preview: Desktop}
+  - {name: Phone}
+pages:
+  - id: a
+    label: A
+    states: [{name: s, preview: contact_sheet/lib/preview/detail.dart#detail}]
+  - id: b
+    label: B
+    states:
+      - {name: s, preview: lib/preview/home.dart#home}
+      - {name: wide, preview: lib/preview/home.dart#home@0.1}
+''');
+    final base = staticIdOf(
+      SheetState(name: '', file: 'lib/preview/home.dart', symbol: 'home'),
+    );
+    Future<ShotRun> shoot(
+      String dir,
+      ShotSubject subject, {
+      ShotPlatform platform = ShotPlatform.android,
+      void Function(ShotProgress event)? onProgress,
+    }) async {
+      final run = Directory(p.join(dir, 'run'))..createSync(recursive: true);
+      final files = (subject as PreviewFiles).files;
+      return ShotRun(
+        id: 'run',
+        dir: run.path,
+        shots: [
+          if (files.contains('lib/preview/home.dart'))
+            for (final (k, name) in const [(0, 'Phone'), (1, 'Desktop')])
+              ShotResult(
+                id: '$base.$k',
+                status: ShotStatus.ok,
+                name: name,
+                size: const LogicalSize(390, 844),
+                png: (File(
+                  p.join(run.path, '$base.$k.png'),
+                )..writeAsBytesSync([k])).path,
+              ),
+          if (files.contains('lib/preview/detail.dart'))
+            ShotResult(
+              id: shotIdOf(
+                SheetState(
+                  name: '',
+                  file: 'lib/preview/detail.dart',
+                  symbol: 'detail',
+                ),
+              ),
+              status: ShotStatus.ok,
+              name: 'detail',
+              size: const LogicalSize(390, 844),
+              png: (File(
+                p.join(run.path, 'detail.png'),
+              )..writeAsBytesSync([9])).path,
+            ),
+        ],
+      );
+    }
+
+    List<Object?> images(String out) {
+      final data = jsonDecode(
+        File(p.join(out, 'sheet.json')).readAsStringSync(),
+      ) as Map<String, Object?>;
+      final b = (data['pages']! as List).last as Map<String, Object?>;
+      return [
+        for (final s in b['states']! as List)
+          for (final v in (s as Map)['variants'] as List) (v as Map)['image'],
+      ];
+    }
+
+    final all = await SheetExport(
+      repo,
+      runner: Tools(),
+      shoot: shoot,
+      m: Messages.of('en'),
+    ).run();
+    final before = images(all.dir);
+    expect(before, everyElement(isNotNull));
+    final some = await SheetExport(
+      repo,
+      runner: Tools(),
+      shoot: shoot,
+      m: Messages.of('en'),
+    ).run(null, {'a'});
+    expect(images(some.dir), before);
+    // A's detail has no Desktop Preview: missing either way.
+    expect(some.missing, all.missing);
   });
 
   test(

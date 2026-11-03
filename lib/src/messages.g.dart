@@ -77,6 +77,7 @@ abstract class Messages {
   String get exportShooting;
   String exportShotFailed(Object page, Object state, Object error);
   String exportNoShot(Object page, Object state, Object preview);
+  String exportNotShot(Object page, Object state);
   String exportNoFile(Object file);
   String exportNotInLib(Object file);
   String exportDone(Object dir);
@@ -424,6 +425,10 @@ class MessagesEn extends Messages {
   @override
   String exportNoShot(Object page, Object state, Object preview) =>
       "${page} (${state}) has no shot: shutter found no preview ${preview}";
+
+  @override
+  String exportNotShot(Object page, Object state) =>
+      "${page} (${state}) has no image: not shot, as --only leaves it out, and the map before has none";
 
   @override
   String exportNoFile(Object file) => "${file} does not exist";
@@ -1046,6 +1051,10 @@ class MessagesJa extends Messages {
   @override
   String exportNoShot(Object page, Object state, Object preview) =>
       "${page}（${state}）の撮影結果がありません: shutter が Preview ${preview} を見つけられませんでした";
+
+  @override
+  String exportNotShot(Object page, Object state) =>
+      "${page}（${state}）には画像がありません: --only で外れたので撮っておらず、前の地図にもありません";
 
   @override
   String exportNoFile(Object file) => "${file} がありません";

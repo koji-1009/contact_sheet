@@ -126,7 +126,7 @@ class SheetExport {
         drift: await drift,
         release: (version: repo.appVersion, commit: commit, branch: branch),
       );
-      final missing = _tellMissing(map);
+      final missing = _tellMissing(map, only);
       _write(out, map);
       return (dir: out, missing: missing);
     } finally {
@@ -137,7 +137,8 @@ class SheetExport {
 
   /// The images the map at [out] has of the pages not [only], in each
   /// variant it drew, as shots (named as they were), copied into [into]
-  /// first: the export replaces `images/`.
+  /// first: the export replaces `images/`; and the errors it has of them,
+  /// as shots that failed.
   Map<String, ShotResult> _keep(
     Sheet sheet,
     String out,
@@ -153,6 +154,7 @@ class SheetExport {
       return const {};
     }
     final kept = <String, ShotResult>{};
+    var images = 0;
     // The variants it drew: their platforms, and the Preview they name.
     final variants = <(VariantPlatform, String?)>[
       if (json case {'variants': final List<Object?> vs})
@@ -177,26 +179,45 @@ class SheetExport {
             }) {
               for (final (i, d) in drawn.indexed) {
                 if (i >= variants.length) break;
-                if (d case {
-                  'shot': final String shot,
-                  'image': final String image,
-                  'width': final num width,
-                  'height': final num height,
-                }) {
+                if (d is! Map<String, Object?>) continue;
+                final shot = d['shot'];
+                if (shot is! String) continue;
+                final (platform, preview) = variants[i];
+                final key = shotKey(
+                  inSheetPackage: project == 'sheet',
+                  id: shot,
+                  platform: platform,
+                );
+                // A variant's Preview is found by its name: one shot can be
+                // two variants', one naming it and one not.
+                final name = preview ?? kept[key]?.name ?? shot;
+                final size = switch (d) {
+                  {'width': final num w, 'height': final num h} => LogicalSize(
+                    w.toDouble(),
+                    h.toDouble(),
+                  ),
+                  _ => null,
+                };
+                if (d['error'] case final String error) {
+                  kept[key] = ShotResult(
+                    id: shot,
+                    status: ShotStatus.error,
+                    name: name,
+                    size: size,
+                    error: error,
+                  );
+                  continue;
+                }
+                if (d['image'] case final String image) {
                   final from = File(pathIn(out, image));
                   if (!from.existsSync()) continue;
-                  final (platform, preview) = variants[i];
                   final png = from.copySync(p.join(into, p.basename(image)));
-                  kept[shotKey(
-                    inSheetPackage: project == 'sheet',
-                    id: shot,
-                    platform: platform,
-                  )] = ShotResult(
+                  if (kept[key]?.png == null) images++;
+                  kept[key] = ShotResult(
                     id: shot,
                     status: ShotStatus.ok,
-                    // A variant's Preview is found by its name.
-                    name: preview ?? shot,
-                    size: LogicalSize(width.toDouble(), height.toDouble()),
+                    name: name,
+                    size: size,
                     png: png.path,
                   );
                 }
@@ -206,7 +227,7 @@ class SheetExport {
         }
       }
     }
-    log(m.exportKept(kept.length));
+    log(m.exportKept(images));
     return kept;
   }
 
@@ -305,9 +326,10 @@ class SheetExport {
     return (shots, failed);
   }
 
-  /// Tells which states have no image in which variant, and why; returns
-  /// how many states lack one in some variant.
-  int _tellMissing(SheetMap map) {
+  /// Tells which states have no image in which variant, and why (a page
+  /// not [only] was not shot); returns how many states lack one in some
+  /// variant.
+  int _tellMissing(SheetMap map, Set<String> only) {
     var missing = 0;
     for (final page in map.sheet.pages) {
       for (final state in page.states) {
@@ -319,7 +341,9 @@ class SheetExport {
           final name = map.sheet.variants.length == 1
               ? state.name
               : '${state.name} · ${variant.name}';
-          if (shot == null) {
+          if (shot == null && only.isNotEmpty && !only.contains(page.id)) {
+            log(m.exportNotShot(page.label, name));
+          } else if (shot == null) {
             final preview = variant.preview;
             log(
               m.exportNoShot(
