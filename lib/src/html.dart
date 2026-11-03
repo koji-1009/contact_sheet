@@ -24,6 +24,7 @@ Map<String, String> htmlStrings(Messages m) => {
   'goesTo': m.htmlGoesTo,
   'comesFrom': m.htmlComesFrom,
   'statesOf': m.htmlStatesOf('{page}', '{count}'),
+  'statesOfOne': m.htmlStatesOfOne('{page}'),
   'noImage': m.htmlNoImage,
   'none': m.htmlNone,
   'colFrom': m.htmlColFrom,
@@ -63,6 +64,7 @@ Map<String, String> htmlStrings(Messages m) => {
   'routeNone': m.htmlRouteNone,
   'routeSame': m.htmlRouteSame,
   'routeSteps': m.htmlRouteSteps('{count}'),
+  'routeStepsOne': m.htmlRouteStepsOne,
   'version': m.htmlVersion('{version}'),
   'inState': m.htmlInState('{state}'),
   'tap': m.htmlTap('{text}'),
@@ -448,12 +450,13 @@ const needs = (e) => [...(e.when.length ? [states(e.when)] : []), ...Object.valu
 // The values [sets] gives the conditions.
 const setting = (sets) => Object.keys(sets ?? {}).length ? esc(T('setting', { values: Object.values(sets).join(T('conditionAnd')) })) : '';
 function sentence(e, { from = false, state = null, sets = e.set } = {}) {
-  const when = needs(e).length ? esc(T('inState', { state: needs(e).join(T('conditionAnd')) })) + ' ' : '';
+  // Their spacing is the words': a comma and a space, or 「、」.
+  const when = needs(e).length ? esc(T('inState', { state: needs(e).join(T('conditionAnd')) })) : '';
   // Going back by the back: "back to" says it once.
   const what = e.kind === 'pop' && e.trigger === 'back' ? '' : doing(e) + ' → ';
   const to = e.kind === 'pop' ? esc(T('backTo', { page: label(e.to) })) : `<b>${esc(label(e.to))}</b>`;
   const then = arriving(e, state);
-  const redirected = e.kind === 'redirect' ? ' ' + esc(T('redirected')) : '';
+  const redirected = e.kind === 'redirect' ? esc(T('redirected')) : '';
   // [from]: its page's name said first, or what to say instead.
   return `${from ? `<b>${esc(typeof from === 'string' ? from : label(e.from))}</b>: ` : ''}${when}${what}${to}${then}${redirected}${setting(sets)}`;
 }
@@ -544,7 +547,7 @@ for (const p of S.pages) {
   const s = drawn(p.states[0]);
   const marks =(p.memo ? '<span class="mark">ⓘ</span>' : '') + (p.links.length ? `<span class="mark">↗ ${p.links.length}</span>` : '');
   n.innerHTML = `<div class="img" style="height:${p.height}px">${s.image ? `<img src="${esc(s.image)}" alt="${esc(p.label)}" loading="lazy">` : ''}</div><div class="label"><span>${esc(p.label)}</span><small></small></div>${marks ? `<div class="marks">${marks}</div>` : ''}`;
-  n.title = T('statesOf', { page: p.label, count: p.states.length });
+  n.title = T(p.states.length === 1 ? 'statesOfOne' : 'statesOf', { page: p.label, count: p.states.length });
   // In the state it shows (where an arrow arrived): what is looked at stays.
   n.addEventListener('click', () => {
     if (moved) return;
@@ -741,7 +744,7 @@ const sentences = (p) => {
     const again = own.length === 1 && own.includes(t.page);
     if (again && (t.page === p.id || bar.retap !== 'first')) return [];
     const when = Object.keys(t.if).length
-      ? esc(T('inState', { state: Object.values(t.if).map(states).join(T('conditionAnd')) })) + ' ' : '';
+      ? esc(T('inState', { state: Object.values(t.if).map(states).join(T('conditionAnd')) })) : '';
     const words = again ? T('tapAgain', { text: tabText(t) }) : tapWords(t);
     return [`<li><a data-go="map/${esc(t.page)}">${when}${esc(words)} → <b>${esc(label(t.page))}</b></a></li>`];
   });
@@ -856,7 +859,7 @@ function showRoute(from, to, glide, state, valuation) {
     const t = tabItem[st.tab];
     // A switch arrives where the tab was left; tapping it again, at its first.
     if (st.move === 'switch') {
-      return `${from}${esc(tapWords(t))} → <b>${esc(label(st.to.page))}</b>${st.to.page !== st.tab ? ' ' + esc(T('asLeft')) : ''}`;
+      return `${from}${esc(tapWords(t))} → <b>${esc(label(st.to.page))}</b>${st.to.page !== st.tab ? esc(T('asLeft')) : ''}`;
     }
     if (st.move === 'retap') {
       return `${from}${esc(T('tapAgain', { text: tabText(t) }))} → <b>${esc(label(st.to.page))}</b>`;
@@ -882,7 +885,7 @@ function showRoute(from, to, glide, state, valuation) {
     : found.bounded ? `<p class="meta">${esc(T('routeBounded'))}</p>` : '';
   const result = from === to ? `<p class="meta">${esc(T('routeSame'))}</p>`
     : !steps ? `<p class="meta">${esc(T('routeNone'))}</p>`
-    : `<p class="meta">${esc(T('routeSteps', { count: steps.length }))}</p><ol>${steps.map((st) => `<li>${said(st)}</li>`).join('')}</ol>`;
+    : `<p class="meta">${esc(T(steps.length === 1 ? 'routeStepsOne' : 'routeSteps', { count: steps.length }))}</p><ol>${steps.map((st) => `<li>${said(st)}</li>`).join('')}</ol>`;
   const box = $('#route');
   box.innerHTML = `<button class="link close" id="routeClose">${esc(T('close'))}</button><h3>${esc(T('route'))}</h3>
     <div class="pick"><span>${esc(T('routeFrom'))}</span><select id="routeFrom">${options(from)}</select>${states}${conditions}

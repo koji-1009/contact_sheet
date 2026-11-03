@@ -175,7 +175,7 @@ void main() {
     expect(err, ['Could not shoot Home (s): lib/home.dart does not exist']);
     expect(out.last, startsWith('Exported: '));
     expect(await cli(['export', '--strict', app.path]), 65);
-    expect(err.last, '1 states have no image');
+    expect(err.last, '1 state has no image');
     String lang() => RegExp(r'<html lang="(\w+)">').firstMatch(
       File('${app.path}/contact_sheet/map/index.html').readAsStringSync(),
     )![1]!;
@@ -190,7 +190,7 @@ void main() {
     expect(await cli(['export', '--locale', 'en', app.path], words: 'ja'), 0);
     expect(lang(), 'en');
     expect(await cli(['export', '--strict', app.path], words: 'ja'), 65);
-    expect(err.last, '1 states have no image');
+    expect(err.last, '1 state has no image');
   });
 
   test('lint tells what the sheet itself shows may be missing', () async {

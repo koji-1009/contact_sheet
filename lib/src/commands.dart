@@ -228,7 +228,9 @@ class _ExportCommand extends _AppCommand {
     ).run(args.option('out'), {...args.multiOption('only')});
     cli.out(m.exportDone(dir));
     if (missing > 0 && args.flag('strict')) {
-      cli.err(m.exportIncomplete(missing));
+      cli.err(
+        missing == 1 ? m.exportIncompleteOne : m.exportIncomplete(missing),
+      );
       return ExitCode.data.code;
     }
     return ExitCode.success.code;

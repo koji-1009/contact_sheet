@@ -34,6 +34,7 @@ abstract class Messages {
   String exportUnknownPage(Object id);
   String exportKept(Object count);
   String exportIncomplete(Object count);
+  String get exportIncompleteOne;
   String get descLint;
   String get lintNone;
   String lintUnreachable(Object page, Object id);
@@ -148,6 +149,7 @@ abstract class Messages {
   String get htmlZoomOut;
   String get htmlFit;
   String htmlStatesOf(Object page, Object count);
+  String htmlStatesOfOne(Object page);
   String get htmlNoImage;
   String get htmlNone;
   String get htmlColFrom;
@@ -177,6 +179,7 @@ abstract class Messages {
   String get htmlRouteNone;
   String get htmlRouteSame;
   String htmlRouteSteps(Object count);
+  String get htmlRouteStepsOne;
   String htmlVersion(Object version);
   String htmlInState(Object state);
   String htmlTap(Object text);
@@ -268,6 +271,9 @@ class MessagesEn extends Messages {
 
   @override
   String exportIncomplete(Object count) => "${count} states have no image";
+
+  @override
+  String get exportIncompleteOne => "1 state has no image";
 
   @override
   String get descLint =>
@@ -670,6 +676,9 @@ class MessagesEn extends Messages {
   String htmlStatesOf(Object page, Object count) => "${page} (${count} states)";
 
   @override
+  String htmlStatesOfOne(Object page) => "${page} (1 state)";
+
+  @override
   String get htmlNoImage => "No image";
 
   @override
@@ -759,10 +768,13 @@ class MessagesEn extends Messages {
   String htmlRouteSteps(Object count) => "${count} steps";
 
   @override
+  String get htmlRouteStepsOne => "1 step";
+
+  @override
   String htmlVersion(Object version) => "Version ${version}";
 
   @override
-  String htmlInState(Object state) => "When ${state},";
+  String htmlInState(Object state) => "When ${state}, ";
 
   @override
   String htmlTap(Object text) => "tap “${text}”";
@@ -780,7 +792,7 @@ class MessagesEn extends Messages {
   String htmlBackTo(Object page) => "back to ${page}";
 
   @override
-  String get htmlRedirected => "(redirected)";
+  String get htmlRedirected => " (redirected)";
 
   @override
   String htmlArriving(Object state) => " (${state})";
@@ -805,7 +817,7 @@ class MessagesEn extends Messages {
   String htmlTapAgain(Object text) => "tap “${text}” again";
 
   @override
-  String get htmlAsLeft => "(as the tab was left)";
+  String get htmlAsLeft => " (as the tab was left)";
 
   @override
   String htmlRouteTabs(Object tabs) => "The other tabs, as left: ${tabs}";
@@ -901,6 +913,9 @@ class MessagesJa extends Messages {
 
   @override
   String exportIncomplete(Object count) => "画像のない状態が ${count} 個あります";
+
+  @override
+  String get exportIncompleteOne => "画像のない状態が 1 個あります";
 
   @override
   String get descLint => "sheet だけから分かる、抜けていそうなものと重複を出す（エージェント向けのヒントで、誤りではない）";
@@ -1290,6 +1305,9 @@ class MessagesJa extends Messages {
   String htmlStatesOf(Object page, Object count) => "${page}（${count} 状態）";
 
   @override
+  String htmlStatesOfOne(Object page) => "${page}（1 状態）";
+
+  @override
   String get htmlNoImage => "画像なし";
 
   @override
@@ -1379,10 +1397,13 @@ class MessagesJa extends Messages {
   String htmlRouteSteps(Object count) => "${count} 回の操作";
 
   @override
+  String get htmlRouteStepsOne => "1 回の操作";
+
+  @override
   String htmlVersion(Object version) => "バージョン ${version}";
 
   @override
-  String htmlInState(Object state) => "${state}のとき";
+  String htmlInState(Object state) => "${state}のとき、";
 
   @override
   String htmlTap(Object text) => "「${text}」をタップ";
@@ -1418,7 +1439,7 @@ class MessagesJa extends Messages {
   String htmlTabOf(Object tab) => "タブ「${tab}」";
 
   @override
-  String htmlInTabs(Object tabs) => "${tabs} のタブの中";
+  String htmlInTabs(Object tabs) => "${tabs}のタブの中";
 
   @override
   String htmlTapAgain(Object text) => "「${text}」をもう一度タップ";
