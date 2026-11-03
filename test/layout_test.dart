@@ -62,6 +62,33 @@ edges:
     expect(svg, contains('<a class="page-link" href="index.html#map/home">'));
   });
 
+  test('arrows that go back are bundled apart from those that do not, and '
+      'their bundle is dashed', () {
+    final sheet = Sheet.parse('''
+pages:
+  - ${_page('home', 'Home')}
+  - ${_page('a', 'A')}
+  - ${_page('b', 'B')}
+  - ${_page('c', 'C')}
+  - ${_page('d', 'D')}
+edges:
+  - {from: home, to: a, trigger: text:A}
+  - {from: home, to: b, trigger: text:B}
+  - {from: home, to: c, trigger: text:C}
+  - {from: a, to: home, trigger: text:Close, kind: pop}
+  - {from: b, to: home, trigger: text:Close, kind: pop}
+  - {from: c, to: home, trigger: text:Close, kind: pop}
+  - {from: d, to: home, trigger: text:Close}
+''', m);
+    final map = SheetMap(sheet, shots: const {}, m: m);
+    final bundle = map.layout.bundles.single;
+    expect(bundle.edges.map((e) => e.from), ['a', 'b', 'c']);
+    expect(
+      exportSvg(map, (_) => null, plain: true),
+      contains('<g class="bundle pop" data-i="0">'),
+    );
+  });
+
   test('an arrow runs behind no page but its own two', () {
     // A flow of four columns, a second row under it, and arrows past the
     // columns between, forward and back, and from the row under.

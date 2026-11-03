@@ -56,7 +56,7 @@ final mapCss =
 .island { fill: var(--island); }
 .island-name { font-size: 13px; font-weight: 600; fill: var(--muted); }
 path.edge { fill: none; stroke: var(--e-sheet); stroke-width: 1.5; }
-path.edge.pop { stroke-dasharray: 6 4; }
+path.edge.pop, g.bundle.pop path { stroke-dasharray: 6 4; }
 .arrow-sheet { fill: var(--e-sheet); }
 .arrow-entry { fill: var(--e-entry); }
 g.entry circle { fill: var(--e-entry); }
@@ -146,8 +146,9 @@ String mapUnder(SheetMap map) {
   for (final (i, bundle) in layout.bundles.indexed) {
     final (s, e) = layout.bundleOf(bundle);
     final from = {for (final edge in bundle.edges) label(edge.from)};
+    final pop = bundle.edges.every((e) => e.kind == NavigationKind.pop);
     out.write(
-      '<g class="bundle" data-i="$i"><circle cx="${_n(s.x)}" '
+      '<g class="bundle${pop ? ' pop' : ''}" data-i="$i"><circle cx="${_n(s.x)}" '
       'cy="${_n(s.y)}" r="3"/><path d="M${_p(s)} L${_p(e)}" '
       'marker-end="url(#arrow-sheet)"/>'
       '<title>${_esc('${from.join(', ')} → ${label(bundle.to)}')}</title></g>',

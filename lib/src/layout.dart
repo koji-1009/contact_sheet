@@ -274,13 +274,16 @@ class MapLayout {
       bundles.add((to: edges.first.to, edges: edges));
     }
     if (labelOf != null) {
-      final into = <(String, String?), List<SheetEdge>>{};
+      // A pop's line, dashed, says more than its label: apart from pushes.
+      final into = <(String, String?, bool), List<SheetEdge>>{};
       for (final e in sheet.edges) {
         if (!e.anywhere && sectionOf[e.from] != sectionOf[e.to]) {
-          (into[(e.to, labelOf(e))] ??= []).add(e);
+          (into[(e.to, labelOf(e), e.kind == NavigationKind.pop)] ??= []).add(
+            e,
+          );
         }
       }
-      for (final MapEntry(key: (to, _), value: edges) in into.entries) {
+      for (final MapEntry(key: (to, _, _), value: edges) in into.entries) {
         if (edges.length >= bundleFrom) bundles.add((to: to, edges: edges));
       }
     }
