@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import 'package:tabs_app/main.dart';
+import 'package:tabs_app/pages/home_shell.dart';
 import 'package:tabs_app/services.dart';
 
 // The team's preview wrappers: fakes in the service locator, as main.dart
@@ -40,10 +41,17 @@ void fakeServices({String? user}) {
   Services.session = _FakeSession(user);
 }
 
-Widget _inApp(Widget page) => MaterialApp(
+/// [page] in the app: alone, or, [over] the tabs, as the app pushes it (its
+/// back button shown).
+Widget _inApp(Widget page, {bool over = false}) => MaterialApp(
   theme: tabsTheme,
   debugShowCheckedModeBanner: false,
-  home: page,
+  onGenerateInitialRoutes: (_) => [
+    if (over) MaterialPageRoute<void>(builder: (_) => const HomeShell()),
+    MaterialPageRoute<void>(builder: (_) => page),
+  ],
+  // The app names no routes: without one, there is no navigator.
+  onGenerateRoute: (_) => null,
 );
 
 Widget guest(Widget page) {
@@ -54,4 +62,10 @@ Widget guest(Widget page) {
 Widget signedIn(Widget page) {
   fakeServices(user: 'koji');
   return _inApp(page);
+}
+
+/// A page the tabs open, over them, for a guest.
+Widget guestOverTabs(Widget page) {
+  fakeServices();
+  return _inApp(page, over: true);
 }
