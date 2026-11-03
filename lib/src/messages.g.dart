@@ -134,7 +134,11 @@ abstract class Messages {
   String get htmlLevelPages;
   String get htmlLevelFlow;
   String get htmlLevelActions;
+  String get htmlBackToggle;
+  String get htmlRouteButton;
   String get htmlTabMap;
+  String get htmlTabTree;
+  String get htmlTreeOutside;
   String get htmlTabList;
   String get htmlTabTable;
   String get htmlSearch;
@@ -631,7 +635,19 @@ class MessagesEn extends Messages {
   String get htmlLevelActions => "Actions";
 
   @override
+  String get htmlBackToggle => "Show or hide the arrows back";
+
+  @override
+  String get htmlRouteButton => "Route";
+
+  @override
   String get htmlTabMap => "Map";
+
+  @override
+  String get htmlTabTree => "Tree";
+
+  @override
+  String get htmlTreeOutside => "Not reached from the app's start";
 
   @override
   String get htmlTabList => "Pages";
@@ -1260,7 +1276,19 @@ class MessagesJa extends Messages {
   String get htmlLevelActions => "操作";
 
   @override
+  String get htmlBackToggle => "戻る矢印を表示・非表示";
+
+  @override
+  String get htmlRouteButton => "経路";
+
+  @override
   String get htmlTabMap => "地図";
+
+  @override
+  String get htmlTabTree => "ツリー";
+
+  @override
+  String get htmlTreeOutside => "アプリの起動から届かない画面";
 
   @override
   String get htmlTabList => "一覧";

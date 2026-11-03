@@ -124,8 +124,12 @@
   "htmlLevelPages": "画面",
   "htmlLevelFlow": "流れ",
   "htmlLevelActions": "操作",
+  "htmlBackToggle": "戻る矢印を表示・非表示",
+  "htmlRouteButton": "経路",
 
   "htmlTabMap": "地図",
+  "htmlTabTree": "ツリー",
+  "htmlTreeOutside": "アプリの起動から届かない画面",
   "htmlTabList": "一覧",
   "htmlTabTable": "遷移表",
   "htmlSearch": "画面を探す",

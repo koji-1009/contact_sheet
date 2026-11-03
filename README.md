@@ -20,7 +20,9 @@ Contact Sheet draws the sheet as it is: it does not check it against the app.
 ## What the map shows
 
 - Every page, grouped by section, with the transitions between them and the deep links into them; each page's first state on the map, all its states (as a guest or signed in; empty; loading) when it is chosen and in the list.
-- A page chosen: its memo, its links, its states, and its transitions as sentences ("When Guest, tap “Log in” → Log in (From home)").
+- A page chosen: its memo, its links, its states, and its transitions as sentences ("When Guest, tap “Log in” → Log in (From home)"). An arrow tapped: what it is, as a sentence.
+- How much it shows: the pages alone, with the arrows, or with what each arrow says; the arrows back shown or hidden.
+- The tree: the pages top to bottom, as a site map draws an app, each under the page the app's start first reaches it from.
 - The route between two pages: the fewest steps as the app's navigator goes. It follows redirects, what the app keeps across its pages (signed in, the cart) and the tabs' own histories.
 - A list of the pages, a table of the transitions, search, and an address to pass around for each page, state and route.
 - Variants, where the sheet names them: iOS or Android, phone or tablet.

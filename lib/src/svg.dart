@@ -41,9 +41,7 @@ String _vars(Map<String, String> palette) =>
     [for (final MapEntry(:key, :value) in palette.entries) '--$key: $value;']
         .join(' ');
 
-const _fonts =
-    '-apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", '
-    'sans-serif';
+const _fonts = 'system-ui, sans-serif';
 
 /// The CSS of the map's drawing, which [mapUnder] and [mapOver] write with
 /// classes: the palette, light or dark as what shows it is set, and how each
@@ -65,6 +63,8 @@ g.bundle circle { fill: var(--e-sheet); }
 g.bundle path { fill: none; stroke: var(--e-sheet); stroke-width: 1.5; }
 a.page-link:hover .page { stroke: var(--accent); stroke-width: 2; }
 .edge-label { font-size: 11px; fill: var(--muted); }
+.edge-label .l-does { fill: var(--text); }
+.edge-label .l-kind { font-style: italic; }
 .entry .edge-label { fill: var(--e-entry); }
 .edge-bg { fill: var(--surface); }
 .tabbar rect { fill: var(--line); }
@@ -157,23 +157,28 @@ String mapUnder(SheetMap map) {
   return '$out';
 }
 
-/// The words of an arrow's label: with [plain], what anyone reads (null
-/// when that is nothing); else all of it, what developers read in `.dev`
-/// spans.
-String? _labelText(EdgeLabel label, {required bool plain}) {
-  final (:code, plain: words, :kind) = label;
-  if (plain) return words == null ? null : _esc(words);
+/// The words of [edge]'s label: with [plain], what anyone reads (null when
+/// that is nothing); else all of it, what developers read in `.dev` spans.
+/// What anyone reads is in a span for each part (`l-does`, `l-when`,
+/// `l-kind`), drawn apart.
+String? _labelText(SheetMap map, SheetEdge edge, {required bool plain}) {
+  final (:code, plain: words, :kind) = map.labelOf(edge);
+  final parts = [
+    for (final (i, p) in map.plainLabelParts(edge).indexed)
+      '${i == 0 ? '' : ' / '}<tspan class="l-${p.part.name}">${_esc(p.text)}</tspan>',
+  ].join();
+  if (plain) return words == null ? null : parts;
   if (code == null && words == null && kind == null) return null;
   return '${code == null ? '' : '<tspan class="dev">${_esc(code)}${words == null ? '' : ' / '}</tspan>'}'
-      '${_esc(words ?? '')}'
+      '$parts'
       '${kind == null ? '' : '<tspan class="dev">${code == null && words == null ? '' : ' / '}${_esc(kind)}</tspan>'}';
 }
 
 /// What lies over the pages: the arrows' labels (`g.lbl`, the parts for
-/// developers in `.dev` spans) and the deep links' (`g.entry`), each on a
-/// background of its estimated size, which a browser may measure again.
-/// With [plain], the labels hold only what anyone reads, an arrow with
-/// nothing of that having none.
+/// developers in `.dev` spans; `pop` for an arrow back) and the deep links'
+/// (`g.entry`), each on a background of its estimated size, which a browser
+/// may measure again. With [plain], the labels hold only what anyone reads,
+/// an arrow with nothing of that having none.
 String mapOver(SheetMap map, {bool plain = false}) {
   final out = StringBuffer();
   void label(String cls, int i, Box box, String text) => out.write(
@@ -193,9 +198,15 @@ String mapOver(SheetMap map, {bool plain = false}) {
   for (final (i, edge) in map.sheet.edges.indexed) {
     final box = map.edgeLabels[edge];
     if (box == null) continue;
-    final text = _labelText(map.labelOf(edge), plain: plain);
+    final text = _labelText(map, edge, plain: plain);
     if (text == null) continue;
-    label('lbl', i, fit(box, map.labelOf(edge).plain), text);
+    final pop = edge.kind == NavigationKind.pop;
+    label(
+      'lbl${pop ? ' pop' : ''}',
+      i,
+      fit(box, map.labelOf(edge).plain),
+      text,
+    );
   }
   for (final (i, entry) in map.sheet.entries.indexed) {
     label('entry', i, map.entryLabels[entry]!, _esc(entry.via));
@@ -203,9 +214,11 @@ String mapOver(SheetMap map, {bool plain = false}) {
   for (final (i, bundle) in map.layout.bundles.indexed) {
     final first = map.labelOf(bundle.edges.first);
     final count = map.bundleCount(bundle);
-    final text = _labelText(first, plain: plain);
+    final text = _labelText(map, bundle.edges.first, plain: plain);
+    // Dashed, as its line, when all in it go back.
+    final pop = bundle.edges.every((e) => e.kind == NavigationKind.pop);
     label(
-      'blbl',
+      'blbl${pop ? ' pop' : ''}',
       i,
       fit(map.bundleLabels[bundle]!, [?first.plain, count].join(' ')),
       text == null ? count : '$text $count',

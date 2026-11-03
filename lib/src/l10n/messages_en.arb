@@ -187,8 +187,12 @@
   "htmlLevelPages": "Pages",
   "htmlLevelFlow": "Flow",
   "htmlLevelActions": "Actions",
+  "htmlBackToggle": "Show or hide the arrows back",
+  "htmlRouteButton": "Route",
 
   "htmlTabMap": "Map",
+  "htmlTabTree": "Tree",
+  "htmlTreeOutside": "Not reached from the app's start",
   "htmlTabList": "Pages",
   "htmlTabTable": "Transitions",
   "htmlSearch": "Find a page",

@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:contact_sheet/src/layout.dart';
 import 'package:contact_sheet/src/messages.g.dart';
 import 'package:contact_sheet/src/sheet.dart';
+import 'package:contact_sheet/src/tree.dart';
 import 'package:crypto/crypto.dart';
 import 'package:shutter/shutter.dart';
 
@@ -84,6 +85,12 @@ String kindName(Messages m, NavigationKind kind) => switch (kind) {
 /// developers only.
 typedef EdgeLabel = ({String? code, String? plain, String? kind});
 
+/// A part of what anyone reads of an arrow's label: what is done
+/// ([LabelPart.does]), a state or the conditions' values it needs
+/// ([LabelPart.when]), or a redirect ([LabelPart.kind]). The map draws each
+/// apart, so the parts read apart.
+enum LabelPart { does, when, kind }
+
 /// Which app an export was drawn from: its version (the pubspec's), and the
 /// commit and branch it was at, when git knows them.
 typedef SheetRelease = ({String? version, String? commit, String? branch});
@@ -120,6 +127,26 @@ class SheetMap {
     gap: _columnGap,
     labelOf: edgeLabel,
   );
+
+  /// The pages as a tree, top to bottom, each the size the map draws it.
+  late final PageTree tree = PageTree.of(
+    sheet,
+    layout.nodes,
+    labelOf: treeLabel,
+    sizeOf: labelSize,
+  );
+
+  /// The words on a page's branch in the tree: what its transition says, as
+  /// on the map; a tab, its words, or its page's name where only the code
+  /// names it.
+  String? treeLabel(TreeLink link) => switch (link) {
+    (edge: final edge?, tab: _) => edgeLabel(edge),
+    (edge: _, tab: final tab?) =>
+      tab.trigger.namedInCode
+          ? sheet.pageOf(tab.page)!.label
+          : tab.trigger.what,
+    _ => null,
+  };
 
   /// The room between columns: enough for the widest arrow label to lie
   /// between two pages, within [MapLayout.maxColumnGap].
@@ -240,26 +267,35 @@ class SheetMap {
   /// anyone, go and replace for developers.
   EdgeLabel labelOf(SheetEdge edge) {
     final trigger = edge.trigger;
-    final said = trigger == null
-        ? null
-        : trigger.isBack
-        ? m.triggerBack
-        : trigger.what;
-    final rest = [
-      if (trigger != null && !trigger.namedInCode) ?said,
-      if (edge.when.isNotEmpty) edge.when.join(m.stateSeparator),
-      for (final values in edge.guard.values) values.join(m.stateSeparator),
-      if (edge.kind == NavigationKind.redirect) kindName(m, edge.kind),
-    ];
+    final rest = plainLabelParts(edge);
     return (
-      code: trigger != null && trigger.namedInCode ? said : null,
-      plain: rest.isEmpty ? null : rest.join(' / '),
+      code: trigger != null && trigger.namedInCode ? _said(trigger) : null,
+      plain: rest.isEmpty ? null : rest.map((p) => p.text).join(' / '),
       kind: switch (edge.kind) {
         NavigationKind.go || NavigationKind.replace => kindName(m, edge.kind),
         _ => null,
       },
     );
   }
+
+  /// What anyone reads of [edge]'s label ([labelOf]'s `plain`), part by
+  /// part, in its order.
+  List<({String text, LabelPart part})> plainLabelParts(SheetEdge edge) {
+    final trigger = edge.trigger;
+    return [
+      if (trigger != null && !trigger.namedInCode)
+        (text: _said(trigger), part: LabelPart.does),
+      if (edge.when.isNotEmpty)
+        (text: edge.when.join(m.stateSeparator), part: LabelPart.when),
+      for (final values in edge.guard.values)
+        (text: values.join(m.stateSeparator), part: LabelPart.when),
+      if (edge.kind == NavigationKind.redirect)
+        (text: kindName(m, edge.kind), part: LabelPart.kind),
+    ];
+  }
+
+  String _said(Trigger trigger) =>
+      trigger.isBack ? m.triggerBack : trigger.what;
 
   /// [labelOf] whole: what a developer reads.
   String? edgeLabel(SheetEdge edge) {
@@ -450,6 +486,11 @@ class SheetMap {
             'labelCode': labelOf(edge).code,
             'labelPlain': labelOf(edge).plain,
             'labelKind': labelOf(edge).kind,
+            // What anyone reads of it, part by part.
+            'labelParts': [
+              for (final p in plainLabelParts(edge))
+                {'text': p.text, 'part': p.part.name},
+            ],
             if (layout.curveOf(edge) case (
               final s,
               final c1,
@@ -476,6 +517,33 @@ class SheetMap {
             'labelAt': point(bundleLabels[bundle]!.center),
           },
       ],
+      // The pages as a tree, top to bottom: each under the page the fewest
+      // steps from the app's start first reach it from.
+      'tree': {
+        'width': _round(tree.width),
+        'height': _round(tree.height),
+        'outside': tree.outside,
+        'pages': [
+          for (final page in sheet.pages)
+            {
+              'page': page.id,
+              ...box(tree.nodes[page.id]!),
+              'parent': tree.parent[page.id],
+              'depth': tree.depth[page.id],
+              'edge': switch (tree.link[page.id]!.edge) {
+                final e? => sheet.edges.indexOf(e),
+                null => null,
+              },
+              'tab': tree.link[page.id]!.tab?.page,
+              if (tree.lines[page.id] case final line?)
+                'line': [for (final p in line) ...point(p)],
+              if (tree.labels[page.id] case final b?) ...{
+                'label': treeLabel(tree.link[page.id]!),
+                'labelAt': point(b.center),
+              },
+            },
+        ],
+      },
       'entries': [
         for (final entry in sheet.entries)
           {

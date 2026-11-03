@@ -326,7 +326,22 @@ void main() {
     // The map's drawing, as map.svg draws it, the code's names for
     // developers only, and never in a tooltip.
     expect(html, contains('<path class="edge" data-i="0"'));
-    expect(html, contains('<tspan class="dev">p1 / </tspan>Guest'));
+    // What anyone reads, part by part: the state it needs, here.
+    expect(
+      html,
+      contains(
+        '<tspan class="dev">p1 / </tspan><tspan class="l-when">Guest</tspan>',
+      ),
+    );
+    // What is done, and a redirect, each a part of its own.
+    expect(
+      html,
+      contains(
+        '<tspan class="l-does">Buy</tspan> / <tspan class="l-kind">redirect</tspan>',
+      ),
+    );
+    // An arrow back's label says so, to be hidden with it.
+    expect(html, contains('<g class="lbl pop" data-i="1">'));
     expect(html, contains('<title>ホーム → 詳細: Guest</title>'));
     // How the code keeps its pages, for developers too, one ' / ' apart.
     expect(
@@ -346,11 +361,21 @@ void main() {
     expect(svg, contains('>/products/:id</text>'));
     // map.svg for anyone: only what anyone reads, an arrow with nothing of
     // that unlabelled; map-dev.svg with what developers read too.
-    expect(svg, contains('text-anchor="middle">Guest</text>'));
+    expect(
+      svg,
+      contains(
+        'text-anchor="middle"><tspan class="l-when">Guest</tspan></text>',
+      ),
+    );
     expect(svg, isNot(contains('class="dev"')));
     expect(svg, isNot(contains('data-i="4"><rect class="edge-bg"')));
     final dev = File(p.join(out, 'map-dev.svg')).readAsStringSync();
-    expect(dev, contains('<tspan class="dev">p1 / </tspan>Guest'));
+    expect(
+      dev,
+      contains(
+        '<tspan class="dev">p1 / </tspan><tspan class="l-when">Guest</tspan>',
+      ),
+    );
     expect(dev, contains('<tspan class="dev">done</tspan>'));
     // Light or dark, as what shows it is set.
     expect(svg, contains('@media (prefers-color-scheme: dark)'));

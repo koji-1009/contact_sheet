@@ -10,6 +10,8 @@ import 'package:contact_sheet/src/svg.dart';
 /// in by the page.
 Map<String, String> htmlStrings(Messages m) => {
   'tabMap': m.htmlTabMap,
+  'tabTree': m.htmlTabTree,
+  'treeOutside': m.htmlTreeOutside,
   'tabList': m.htmlTabList,
   'tabTable': m.htmlTabTable,
   'zoomIn': m.htmlZoomIn,
@@ -42,6 +44,8 @@ Map<String, String> htmlStrings(Messages m) => {
   'level_pages': m.htmlLevelPages,
   'level_flow': m.htmlLevelFlow,
   'level_actions': m.htmlLevelActions,
+  'backToggle': m.htmlBackToggle,
+  'routeButton': m.htmlRouteButton,
   'entries': m.htmlEntries,
   'colVia': m.htmlColVia,
   for (final kind in NavigationKind.values)
@@ -143,7 +147,7 @@ const _template = r'''<!doctype html>
 __MAP_CSS__
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-body { margin: 0; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif; background: var(--bg); color: var(--text); }
+body { margin: 0; font: 14px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--text); }
 /* What only the app's developers read: the code. */
 body.plain .dev { display: none !important; }
 body:not(.plain) .plain-only { display: none !important; }
@@ -154,7 +158,7 @@ header input[type=search] { font: inherit; padding: 4px 10px; border: 1px solid 
 header label { font-size: 12px; color: var(--muted); display: flex; gap: 4px; align-items: center; cursor: pointer; }
 header select { font: inherit; font-size: 13px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--text); }
 /* Another variant than the map's: its images in the map's boxes, whole. */
-#canvas.contain .node img { object-fit: contain; object-position: center; background: var(--surface); }
+:is(#canvas, #tree-canvas).contain .node img { object-fit: contain; object-position: center; background: var(--surface); }
 nav { display: flex; gap: 4px; margin-left: auto; }
 nav button { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 6px; padding: 4px 12px; cursor: pointer; font: inherit; }
 nav button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -211,20 +215,31 @@ path.edge, g.lbl, g.entry, g.bundle, g.blbl { transition: opacity .3s; }
 #map-view[data-level="pages"] :is(path.edge, g.entry, g.bundle):not(.near),
 #map-view:is([data-level="pages"], [data-level="flow"]) :is(g.lbl, g.blbl, #over g.entry):not(.near) { visibility: hidden; pointer-events: none; }
 #map-view:is([data-level="pages"], [data-level="flow"]) .node .marks,
-#map-view[data-level="pages"] .legend .key { display: none; }
+#map-view[data-level="pages"] .legend { display: none; }
+/* The arrows back, hidden when the viewer chose so: those of a page chosen,
+   or of a route, stay. */
+#map-view.no-back :is(path.edge.pop, g.lbl.pop, g.bundle.pop, g.blbl.pop):not(.near) { visibility: hidden; pointer-events: none; }
+/* An arrow, or its label, tapped to read it: a wide line to tap, unseen. */
+#under path.hit { stroke: transparent; stroke-width: 14; stroke-dasharray: none; fill: none; pointer-events: stroke; cursor: pointer; }
+#over :is(g.lbl, g.blbl) { pointer-events: auto; cursor: pointer; }
 .tools { position: absolute; right: 12px; top: 12px; display: flex; gap: 4px; z-index: 2; }
-.tools button { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 6px; width: 32px; height: 32px; cursor: pointer; font-size: 16px; }
-.legend { position: absolute; left: 12px; bottom: 12px; z-index: 2; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; display: flex; gap: 12px; font-size: 12px; }
+.tools button { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 6px; min-width: 32px; height: 32px; cursor: pointer; font-size: 16px; }
+.tools #routeOpen { font-size: 13px; padding: 0 10px; }
+/* Under the map: how much it shows, and what its lines are. */
+.bar { position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; pointer-events: none; }
+.bar > * { pointer-events: auto; }
+.levels { display: flex; align-items: center; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 3px 3px 3px 10px; font-size: 12px; }
+.levels > span { color: var(--muted); margin-right: 4px; }
+.levels button { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 6px; padding: 2px 10px; cursor: pointer; font: inherit; }
+.levels button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.legend { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; }
 .legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid currentColor; vertical-align: middle; margin-right: 4px; }
 .legend i.dash { border-top-style: dashed; }
 .legend i.dot { border-top-style: dotted; }
-.legend button { border: 0; background: none; color: var(--text); font: inherit; padding: 0; cursor: pointer; }
-.legend button[aria-pressed="false"] { opacity: .45; }
-.legend button[aria-pressed="true"] { color: var(--accent); font-weight: 600; }
-.legend .levels { display: flex; gap: 8px; }
-.legend .levels + .key { border-left: 1px solid var(--line); padding-left: 12px; }
+.legend button { border: 0; background: none; color: inherit; font: inherit; padding: 0; cursor: pointer; }
+.legend button[aria-pressed="false"] { opacity: .45; text-decoration: line-through; }
 /* The chosen page, beside the map. */
-#card { position: absolute; right: 12px; bottom: 12px; z-index: 3; width: 320px; max-height: 60%; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 10px 12px; display: none; cursor: auto; }
+#card { position: absolute; right: 12px; bottom: 12px; z-index: 3; width: 320px; max-height: calc(100% - 68px); overflow: auto; overscroll-behavior: contain; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 10px 12px; display: none; cursor: auto; }
 #card.on { display: block; }
 #card h3 { margin: 0 0 2px; font-size: 15px; }
 #card .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
@@ -241,7 +256,7 @@ ul.says a:hover { background: var(--hover); }
 .card-states button[aria-pressed="true"] { border-color: var(--accent); outline: 1px solid var(--accent); }
 .card-states img { width: 40px; height: 64px; object-fit: cover; object-position: top; border-radius: 3px; }
 /* The route between two pages, beside the map. */
-#route { position: absolute; left: 12px; top: 12px; z-index: 3; width: 340px; max-height: calc(100% - 72px); overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 10px 12px; display: none; cursor: auto; }
+#route { position: absolute; left: 12px; top: 12px; z-index: 3; width: 340px; max-height: calc(100% - 72px); overflow: auto; overscroll-behavior: contain; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 10px 12px; display: none; cursor: auto; }
 #route.on { display: block; }
 #route h3 { margin: 0 0 8px; font-size: 14px; }
 #route .close { float: right; }
@@ -251,6 +266,17 @@ ul.says a:hover { background: var(--hover); }
 #route ol { margin: 0; padding-left: 20px; font-size: 13px; }
 #route li { margin: 4px 0; }
 #route li small { display: block; color: var(--muted); }
+/* tree: the pages top to bottom, scrolled, larger or smaller */
+.tree-wrap { position: relative; }
+#tree-view { height: calc(100vh - var(--header-h, 52px)); height: calc(100dvh - var(--header-h, 52px)); overflow: auto; overscroll-behavior: contain; }
+#tree-sizer { position: relative; }
+#tree-canvas { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+#tree-canvas svg { position: absolute; left: 0; top: 0; overflow: visible; }
+#tree-canvas path { fill: none; stroke: var(--e-sheet); stroke-width: 1.5; }
+.tlabel { position: absolute; transform: translate(-50%, -50%); background: var(--surface); border-radius: 4px; padding: 0 4px; font-size: 11px; line-height: 17px; color: var(--muted); white-space: nowrap; }
+.tlabel .l-does, .tlabel.tab { color: var(--text); }
+.tlabel .l-kind { font-style: italic; }
+.tree-outside { position: absolute; font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; }
 /* list */
 .wrap { padding: 16px; max-width: 1200px; margin: 0 auto; }
 h2 { font-size: 15px; margin: 24px 0 8px; color: var(--muted); }
@@ -285,7 +311,7 @@ tr.group td { border-top: 2px solid var(--line); }
 /* detail */
 #detail { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: none; z-index: 10; }
 #detail.on { display: block; }
-#detail .panel { position: absolute; right: 0; top: 0; bottom: 0; width: min(920px, 100%); background: var(--bg); overflow: auto; padding: 16px 20px; box-shadow: -4px 0 24px rgba(0,0,0,.2); }
+#detail .panel { position: absolute; right: 0; top: 0; bottom: 0; width: min(920px, 100%); background: var(--bg); overflow: auto; overscroll-behavior: contain; padding: 16px 20px; box-shadow: -4px 0 24px rgba(0,0,0,.2); }
 #detail .close { float: right; }
 #detail .state, #detail .state img, #detail .state .none { width: 240px; }
 /* An image, large. */
@@ -300,17 +326,17 @@ tr.group td { border-top: 2px solid var(--line); }
   header input[type=search] { min-width: 0; flex: 1 1 140px; }
   nav { margin-left: 0; }
   .flows { grid-template-columns: 1fr; }
-  #card { left: 12px; right: 12px; width: auto; bottom: 56px; max-height: 45%; }
+  #card { left: 12px; right: 12px; width: auto; bottom: calc(var(--bar-h, 32px) + 20px); max-height: 45%; }
   #route { right: 12px; width: auto; }
-  .legend { flex-wrap: wrap; right: 12px; }
   .wrap { padding: 12px; }
 }
-/* On paper: the list, or the table, whole; the map is map.svg's. */
+/* On paper: the list, or the table, whole; the map is map.svg's, and from
+   the map or the tree, the list is printed. */
 @media print {
   header input, header label, nav, .actions, .tools, #detail, #zoom, #route, #card { display: none !important; }
   header { position: static; border: 0; }
-  body[data-view="map"] #sec-map { display: none; }
-  body[data-view="map"] #sec-list { display: block; }
+  body:is([data-view="map"], [data-view="tree"]) :is(#sec-map, #sec-tree) { display: none; }
+  body:is([data-view="map"], [data-view="tree"]) #sec-list { display: block; }
   #nomatch { display: none !important; }
   .row { break-inside: avoid; border-color: #bbb; }
   .row.hit { outline: 0; }
@@ -330,14 +356,17 @@ tr.group td { border-top: 2px solid var(--line); }
   <label id="variant-pick" hidden><span data-t="variant"></span><select id="variant"></select></label>
   <nav>
     <button data-tab="map" data-t="tabMap"></button>
+    <button data-tab="tree" data-t="tabTree"></button>
     <button data-tab="list" data-t="tabList"></button>
     <button data-tab="table" data-t="tabTable"></button>
   </nav>
 </header>
 <main>
-  <section id="sec-map"><div id="map-view"><div class="tools"><button id="routeOpen" data-title="route">⇢</button><button id="zin" data-title="zoomIn">＋</button><button id="zout" data-title="zoomOut">－</button><button id="fit" data-title="fit">⤢</button></div>
+  <section id="sec-map"><div id="map-view"><div class="tools"><button id="routeOpen" data-title="route">⇢ <span data-t="routeButton"></span></button><button id="zin" data-title="zoomIn">＋</button><button id="zout" data-title="zoomOut">－</button><button id="fit" data-title="fit">⤢</button></div>
     <div id="canvas"><svg id="under">__MAP_DEFS____MAP_UNDER__</svg><svg id="over">__MAP_OVER__</svg></div>
-    <div class="legend" id="legend"></div><div id="card"></div><div id="route"></div></div></section>
+    <div class="bar" id="bar"><div class="levels" id="levels"></div><div class="legend" id="legend"></div></div><div id="card"></div><div id="route"></div></div></section>
+  <section id="sec-tree"><div class="tree-wrap"><div class="tools"><button id="tzin" data-title="zoomIn">＋</button><button id="tzout" data-title="zoomOut">－</button><button id="tfit" data-title="fit">⤢</button></div>
+    <div id="tree-view"><div id="tree-sizer"><div id="tree-canvas"></div></div></div></div></section>
   <section id="sec-list"><div class="wrap"><p id="nomatch" data-t="noMatch"></p><div id="page-list"></div></div></section>
   <section id="sec-table"><div class="wrap" id="edge-table"></div></section>
 </main>
@@ -538,6 +567,17 @@ const entryLabels = byIndex('#over g.entry');
 const bundles = S.bundles;
 const bundleLines = byIndex('#under g.bundle');
 const bundleLabels = byIndex('#over g.blbl');
+// Each arrow, and each bundle's line, has a wide line over it to tap,
+// unseen, shown or hidden as its own is.
+const hitOf = (path) => {
+  const hit = path.cloneNode(false);
+  hit.classList.add('hit');
+  hit.removeAttribute('marker-end');
+  path.after(hit);
+  return hit;
+};
+const edgeHits = edgePaths.map((p) => p && hitOf(p));
+for (const g of bundleLines) if (g) hitOf(g.querySelector('path'));
 const nodes = {};
 for (const p of S.pages) {
   const n = document.createElement('div');
@@ -591,14 +631,20 @@ function backgrounds() {
 }
 // How much the map shows, and what its lines are.
 const levels = ['pages', 'flow', 'actions'];
+$('#levels').setAttribute('role', 'group');
+$('#levels').setAttribute('aria-label', T('show'));
+$('#levels').innerHTML = `<span>${esc(T('show'))}</span>${levels.map((l) =>
+  `<button data-level="${l}" aria-pressed="false">${esc(T('level_' + l))}</button>`).join('')}`;
+// The arrows back can be hidden: on a large app they are many, and their
+// dashed line says what they do.
 $('#legend').innerHTML = [
-  `<span class="levels" role="group" aria-label="${esc(T('show'))}"><span>${esc(T('show'))}</span>${levels.map((l) =>
-    `<button data-level="${l}" aria-pressed="false">${esc(T('level_' + l))}</button>`).join('')}</span>`,
   edges.some((e) => e.kind !== 'pop') ? `<span class="key e-sheet"><i></i>${esc(T('legendSheet'))}</span>` : '',
-  edges.some((e) => e.kind === 'pop') ? `<span class="key e-sheet"><i class="dash"></i>${esc(T('legendBack'))}</span>` : '',
+  edges.some((e) => e.kind === 'pop') ? `<button class="key e-sheet" id="backToggle" aria-pressed="true" title="${esc(T('backToggle'))}"><i class="dash"></i>${esc(T('legendBack'))}</button>` : '',
   entries.length ? `<span class="key e-entry"><i class="dot"></i>${esc(T('legendEntries'))}</span>` : '',
 ].join('');
-if (!edges.length && !entries.length) $('#legend').style.display = 'none';
+if (!edges.length && !entries.length) $('#bar').style.display = 'none';
+// How tall what is under the map is, for the card on a phone to sit above it.
+const fitBar = () => map.style.setProperty('--bar-h', $('#bar').offsetHeight + 'px');
 // The pages alone (to look at the screens), with the arrows (to see how they
 // lead to each other), or with what each arrow says (the default). Kept in
 // the address (?show=) to pass around, and for the viewer.
@@ -611,18 +657,32 @@ let level = (() => {
 function setLevel(l, { remember = true } = {}) {
   level = l;
   map.dataset.level = l;
-  for (const b of $('#legend').querySelectorAll('[data-level]')) b.setAttribute('aria-pressed', b.dataset.level === l);
+  for (const b of $('#levels').querySelectorAll('[data-level]')) b.setAttribute('aria-pressed', b.dataset.level === l);
+  requestAnimationFrame(fitBar);
   if (!remember) return;
   try { localStorage.setItem('contact_sheet.show', l); } catch {}
   const url = new URL(location.href);
   if (l === 'actions') url.searchParams.delete('show'); else url.searchParams.set('show', l);
   history.replaceState(null, '', url);
 }
-$('#legend').addEventListener('click', (e) => {
+$('#levels').addEventListener('click', (e) => {
   const b = e.target.closest('[data-level]');
   if (b) setLevel(b.dataset.level);
 });
 setLevel(level, { remember: false });
+// The arrows back, shown (the default) or hidden. Kept in the address
+// (?back=hide) to pass around, and for the viewer.
+function setBack(on, { remember = true } = {}) {
+  map.classList.toggle('no-back', !on);
+  $('#backToggle')?.setAttribute('aria-pressed', on);
+  if (!remember) return;
+  save('contact_sheet.back', on);
+  const url = new URL(location.href);
+  if (on) url.searchParams.delete('back'); else url.searchParams.set('back', 'hide');
+  history.replaceState(null, '', url);
+}
+setBack(new URLSearchParams(location.search).get('back') === 'hide' ? false : load('contact_sheet.back', true), { remember: false });
+$('#backToggle')?.addEventListener('click', () => setBack(map.classList.contains('no-back')));
 
 let view = { x: 0, y: 0, k: 1 };
 const apply = () => {
@@ -646,8 +706,11 @@ function show(box, glide, { left = 0, right = 0, top = 0, bottom = 0 } = {}) {
   if (glide) setTimeout(() => canvas.classList.remove('moving'), 460);
 }
 const whole = () => ({ x: 0, y: 0, width: S.canvas.width, height: S.canvas.height });
-// Whether the panels sit beside what the map shows, or across it (a phone).
-const wide = () => map.clientWidth > 720;
+// Whether the panels sit beside what the map shows, or across it (a phone):
+// as the CSS lays them out.
+const wide = () => !matchMedia('(max-width: 640px)').matches;
+// Where the map moves what it shows to, clear of the card.
+const clearOfCard = (card) => wide() ? { right: card.offsetWidth + 24 } : { bottom: card.offsetHeight + $('#bar').offsetHeight + 32 };
 function zoom(f, cx, cy) {
   const m = map.getBoundingClientRect();
   cx ??= m.width / 2; cy ??= m.height / 2;
@@ -672,6 +735,7 @@ function highlight(near, edgeOn, entryOn, sel) {
   edges.forEach((e, i) => {
     const on = edgeOn(i);
     edgePaths[i]?.classList.toggle('near', on);
+    edgeHits[i]?.classList.toggle('near', on);
     edgeLabels[i]?.classList.toggle('near', on);
   });
   entries.forEach((en, i) => {
@@ -763,9 +827,10 @@ let focused = null;
 let routed = null;
 function focus(id, glide, { state } = {}) {
   const p = pageById[id];
-  if (focused !== (p ? id : null)) firstStates();
+  if (focused !== (p ? id : null) || picked) firstStates();
   focused = p ? id : null;
   routed = null;
+  picked = null;
   $('#route').classList.remove('on');
   const card = $('#card');
   if (!focused) { highlight(new Set(), () => false, () => false, null); card.classList.remove('on'); show(whole(), glide); return; }
@@ -803,7 +868,24 @@ function focus(id, glide, { state } = {}) {
   $('#enlarge').onclick = () => enlarge(focused);
   // The pages beside the card, at the right; on a phone, where it lies
   // across the bottom, above it.
-  show(around(frame), glide, wide() ? { right: card.offsetWidth + 24 } : { bottom: card.offsetHeight + 68 });
+  show(around(frame), glide, clearOfCard(card));
+}
+// An arrow tapped on the map, or its label (a bundle's: each arrow in it):
+// what it is, as a sentence, in the card, with the pages at its ends.
+let picked = null;
+function pick(list, glide) {
+  focused = null;
+  routed = null;
+  picked = list;
+  firstStates();
+  $('#route').classList.remove('on');
+  const ends = new Set(list.flatMap((i) => [edges[i].from, edges[i].to]));
+  highlight(ends, (i) => list.includes(i), () => false, null);
+  const card = $('#card');
+  card.innerHTML = `<h3>${esc(T('legendSheet'))}</h3><ul class="says">${list.map((i) => `<li>${sentence(edges[i], { from: true })}</li>`).join('')}</ul>
+    <div class="actions">${[...ends].map((id) => `<button class="link" data-go="map/${esc(id)}">${esc(label(id))}</button>`).join('')}</div>`;
+  card.classList.add('on');
+  show(around(ends), glide, clearOfCard(card));
 }
 // A state chosen beside the page: the map shows it, and its address says it.
 $('#card').addEventListener('click', (e) => {
@@ -845,6 +927,7 @@ function showRoute(from, to, glide, state, valuation) {
   from = pageById[from] ? from : S.pages[0].id;
   to = pageById[to] ? to : (S.pages.find((p) => p.id !== from) ?? S.pages[0]).id;
   focused = null;
+  picked = null;
   routed = [from, to, state, valuation];
   $('#card').classList.remove('on');
   const found = routeOf(from, state, to, valuation);
@@ -916,7 +999,7 @@ $('#routeOpen').onclick = () => {
 // smaller around where they are.
 let drag = null, moved = false, pinch = null;
 const touches = new Map();
-const panels = '.tools, #card, #route, .legend';
+const panels = '.tools, #card, #route, .bar';
 const apart = () => { const [a, b] = [...touches.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
 map.addEventListener('pointerdown', (e) => {
   if (e.target.closest(panels)) return;
@@ -944,9 +1027,21 @@ const lift = (e) => {
 };
 window.addEventListener('pointerup', lift);
 window.addEventListener('pointercancel', lift);
-// A click on the map, off the pages, lets the chosen page go.
-map.addEventListener('click', (e) => { if (!moved && focused && !e.target.closest('.node, ' + panels)) go('map'); });
+// A click on the map, off the pages, lets the chosen page, or arrow, go.
+map.addEventListener('click', (e) => { if (!moved && (focused || picked) && !e.target.closest('.node, ' + panels)) go('map'); });
+// An arrow, or its label, tapped: read in the card.
+canvas.addEventListener('click', (e) => {
+  if (moved) return;
+  const t = e.target.closest('#under path.hit, #over g.lbl, #over g.blbl');
+  if (!t) return;
+  e.stopPropagation();
+  const g = t.closest('[data-i]');
+  const i = +g.dataset.i;
+  pick(g.matches('g.bundle, g.blbl') ? bundles[i].edges : [i], true);
+});
+// Over a panel, the wheel scrolls it; elsewhere, it moves the map.
 map.addEventListener('wheel', (e) => {
+  if (e.target.closest(panels)) return;
   e.preventDefault();
   const m = map.getBoundingClientRect();
   if (e.ctrlKey || e.metaKey || Math.abs(e.deltaY) > Math.abs(e.deltaX) * 2 && !e.shiftKey) {
@@ -1065,6 +1160,95 @@ $('#edge-table').innerHTML = edgeRows([...once].sort((a, b) => rowOrder(a) - row
   [COLS.from, COLS.when, COLS.trigger, COLS.to, COLS.kind, COLS.code], true)
   + entryRows(entries, [COLS.to, COLS.via, COLS.code]);
 
+// --- tree: the pages top to bottom, as a site map draws an app; each under
+// the page the fewest steps from the app's start first reach it from ---
+const tree = S.tree;
+const treeById = Object.fromEntries(tree.pages.map((t) => [t.page, t]));
+const treeView = $('#tree-view'), treeCanvas = $('#tree-canvas'), treeSizer = $('#tree-sizer');
+// An arrow's words part by part, as the map draws them: what only the code
+// names and how it keeps its pages, for developers.
+const partsHtml = (e) => [
+  e.labelCode ? `<span class="dev">${esc(e.labelCode)}${e.labelParts.length ? ' / ' : ''}</span>` : '',
+  e.labelParts.map((p) => `<span class="l-${esc(p.part)}">${esc(p.text)}</span>`).join(' / '),
+  e.labelKind ? `<span class="dev">${e.labelCode || e.labelParts.length ? ' / ' : ''}${esc(e.labelKind)}</span>` : '',
+].join('');
+// Each tree's root, to tell the trees not reached from the app's start.
+const rootOf = (t) => { while (t.parent) t = treeById[t.parent]; return t.page; };
+let treeNodes = {};
+// Drawn again when another variant is shown.
+function renderTree() {
+  const lines = tree.pages.filter((t) => t.line).map((t) => {
+    const pts = [];
+    for (let i = 0; i < t.line.length; i += 2) pts.push(t.line[i] + ',' + t.line[i + 1]);
+    return `<path d="M${pts.join(' L')}"/>`;
+  }).join('');
+  const words = tree.pages.filter((t) => t.labelAt).map((t) => {
+    const e = t.edge != null ? edges[t.edge] : null;
+    const cls = e ? (e.labelParts.length ? '' : ' dev') : ' tab';
+    return `<div class="tlabel${cls}" style="left:${t.labelAt[0]}px;top:${t.labelAt[1]}px">${e ? partsHtml(e) : esc(t.label)}</div>`;
+  }).join('');
+  // Over the trees after the app's: they are not reached from its start.
+  const outside = new Set(tree.outside);
+  const apart = tree.pages.filter((t) => outside.has(rootOf(t)));
+  const heading = apart.length
+    ? `<div class="tree-outside" style="left:${Math.min(...apart.map((t) => t.x))}px;top:${tree.pages[0].y - 40}px">${esc(T('treeOutside'))}</div>` : '';
+  treeCanvas.style.width = tree.width + 'px';
+  treeCanvas.style.height = tree.height + 'px';
+  treeCanvas.innerHTML = `<svg width="${tree.width}" height="${tree.height}">${lines}</svg>${heading}${words}`;
+  treeNodes = {};
+  for (const t of tree.pages) {
+    const p = pageById[t.page];
+    const s = drawn(p.states[0]);
+    const n = document.createElement('div');
+    n.className = 'node';
+    n.style.left = t.x + 'px'; n.style.top = t.y + 'px'; n.style.width = t.width + 'px';
+    n.innerHTML = `<div class="img" style="height:${t.height}px">${s.image ? `<img src="${esc(s.image)}" alt="${esc(p.label)}" loading="lazy">` : ''}</div><div class="label"><span>${esc(p.label)}</span><small></small></div>`;
+    n.title = T(p.states.length === 1 ? 'statesOfOne' : 'statesOf', { page: p.label, count: p.states.length });
+    // Its details, over the tree.
+    n.addEventListener('click', () => go('page', t.page));
+    treeCanvas.appendChild(n);
+    treeNodes[t.page] = n;
+  }
+}
+renderTree();
+// Larger or smaller: the whole width to begin with, not too small to read.
+let tk = 1, treeFitted = false;
+function zoomTree(k, cx, cy) {
+  const r = treeView.getBoundingClientRect();
+  cx ??= r.width / 2; cy ??= r.height / 2;
+  const at = { x: (treeView.scrollLeft + cx) / tk, y: (treeView.scrollTop + cy) / tk };
+  tk = Math.max(0.2, Math.min(2, k));
+  treeCanvas.style.transform = `scale(${tk})`;
+  treeSizer.style.width = tree.width * tk + 'px';
+  treeSizer.style.height = tree.height * tk + 'px';
+  treeView.scrollLeft = at.x * tk - cx;
+  treeView.scrollTop = at.y * tk - cy;
+}
+const fitTree = () => zoomTree(Math.max(0.4, Math.min(1, treeView.clientWidth / tree.width)), 0, 0);
+$('#tzin').onclick = () => zoomTree(tk * 1.25);
+$('#tzout').onclick = () => zoomTree(tk * 0.8);
+$('#tfit').onclick = () => { fitTree(); treeView.scrollTo(0, 0); };
+// A pinch, or the wheel with Ctrl or Cmd, zooms; the wheel alone scrolls.
+treeView.addEventListener('wheel', (e) => {
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+  const r = treeView.getBoundingClientRect();
+  zoomTree(tk * Math.exp(-e.deltaY * 0.002), e.clientX - r.left, e.clientY - r.top);
+}, { passive: false });
+// The page [id] chosen in the tree: scrolled to, and marked.
+function showTree(id, glide) {
+  if (!treeFitted && treeView.clientWidth) { fitTree(); treeFitted = true; }
+  for (const n of treeCanvas.querySelectorAll('.node.sel')) n.classList.remove('sel');
+  const t = treeById[id];
+  if (!t) return;
+  treeNodes[id].classList.add('sel');
+  treeView.scrollTo({
+    left: (t.x + t.width / 2) * tk - treeView.clientWidth / 2,
+    top: t.y * tk - 80,
+    behavior: glide ? 'smooth' : 'auto',
+  });
+}
+
 // --- detail ---
 function openPanel(html) {
   $('#panel').innerHTML = `<button class="link close" id="close">${esc(T('close'))}</button>${html}`;
@@ -1119,12 +1303,19 @@ document.addEventListener('click', (e) => {
   else if (target.dataset.detail) go('page', target.dataset.detail);
   else zoomImage(target);
 });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closePage(); $('#zoom').classList.remove('on'); } });
+// Escape closes what is on top: the image, the details, then the card or
+// the route on the map.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if ($('#zoom').classList.contains('on')) $('#zoom').classList.remove('on');
+  else if ($('#detail').classList.contains('on')) closePage();
+  else if (current === 'map' && (focused || routed || picked)) go('map');
+});
 
 // --- views and their addresses: #map, #map/<page>, #map/<page>/<state>,
 // #route/<from>/<to>, #route/<from>/<state>/<to>, #list/<page>,
 // #page/<page> (its details, over the view), #table ---
-const views = ['map', 'list', 'table'];
+const views = ['map', 'tree', 'list', 'table'];
 let current = null;
 function go(v, id) {
   const hash = '#' + v + (id ? '/' + encodeURIComponent(id) : '');
@@ -1152,11 +1343,17 @@ function route() {
   $('#detail').classList.remove('on');
   if (name === 'map') requestAnimationFrame(() => {
     if (!measured) backgrounds();
+    fitBar();
     // A route from a page in a state names three: #route/<from>/<state>/<to>.
     if (v === 'route') {
       const chosen = Object.keys(valuation).length ? valuation : undefined;
       if (ids.length > 2) showRoute(ids[0], ids[2], !first, ids[1], chosen); else showRoute(ids[0], ids[1], !first, undefined, chosen);
     } else focus(ids[0] ?? null, !first, { state: ids[1] });
+  });
+  if (name === 'tree') requestAnimationFrame(() => {
+    if (!treeFitted && treeView.clientWidth) { fitTree(); treeFitted = true; }
+    if (ids[0]) showTree(ids[0], !first);
+    else for (const n of treeCanvas.querySelectorAll('.node.sel')) n.classList.remove('sel');
   });
   if (name === 'list') { if (ids[0]) requestAnimationFrame(() => toRow(ids[0], !first)); else if (first) window.scrollTo(0, 0); }
 }
@@ -1170,7 +1367,10 @@ window.addEventListener('resize', () => {
     resizing = false;
     fitHeader();
     if (current !== 'map') return;
-    if (routed) showRoute(...routed.slice(0, 2), false, ...routed.slice(2)); else focus(focused, false);
+    fitBar();
+    if (routed) showRoute(...routed.slice(0, 2), false, ...routed.slice(2));
+    else if (picked) pick(picked, false);
+    else focus(focused, false);
   });
 });
 // On paper, every image, not only those scrolled to.
@@ -1201,12 +1401,14 @@ function setCode(on) {
 function setVariant(i) {
   variant = i;
   canvas.classList.toggle('contain', i > 0);
+  treeCanvas.classList.toggle('contain', i > 0);
   try { localStorage.setItem('contact_sheet.variant', variantName()); } catch {}
   const url = new URL(location.href);
   if (i) url.searchParams.set('variant', variantName()); else url.searchParams.delete('variant');
   history.replaceState(null, '', url);
   for (const p of S.pages) showState(p.id, shownState[p.id] ?? 0);
   renderList();
+  renderTree();
   filter();
   if (current === 'map' && focused) focus(focused, false, { state: chosen(focused) ?? undefined });
   if ($('#detail').classList.contains('on') && location.hash.startsWith('#page/')) openPage(decodeURIComponent(location.hash.slice('#page/'.length)));
@@ -1218,6 +1420,7 @@ if (variants.length > 1) {
   pick.onchange = () => setVariant(+pick.value);
   $('#variant-pick').hidden = false;
   canvas.classList.toggle('contain', variant > 0);
+  treeCanvas.classList.toggle('contain', variant > 0);
 }
 code.checked = load('contact_sheet.code', false);
 setCode(code.checked);

@@ -58,7 +58,7 @@ edges:
     // index.html.
     final svg = exportSvg(map, (_) => null, plain: true);
     expect(svg, contains('class="blbl"'));
-    expect(svg, contains('>Home ×3</text>'));
+    expect(svg, contains('><tspan class="l-does">Home</tspan> ×3</text>'));
     expect(svg, contains('<a class="page-link" href="index.html#map/home">'));
   });
 
