@@ -29,6 +29,8 @@ Contact Sheet draws the sheet as it is: it does not check it against the app.
 - What only developers read (the code's names and files) is behind “For developers”.
 - Light and dark, a phone's width, and print.
 
+![The tree of the shop example: each page under the page the app's start first reaches it from](https://raw.githubusercontent.com/koji-1009/contact_sheet/main/doc/images/tree.png)
+
 `contact_sheet/map/` holds:
 
 - `index.html`, with the images in `images/` next to it: opened from disk or served anywhere.

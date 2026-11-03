@@ -269,7 +269,8 @@ ul.says a:hover { background: var(--hover); }
 /* tree: the pages top to bottom, scrolled, larger or smaller */
 .tree-wrap { position: relative; }
 #tree-view { height: calc(100vh - var(--header-h, 52px)); height: calc(100dvh - var(--header-h, 52px)); overflow: auto; overscroll-behavior: contain; }
-#tree-sizer { position: relative; }
+/* Narrower than the view, in its middle. */
+#tree-sizer { position: relative; margin: 0 auto; }
 #tree-canvas { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 #tree-canvas svg { position: absolute; left: 0; top: 0; overflow: visible; }
 #tree-canvas path { fill: none; stroke: var(--e-sheet); stroke-width: 1.5; }
@@ -1211,7 +1212,8 @@ function renderTree() {
   }
 }
 renderTree();
-// Larger or smaller: the whole width to begin with, not too small to read.
+// Larger or smaller: the whole tree to begin with, as the map's whole, not
+// too small to read.
 let tk = 1, treeFitted = false;
 function zoomTree(k, cx, cy) {
   const r = treeView.getBoundingClientRect();
@@ -1224,7 +1226,7 @@ function zoomTree(k, cx, cy) {
   treeView.scrollLeft = at.x * tk - cx;
   treeView.scrollTop = at.y * tk - cy;
 }
-const fitTree = () => zoomTree(Math.max(0.4, Math.min(1, treeView.clientWidth / tree.width)), 0, 0);
+const fitTree = () => zoomTree(Math.max(0.4, Math.min(1, treeView.clientWidth / tree.width, treeView.clientHeight / tree.height)), 0, 0);
 $('#tzin').onclick = () => zoomTree(tk * 1.25);
 $('#tzout').onclick = () => zoomTree(tk * 0.8);
 $('#tfit').onclick = () => { fitTree(); treeView.scrollTo(0, 0); };
