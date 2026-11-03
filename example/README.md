@@ -11,8 +11,8 @@ Three Flutter apps, each with its sheet (`contact_sheet/sheet.yaml`) written as 
 What each sheet shows:
 
 - `shop_app`: conditions the app keeps across its pages (`Login`, `Cart`): the home page's states are of the login, the cart's and checkout's of the cart, and the router's redirect for a guest is an edge of its own (`if: {Login: Guest}`). A route from home to checkout as a guest goes through logging in.
-- `notes_app`: `data` states (an empty list, loading), a page opened in the state its argument decides (`then: 新規`, `then: 編集`), saving that goes back to where the editor was opened from (a `pop` for each state), and `variants`.
-- `tabs_app`: tabs written as `replace` edges from a list of pages (`from: [search, profile]`), signing in that the profile keeps after the tabs change (`set: {ログイン: ログイン済み}`), and signing out in place (an edge from the page to itself).
+- `notes_app`: `data` states (an empty list, loading), a page opened in the state its argument decides (`then: New`, `then: Existing`), saving that goes back to where the editor was opened from (a `pop` for each state), and `variants`.
+- `tabs_app`: tabs written as `replace` edges from a list of pages (`from: [search, profile]`), signing in that the profile keeps after the tabs change (`set: {Login: Signed in}`), and signing out in place (an edge from the page to itself).
 
 To draw one, from the repository's root:
 

@@ -10,10 +10,10 @@ class NotesPage extends StatelessWidget {
     final store = NotesScope.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('メモ'),
+        title: const Text('Notes'),
         actions: [
           IconButton(
-            tooltip: '設定',
+            tooltip: 'Settings',
             icon: const Icon(Icons.settings_outlined),
             onPressed: () => Navigator.pushNamed(context, '/settings'),
           ),
@@ -22,7 +22,7 @@ class NotesPage extends StatelessWidget {
       body: store.loading
           ? const Center(child: CircularProgressIndicator())
           : store.notes.isEmpty
-          ? const Center(child: Text('メモはまだありません'))
+          ? const Center(child: Text('No notes yet'))
           : ListView(
               children: [
                 for (final note in store.notes)
@@ -39,7 +39,7 @@ class NotesPage extends StatelessWidget {
               ],
             ),
       floatingActionButton: FloatingActionButton(
-        tooltip: '新しいメモ',
+        tooltip: 'New note',
         onPressed: () => Navigator.pushNamed(context, '/edit'),
         child: const Icon(Icons.add),
       ),

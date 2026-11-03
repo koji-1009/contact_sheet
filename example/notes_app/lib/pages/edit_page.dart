@@ -52,12 +52,12 @@ class _EditPageState extends State<EditPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.id == null ? '新しいメモ' : 'メモを編集'),
+        title: Text(widget.id == null ? 'New note' : 'Edit note'),
         actions: [
           TextButton(
             key: const ValueKey('save'),
             onPressed: _save,
-            child: const Text('保存'),
+            child: const Text('Save'),
           ),
         ],
       ),
@@ -67,13 +67,13 @@ class _EditPageState extends State<EditPage> {
           children: [
             TextField(
               controller: _title,
-              decoration: const InputDecoration(labelText: 'タイトル'),
+              decoration: const InputDecoration(labelText: 'Title'),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _body,
               maxLines: 8,
-              decoration: const InputDecoration(labelText: '本文'),
+              decoration: const InputDecoration(labelText: 'Body'),
             ),
           ],
         ),

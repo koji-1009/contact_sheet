@@ -6,11 +6,11 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('設定')),
+      appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: const [
-          SwitchListTile(value: true, onChanged: null, title: Text('同期する')),
-          ListTile(title: Text('バージョン'), trailing: Text('1.0.0')),
+          SwitchListTile(value: true, onChanged: null, title: Text('Sync')),
+          ListTile(title: Text('Version'), trailing: Text('1.0.0')),
         ],
       ),
     );

@@ -8,9 +8,13 @@ import 'package:tabs_app/services.dart';
 // puts the real services, and the page in the app's theme.
 
 const previewPosts = [
-  Post(id: 'p1', author: 'Aoi', text: '新しいカフェに行ってきた'),
-  Post(id: 'p2', author: 'Ren', text: 'Flutter のプレビューで画面を一覧にした'),
-  Post(id: 'p3', author: 'Mio', text: '週末は山へ'),
+  Post(id: 'p1', author: 'Aoi', text: 'Tried the new café'),
+  Post(
+    id: 'p2',
+    author: 'Ren',
+    text: 'Every screen in one list, from previews',
+  ),
+  Post(id: 'p3', author: 'Mio', text: 'Off to the mountains this weekend'),
 ];
 
 class _FakeFeed implements FeedApi {

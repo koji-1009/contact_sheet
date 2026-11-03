@@ -4,7 +4,7 @@ import 'package:notes_app/pages/notes_page.dart';
 import 'package:notes_app/previews/devices.dart';
 import 'package:notes_app/previews/fake_notes.dart';
 
-@Devices(group: 'メモ一覧 · 3件', wrapper: threeNotes)
-@Devices(group: 'メモ一覧 · 空', wrapper: noNotes)
-@Devices(group: 'メモ一覧 · 読み込み中', wrapper: loadingNotes)
+@Devices(group: 'Notes · Three notes', wrapper: threeNotes)
+@Devices(group: 'Notes · Empty', wrapper: noNotes)
+@Devices(group: 'Notes · Loading', wrapper: loadingNotes)
 Widget notesPage() => const NotesPage();

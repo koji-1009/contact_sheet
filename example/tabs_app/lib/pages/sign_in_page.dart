@@ -8,12 +8,12 @@ class SignInPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('ログイン')),
+      appBar: AppBar(title: const Text('Sign in')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            const TextField(decoration: InputDecoration(labelText: 'ユーザー名')),
+            const TextField(decoration: InputDecoration(labelText: 'Username')),
             const SizedBox(height: 24),
             FilledButton(
               key: const ValueKey('submit'),
@@ -21,7 +21,7 @@ class SignInPage extends StatelessWidget {
                 Services.session.signIn('koji');
                 Navigator.pop(context);
               },
-              child: const Text('ログインする'),
+              child: const Text('Sign in'),
             ),
           ],
         ),

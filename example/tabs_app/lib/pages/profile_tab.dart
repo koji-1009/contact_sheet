@@ -15,7 +15,7 @@ class _ProfileTabState extends State<ProfileTab> {
   Widget build(BuildContext context) {
     final user = Services.session.user;
     return Scaffold(
-      appBar: AppBar(title: const Text('プロフィール')),
+      appBar: AppBar(title: const Text('Profile')),
       body: Center(
         child: user == null
             ? FilledButton(
@@ -31,7 +31,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   );
                   setState(() {});
                 },
-                child: const Text('ログイン'),
+                child: const Text('Sign in'),
               )
             : Column(
                 mainAxisSize: MainAxisSize.min,
@@ -42,7 +42,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   const SizedBox(height: 24),
                   OutlinedButton(
                     onPressed: () => setState(() => Services.session.signOut()),
-                    child: const Text('ログアウト'),
+                    child: const Text('Sign out'),
                   ),
                 ],
               ),

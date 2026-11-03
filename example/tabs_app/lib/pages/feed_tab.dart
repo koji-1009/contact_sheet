@@ -10,7 +10,7 @@ class FeedTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final posts = Services.feed.latest();
     return Scaffold(
-      appBar: AppBar(title: const Text('フィード')),
+      appBar: AppBar(title: const Text('Feed')),
       body: ListView(
         children: [
           for (final post in posts)

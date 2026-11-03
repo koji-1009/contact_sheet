@@ -25,7 +25,7 @@ class _SearchTabState extends State<SearchTab> {
         ? const <Post>[]
         : Services.feed.search(_query.text);
     return Scaffold(
-      appBar: AppBar(title: const Text('検索')),
+      appBar: AppBar(title: const Text('Search')),
       body: Column(
         children: [
           Padding(
@@ -35,7 +35,7 @@ class _SearchTabState extends State<SearchTab> {
               onChanged: (_) => setState(() {}),
               decoration: const InputDecoration(
                 prefixIcon: Icon(Icons.search),
-                hintText: '投稿を検索',
+                hintText: 'Search posts',
               ),
             ),
           ),

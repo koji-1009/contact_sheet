@@ -14,67 +14,67 @@ dependencies:
 
 # Signing in is kept by the session, whichever tab is shown.
 conditions:
-  - name: ログイン
-    values: [未ログイン, ログイン済み]
+  - name: Login
+    values: [Guest, Signed in]
     source: lib/services.dart
 
 pages:
   - id: feed
-    label: フィード
-    section: タブ
+    label: Feed
+    section: Tabs
     widget: FeedTab
     source: lib/pages/feed_tab.dart
-    memo: HomeShell の 1 つ目のタブ。タブは履歴を持たず、切り替えるとその場で入れ替わる。
+    memo: "HomeShell's first tab. The tabs keep no history: switching shows another in place."
     dependencies: [FeedApi]
     states:
-      - {name: 標準, preview: lib/pages/home_shell_preview.dart#feedTab, uses: {FeedApi: 3件}}
+      - {name: Default, preview: lib/pages/home_shell_preview.dart#feedTab, uses: {FeedApi: 3 posts}}
 
   - id: search
-    label: 検索
-    section: タブ
+    label: Search
+    section: Tabs
     widget: SearchTab
     source: lib/pages/search_tab.dart
     dependencies: [FeedApi]
     states:
-      - {name: 未入力, preview: lib/pages/home_shell_preview.dart#searchTab, uses: {FeedApi: 3件}}
+      - {name: Nothing typed, preview: lib/pages/home_shell_preview.dart#searchTab, uses: {FeedApi: 3 posts}}
 
   - id: profile
-    label: プロフィール
-    section: タブ
+    label: Profile
+    section: Tabs
     widget: ProfileTab
     source: lib/pages/profile_tab.dart
     dependencies: [Session]
     states:
-      - {name: 未ログイン, if: {ログイン: 未ログイン}, preview: lib/pages/home_shell_preview.dart#profileTab, uses: {Session: ゲスト}}
-      - {name: ログイン済み, if: {ログイン: ログイン済み}, preview: lib/pages/home_shell_preview.dart#profileTab@1, uses: {Session: koji}}
+      - {name: Guest, if: {Login: Guest}, preview: lib/pages/home_shell_preview.dart#profileTab, uses: {Session: guest}}
+      - {name: Signed in, if: {Login: Signed in}, preview: lib/pages/home_shell_preview.dart#profileTab@1, uses: {Session: koji}}
 
   - id: post
-    label: 投稿
+    label: Post
     widget: PostPage
     source: lib/pages/post_page.dart
     states:
-      - {name: 標準, preview: lib/pages/post_page_preview.dart#postPage}
+      - {name: Default, preview: lib/pages/post_page_preview.dart#postPage}
 
   - id: sign_in
-    label: ログイン
+    label: Sign in
     widget: SignInPage
     source: lib/pages/sign_in_page.dart
-    memo: プロフィールからフルスクリーンのダイアログで開く。
+    memo: Opens from the profile as a full-screen dialog.
     dependencies: [Session]
     states:
-      - {name: 標準, preview: contact_sheet/lib/preview/sign_in.dart#signIn, uses: {Session: ゲスト}}
+      - {name: Default, preview: contact_sheet/lib/preview/sign_in.dart#signIn, uses: {Session: guest}}
 
 edges:
   # The bottom tabs (HomeShell's NavigationBar): no history. Each tab from
   # the other two.
-  - {from: [search, profile], to: feed, trigger: text:フィード, kind: replace, source: lib/pages/home_shell.dart}
-  - {from: [feed, profile], to: search, trigger: text:検索, kind: replace, source: lib/pages/home_shell.dart}
-  - {from: [feed, search], to: profile, trigger: text:プロフィール, kind: replace, source: lib/pages/home_shell.dart}
+  - {from: [search, profile], to: feed, trigger: text:Feed, kind: replace, source: lib/pages/home_shell.dart}
+  - {from: [feed, profile], to: search, trigger: text:Search, kind: replace, source: lib/pages/home_shell.dart}
+  - {from: [feed, search], to: profile, trigger: text:Profile, kind: replace, source: lib/pages/home_shell.dart}
   # Each post's ListTile opens it.
-  - {from: feed, to: post, trigger: other:投稿をタップ, source: lib/pages/feed_tab.dart}
+  - {from: feed, to: post, trigger: other:Tap a post, source: lib/pages/feed_tab.dart}
   # A search result opens its post too.
-  - {from: search, to: post, trigger: other:検索結果をタップ, source: lib/pages/search_tab.dart}
-  - {from: profile, to: sign_in, trigger: text:ログイン, when: 未ログイン, source: lib/pages/profile_tab.dart}
-  - {from: sign_in, to: profile, trigger: text:ログインする, set: {ログイン: ログイン済み}, kind: pop, source: lib/pages/sign_in_page.dart}
+  - {from: search, to: post, trigger: other:Tap a search result, source: lib/pages/search_tab.dart}
+  - {from: profile, to: sign_in, trigger: text:Sign in, when: Guest, source: lib/pages/profile_tab.dart}
+  - {from: sign_in, to: profile, trigger: text:Sign in, set: {Login: Signed in}, kind: pop, source: lib/pages/sign_in_page.dart}
   # Signing out is done in place (setState): the profile shows signed out.
-  - {from: profile, to: profile, trigger: text:ログアウト, when: ログイン済み, set: {ログイン: 未ログイン}, kind: replace, source: lib/pages/profile_tab.dart}
+  - {from: profile, to: profile, trigger: text:Sign out, when: Signed in, set: {Login: Guest}, kind: replace, source: lib/pages/profile_tab.dart}

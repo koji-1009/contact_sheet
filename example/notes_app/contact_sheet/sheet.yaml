@@ -8,7 +8,7 @@
 variants:
   - {name: iPhone}
   - {name: Android, platform: android}
-  - {name: タブレット, preview: Tablet}
+  - {name: Tablet, preview: Tablet}
 
 dependencies:
   - name: NotesApi
@@ -17,54 +17,54 @@ dependencies:
 
 pages:
   - id: notes
-    label: メモ一覧
+    label: Notes
     widget: NotesPage
     source: lib/pages/notes_page.dart
     path: /
     dependencies: [NotesApi]
     states:
-      - {name: 3件, preview: lib/pages/notes_page_preview.dart#notesPage, uses: {NotesApi: 3件}}
+      - {name: Three notes, preview: lib/pages/notes_page_preview.dart#notesPage, uses: {NotesApi: 3 notes}}
       # What the API gives decides these, not the arrow.
-      - {name: 空, preview: lib/pages/notes_page_preview.dart#notesPage@1, uses: {NotesApi: 0件}, data: true}
-      - {name: 読み込み中, preview: lib/pages/notes_page_preview.dart#notesPage@2, uses: {NotesApi: 応答待ち}, data: true}
+      - {name: Empty, preview: lib/pages/notes_page_preview.dart#notesPage@1, uses: {NotesApi: 0 notes}, data: true}
+      - {name: Loading, preview: lib/pages/notes_page_preview.dart#notesPage@2, uses: {NotesApi: waiting}, data: true}
 
   - id: note
-    label: メモ
+    label: Note
     widget: NotePage
     source: lib/pages/note_page.dart
     path: /note
     dependencies: [NotesApi]
     states:
-      - {name: 標準, preview: lib/pages/note_page_preview.dart#notePage, uses: {NotesApi: 3件}}
+      - {name: Default, preview: lib/pages/note_page_preview.dart#notePage, uses: {NotesApi: 3 notes}}
 
   - id: edit
-    label: 編集
+    label: Edit
     widget: EditPage
     source: lib/pages/edit_page.dart
     path: /edit
-    memo: 新しいメモはフルスクリーンのダイアログで開く（id なしの /edit）。
+    memo: A new note opens as a full-screen dialog (/edit without an id).
     dependencies: [NotesApi]
     states:
-      - {name: 新規, preview: lib/pages/edit_page_preview.dart#newNote, uses: {NotesApi: 3件}}
-      - {name: 編集, preview: lib/pages/edit_page_preview.dart#editNote, uses: {NotesApi: 3件}}
+      - {name: New, preview: lib/pages/edit_page_preview.dart#newNote, uses: {NotesApi: 3 notes}}
+      - {name: Existing, preview: lib/pages/edit_page_preview.dart#editNote, uses: {NotesApi: 3 notes}}
 
   - id: settings
-    label: 設定
+    label: Settings
     widget: SettingsPage
     source: lib/pages/settings_page.dart
     path: /settings
     states:
-      - {name: 標準, preview: lib/pages/settings_page_preview.dart#settingsPage}
+      - {name: Default, preview: lib/pages/settings_page_preview.dart#settingsPage}
 
 edges:
   # Each note's ListTile opens it.
-  - {from: notes, to: note, trigger: other:メモをタップ, when: 3件, source: lib/pages/notes_page.dart}
+  - {from: notes, to: note, trigger: other:Tap a note, when: Three notes, source: lib/pages/notes_page.dart}
   # /edit without an argument is a new note; with the note's id, that note.
-  - {from: notes, to: edit, trigger: label:新しいメモ, then: 新規, source: lib/pages/notes_page.dart}
-  - {from: notes, to: settings, trigger: label:設定, source: lib/pages/notes_page.dart}
-  - {from: note, to: edit, trigger: label:編集, then: 編集, source: lib/pages/note_page.dart}
+  - {from: notes, to: edit, trigger: label:New note, then: New, source: lib/pages/notes_page.dart}
+  - {from: notes, to: settings, trigger: label:Settings, source: lib/pages/notes_page.dart}
+  - {from: note, to: edit, trigger: label:Edit, then: Existing, source: lib/pages/note_page.dart}
   # Deleting pops back to the list.
-  - {from: note, to: notes, trigger: label:削除, kind: pop, source: lib/pages/note_page.dart}
+  - {from: note, to: notes, trigger: label:Delete, kind: pop, source: lib/pages/note_page.dart}
   # Saving pops back to where the editor was opened from.
-  - {from: edit, to: notes, trigger: text:保存, when: 新規, kind: pop, source: lib/pages/edit_page.dart}
-  - {from: edit, to: note, trigger: text:保存, when: 編集, kind: pop, source: lib/pages/edit_page.dart}
+  - {from: edit, to: notes, trigger: text:Save, when: New, kind: pop, source: lib/pages/edit_page.dart}
+  - {from: edit, to: note, trigger: text:Save, when: Existing, kind: pop, source: lib/pages/edit_page.dart}

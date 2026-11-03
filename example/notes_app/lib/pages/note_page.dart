@@ -16,13 +16,13 @@ class NotePage extends StatelessWidget {
         title: Text(note?.title ?? ''),
         actions: [
           IconButton(
-            tooltip: '編集',
+            tooltip: 'Edit',
             icon: const Icon(Icons.edit_outlined),
             onPressed: () =>
                 Navigator.pushNamed(context, '/edit', arguments: id),
           ),
           IconButton(
-            tooltip: '削除',
+            tooltip: 'Delete',
             icon: const Icon(Icons.delete_outline),
             onPressed: () async {
               await store.delete(id);
@@ -33,7 +33,7 @@ class NotePage extends StatelessWidget {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Text(note?.body ?? 'このメモは削除されました'),
+        child: Text(note?.body ?? 'This note was deleted'),
       ),
     );
   }

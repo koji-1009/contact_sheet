@@ -29,11 +29,11 @@ class _HomeShellState extends State<HomeShell> {
         selectedIndex: _tab,
         onDestinationSelected: (tab) => setState(() => _tab = tab),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), label: 'フィード'),
-          NavigationDestination(icon: Icon(Icons.search), label: '検索'),
+          NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Feed'),
+          NavigationDestination(icon: Icon(Icons.search), label: 'Search'),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
-            label: 'プロフィール',
+            label: 'Profile',
           ),
         ],
       ),

@@ -14,8 +14,8 @@ Widget guestServices(Widget child) {
 }
 
 @Preview(
-  group: 'ログイン',
-  name: '標準',
+  group: 'Sign in',
+  name: 'Default',
   size: Size(390, 844),
   wrapper: guestServices,
 )

@@ -8,9 +8,13 @@ import 'package:notes_app/routes.dart';
 // NotesStore on fixed notes, as main.dart gives the real one.
 
 const previewNotes = [
-  Note(id: 'n1', title: '買い物', body: '牛乳、卵、パン'),
-  Note(id: 'n2', title: '会議のメモ', body: '来週までに見積もりを出す'),
-  Note(id: 'n3', title: '本', body: '読みたい本のリスト'),
+  Note(id: 'n1', title: 'Shopping', body: 'Milk, eggs, bread'),
+  Note(
+    id: 'n2',
+    title: 'Meeting notes',
+    body: 'Send the estimate by next week',
+  ),
+  Note(id: 'n3', title: 'Books', body: 'Books to read'),
 ];
 
 class _FakeApi implements NotesApi {
