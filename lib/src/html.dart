@@ -368,27 +368,39 @@ for (const p of S.pages) {
   const bar = (S.tabs ?? []).find((b) => b.pages.some((t) => t.page === p.id || p.tab.includes(t.page)));
   if (bar) barOfPage[p.id] = bar;
 }
+// A tab's name, in the screen's words: what its trigger says, or, where
+// only the code names it (a key, a widget class), its first page's.
+const tabText = (t) => {
+  const how = t.trigger.split(':', 1)[0];
+  return how === 'key' || how === 'type' ? label(t.page) : t.trigger.slice(how.length + 1);
+};
 // Which tab a page is, or is shown in.
 const tabMeta = (p) => tabItem[p.id]
-  ? `<div class="meta">${esc(T('tabOf', { tab: tabItem[p.id].trigger.slice(tabItem[p.id].trigger.indexOf(':') + 1) }))}</div>`
+  ? `<div class="meta">${esc(T('tabOf', { tab: tabText(tabItem[p.id]) }))}</div>`
   : p.tab.length ? `<div class="meta">${esc(T('inTabs', { tabs: p.tab.map(label).join(T('stateSeparator')) }))}</div>` : '';
 // What switches to a tab, in the screen's words.
-const tapWords = (trigger) => {
-  const how = trigger.split(':', 1)[0];
-  const what = trigger.slice(how.length + 1);
-  return how === 'other' ? what : T('tap', { text: what });
-};
+const tapWords = (t) => t.trigger.startsWith('other:') ? tabText(t) : T('tap', { text: tabText(t) });
 // What a search looks for in a page: its names, memo, states and links, and
-// what is done on it (a button's words find the page it is on).
-const said = (e) => e.trigger && e.trigger !== 'back' ? e.trigger.slice(e.trigger.indexOf(':') + 1) : '';
-const findText = (p) => [
-  p.label, p.section, p.path, p.id, p.memo,
+// what is done on it (a button's words find the page it is on); with [dev],
+// what developers read too (its id and path, a key or a widget class
+// tapped), as only they are shown it.
+const said = (e, dev) => {
+  if (!e.trigger || e.trigger === 'back') return '';
+  const how = e.trigger.split(':', 1)[0];
+  return !dev && (how === 'key' || how === 'type') ? '' : e.trigger.slice(how.length + 1);
+};
+const findText = (p, dev) => [
+  p.label, p.section, p.memo,
+  ...(dev ? [p.path, p.id] : []),
   ...p.states.map((s) => s.name),
   ...p.links.map((l) => l.label),
-  ...edges.filter((e) => e.from === p.id).map(said),
+  ...edges.filter((e) => e.from === p.id).map((e) => said(e, dev)),
 ].filter(Boolean).join(' ').toLowerCase();
 // What it looks for in a transition: its pages, states, and what is done.
-const findEdge = (e) => [label(e.from), label(e.to), said(e), ...e.when, ...Object.values(e.if).flat(), ...thenNames(e)].filter(Boolean).join(' ').toLowerCase();
+const findEdge = (e, dev) => [label(e.from), label(e.to), said(e, dev), ...e.when, ...Object.values(e.if).flat(), ...thenNames(e)].filter(Boolean).join(' ').toLowerCase();
+// What is searched in, as the developers' information is shown or not.
+const forDev = () => !document.body.classList.contains('plain');
+const findIn = (el) => forDev() ? el.dataset.findDev : el.dataset.find;
 // A viewer's choice, kept in their browser when it can be.
 const load = (key, fallback) => { try { const v = localStorage.getItem(key); return v === null ? fallback : v === '1'; } catch { return fallback; } };
 const save = (key, on) => { try { localStorage.setItem(key, on ? '1' : '0'); } catch {} };
@@ -730,7 +742,7 @@ const sentences = (p) => {
     if (again && (t.page === p.id || bar.retap !== 'first')) return [];
     const when = Object.keys(t.if).length
       ? esc(T('inState', { state: Object.values(t.if).map(states).join(T('conditionAnd')) })) + ' ' : '';
-    const words = again ? T('tapAgain', { text: t.trigger.slice(t.trigger.indexOf(':') + 1) }) : tapWords(t.trigger);
+    const words = again ? T('tapAgain', { text: tabText(t) }) : tapWords(t);
     return [`<li><a data-go="map/${esc(t.page)}">${when}${esc(words)} → <b>${esc(label(t.page))}</b></a></li>`];
   });
   return (goes.length || tabs.length ? `<h4>${esc(T('fromHere'))}</h4><ul class="says">${goes.map((e) => item(e, e.to, false, state)).join('')}${tabs.join('')}</ul>` : '')
@@ -844,10 +856,10 @@ function showRoute(from, to, glide, state, valuation) {
     const t = tabItem[st.tab];
     // A switch arrives where the tab was left; tapping it again, at its first.
     if (st.move === 'switch') {
-      return `${from}${esc(tapWords(t.trigger))} → <b>${esc(label(st.to.page))}</b>${st.to.page !== st.tab ? ' ' + esc(T('asLeft')) : ''}`;
+      return `${from}${esc(tapWords(t))} → <b>${esc(label(st.to.page))}</b>${st.to.page !== st.tab ? ' ' + esc(T('asLeft')) : ''}`;
     }
     if (st.move === 'retap') {
-      return `${from}${esc(T('tapAgain', { text: t.trigger.slice(t.trigger.indexOf(':') + 1) }))} → <b>${esc(label(st.to.page))}</b>`;
+      return `${from}${esc(T('tapAgain', { text: tabText(t) }))} → <b>${esc(label(st.to.page))}</b>`;
     }
     return `${from}${esc(T('backTo', { page: label(st.to.page) }))}${setting(st.set)}`;
   };
@@ -956,7 +968,7 @@ const renderList = () => $('#page-list').innerHTML = Object.entries(sections).ma
   `<div class="group">${name ? `<h2>${esc(name)}</h2>` : ''}${pages.map((p) => {
     const goes = (out[p.id] ?? []).map((e) => chip(e.to, e)).join('');
     const comes = (into[p.id] ?? []).map((e) => e.anywhere ? `<span class="chip entry">${esc(T('fromAnywhere'))}</span>` : chip(e.from, e)).join('') + (links[p.id] ?? []).map((en) => `<span class="chip entry">${esc(en.via)}</span>`).join('');
-    return `<article class="row" id="row-${esc(p.id)}" data-find="${esc(findText(p))}">
+    return `<article class="row" id="row-${esc(p.id)}" data-find="${esc(findText(p, false))}" data-find-dev="${esc(findText(p, true))}">
       <header><h3>${esc(p.label)}</h3><span class="meta dev">${codeMeta(p)}</span>
         ${p.sheetChanged.length ? `<span class="badge changed dev" title="${esc(p.sheetChanged.join('\n'))}">${esc(T('sheetChanged'))}</span>` : ''}
         <span class="actions"><button class="link" data-go="map/${esc(p.id)}">${esc(T('onMap'))}</button><button class="link" data-detail="${esc(p.id)}">${esc(T('detail'))}</button></span></header>
@@ -973,12 +985,12 @@ function filter() {
   const q = $('#search').value.trim().toLowerCase();
   const table = $('#edge-table');
   table.classList.toggle('filtering', !!q);
-  for (const r of table.querySelectorAll('tr[data-find]')) r.style.display = !q || r.dataset.find.includes(q) ? '' : 'none';
+  for (const r of table.querySelectorAll('tr[data-find]')) r.style.display = !q || findIn(r).includes(q) ? '' : 'none';
   let any = false;
   for (const g of document.querySelectorAll('#page-list .group')) {
     let shown = 0;
     for (const r of g.querySelectorAll('.row')) {
-      const on = !q || r.dataset.find.includes(q);
+      const on = !q || findIn(r).includes(q);
       r.style.display = on ? '' : 'none';
       if (on) shown++;
     }
@@ -1011,7 +1023,7 @@ function edgeRows(list, cols, grouped) {
       const first = cols[0][1](e);
       const again = grouped && first === last;
       last = first;
-      const find = e.from ? ` data-find="${esc(findEdge(e))}"` : '';
+      const find = e.from ? ` data-find="${esc(findEdge(e, false))}" data-find-dev="${esc(findEdge(e, true))}"` : '';
       return `<tr class="${grouped ? (again ? 'again' : 'group') : ''}"${find}>${cols.map((c) => `<td class="${c[2] ?? ''}">${c[1](e)}</td>`).join('')}</tr>`;
     }).join('')}</tbody></table></div>`;
 }
@@ -1093,7 +1105,12 @@ $('#zoom').onclick = () => $('#zoom').classList.remove('on');
 document.addEventListener('click', (e) => {
   const target = e.target.closest('[data-go], [data-detail], img[data-zoom]');
   if (!target) return;
-  if (target.dataset.go) { const [v, id] = target.dataset.go.split('/'); closePage(); go(v, id); }
+  // The view, then the page's id, whole: an id may hold a /.
+  if (target.dataset.go) {
+    const to = target.dataset.go, at = to.indexOf('/');
+    closePage();
+    if (at < 0) go(to); else go(to.slice(0, at), to.slice(at + 1));
+  }
   else if (target.dataset.detail) go('page', target.dataset.detail);
   else zoomImage(target);
 });
@@ -1161,7 +1178,7 @@ $('#search').addEventListener('change', () => {
   if (!q) return;
   // The table stays, narrowed; elsewhere, to the page found.
   if (current === 'table') return;
-  const hit = S.pages.find((p) => p.label.toLowerCase() === q) ?? S.pages.find((p) => findText(p).includes(q));
+  const hit = S.pages.find((p) => p.label.toLowerCase() === q) ?? S.pages.find((p) => findText(p, forDev()).includes(q));
   if (hit) go(current, hit.id);
 });
 // Developers' information, shown or not: only CSS changes, and the labels'
@@ -1170,6 +1187,8 @@ const code = $('#code');
 function setCode(on) {
   document.body.classList.toggle('plain', !on);
   save('contact_sheet.code', on);
+  // What the search finds follows what is shown.
+  filter();
 }
 // The variant shown: every image follows; the map's boxes stay the first
 // variant's. Kept in the address (?variant=) to pass around, and for the
