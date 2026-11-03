@@ -227,8 +227,8 @@ String exportSvg(
   required bool plain,
 }) {
   final layout = map.layout;
-  final w = _n(layout.width);
-  final h = _n(layout.height);
+  final w = _n(map.canvas.$1);
+  final h = _n(map.canvas.$2);
   final out = StringBuffer()
     ..write(
       '<svg xmlns="http://www.w3.org/2000/svg" width="$w" height="$h" '

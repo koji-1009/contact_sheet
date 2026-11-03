@@ -150,6 +150,21 @@ class SheetMap {
     avoid: [...entryLabels.values, ...edgeLabels.values],
   );
 
+  /// The size of the map drawn: the layout's, and as far right and down as
+  /// a label lies.
+  late final (double, double) canvas = () {
+    var (w, h) = (layout.width, layout.height);
+    for (final box in [
+      ...entryLabels.values,
+      ...edgeLabels.values,
+      ...bundleLabels.values,
+    ]) {
+      w = math.max(w, box.right + 8);
+      h = math.max(h, box.bottom + 8);
+    }
+    return (w, h);
+  }();
+
   /// What a bundle says: what each of its arrows says, and how many.
   String bundleLabel(EdgeBundle bundle) =>
       [?edgeLabel(bundle.edges.first), bundleCount(bundle)].join(' ');
@@ -374,8 +389,8 @@ class SheetMap {
           'unmapped': unmapped,
         },
       'canvas': {
-        'width': _round(layout.width),
-        'height': _round(layout.height),
+        'width': _round(canvas.$1),
+        'height': _round(canvas.$2),
         // The page's label under its image, in each page's box below.
         'labelHeight': MapLayout.labelHeight,
       },

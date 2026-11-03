@@ -89,6 +89,38 @@ edges:
     );
   });
 
+  test('the labels stay on the map, at its left too', () {
+    // Deep links into pages nothing else leads to: all in the first
+    // column, an arrow up it round the left past the page between.
+    final sheet = Sheet.parse('''
+pages:
+  - ${_page('home', '')}
+  - ${_page('x', '')}
+  - ${_page('y', '')}
+  - ${_page('z', '')}
+edges:
+  - {from: z, to: x, trigger: 'text:View all of the reviews', kind: replace}
+entries:
+  - {to: x, via: /a-rather-long-link/x}
+  - {to: y, via: /y}
+  - {to: z, via: /z}
+''', m);
+    final map = SheetMap(sheet, shots: const {}, m: m);
+    // The map grows right and down to its labels.
+    final (width, height) = map.canvas;
+    for (final box in [
+      ...map.edgeLabels.values,
+      ...map.entryLabels.values,
+      ...map.bundleLabels.values,
+    ]) {
+      expect(box.left, greaterThanOrEqualTo(0));
+      expect(box.top, greaterThanOrEqualTo(0));
+      expect(box.right, lessThanOrEqualTo(width));
+      expect(box.bottom, lessThanOrEqualTo(height));
+    }
+    expect(width, greaterThan(map.layout.width));
+  });
+
   test('an arrow runs behind no page but its own two', () {
     // A flow of four columns, a second row under it, and arrows past the
     // columns between, forward and back, and from the row under.

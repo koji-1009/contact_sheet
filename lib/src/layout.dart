@@ -714,8 +714,9 @@ class MapLayout {
   }
 
   /// A label of [size] above [start], or a little higher, or leaning to
-  /// [side] (-1 left, 1 right): where it covers the least of [keep], near
-  /// [start]. Added to [placed].
+  /// [side] (-1 left, 1 right; the other way where the map ends): where it
+  /// covers the least of [keep], on the map, near [start]. Added to
+  /// [placed].
   static Box _placeAbove(
     Point start,
     (double, double) size,
@@ -730,17 +731,27 @@ class MapLayout {
       for (var k = 0; k <= 3; k++) ...[
         above - step * k.toDouble(),
         above - step * k.toDouble() + Point(side * w / 2, 0),
+        above - step * k.toDouble() - Point(side * w / 2, 0),
       ],
     ];
     final box = _cheapest(
       candidates,
       w,
       h,
-      (box) => _overlap(box, keep) * 4 + box.center.distanceTo(above) * h,
+      (box) =>
+          _offMap(box) * 8 +
+          _overlap(box, keep) * 4 +
+          box.center.distanceTo(above) * h,
     );
     placed.add(box);
     return box;
   }
+
+  /// How much of [box] is off the map at its left or top, where it would be
+  /// cut (the map grows right and down to its labels).
+  static double _offMap(Box box) =>
+      box.width * box.height -
+      box.overlap(const Box(0, 0, double.infinity, double.infinity));
 
   /// Where each arrow's [labelOf] goes: on its curve, beside it, or a little
   /// above or below it; where it covers the fewest labels placed before it
@@ -781,6 +792,7 @@ class MapLayout {
         w,
         h,
         (box) =>
+            _offMap(box) * 8 +
             (_overlap(box, placed.values) + _overlap(box, entries)) * 4 +
             _overlap(box, pages) +
             away(box) * h,
