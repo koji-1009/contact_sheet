@@ -736,6 +736,7 @@ class _Parser {
         if (edge.kind != NavigationKind.go) {
           _fail('$where.tab', m.sheetTabNotGo);
         }
+        if (!roots.contains(tab)) _fail('$where.tab', m.sheetNotATab(tab));
         if (!inTab(to.id, tab)) {
           _fail('$where.tab', m.sheetTabNotOf(tab, to.id));
         }
@@ -752,8 +753,11 @@ class _Parser {
         _fail('entries[$i].then', m.sheetUnknownState(then, to.id));
       }
       known(entry.guard, 'entries[$i].if');
-      if (entry.tab case final tab? when !inTab(to.id, tab)) {
-        _fail('entries[$i].tab', m.sheetTabNotOf(tab, to.id));
+      if (entry.tab case final tab?) {
+        if (!roots.contains(tab)) _fail('entries[$i].tab', m.sheetNotATab(tab));
+        if (!inTab(to.id, tab)) {
+          _fail('entries[$i].tab', m.sheetTabNotOf(tab, to.id));
+        }
       }
     }
     final variants = [

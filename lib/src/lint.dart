@@ -277,6 +277,9 @@ List<String> _lintConditions(Sheet sheet, Messages m, Set<String> reached) {
       (to: e.to, then: e.then, guard: e.guard, tab: e.tab),
   ]);
   final told = <String>{};
+  // An item from a page happens if one of its edges from there does (a pop
+  // back to the page under it is one edge to each page it can be over).
+  final happens = <(int, String), bool>{};
   for (final (i, e) in sheet.edges.indexed) {
     if (e.guard.isEmpty) continue;
     final from = sheet.pageOf(e.from)!;
@@ -287,8 +290,14 @@ List<String> _lintConditions(Sheet sheet, Messages m, Set<String> reached) {
         findings.add(m.lintIfExcludesWhen(e.item, state.name));
       }
     }
-    if (reached.contains(e.from) && !happening.contains(i)) {
-      findings.add(m.lintGuardUnsatisfied(e.item, from.label));
+    if (reached.contains(e.from)) {
+      happens[(e.item, e.from)] =
+          (happens[(e.item, e.from)] ?? false) || happening.contains(i);
+    }
+  }
+  for (final MapEntry(key: (item, from), value: does) in happens.entries) {
+    if (!does) {
+      findings.add(m.lintGuardUnsatisfied(item, sheet.pageOf(from)!.label));
     }
   }
   return findings;

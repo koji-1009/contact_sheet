@@ -566,6 +566,31 @@ entries:
     );
   });
 
+  test(
+    'a go\'s or a deep link\'s tab is a tab, though the page be its own',
+    () {
+      const pages = '''
+pages:
+  - {id: a, label: A, states: [{name: s, preview: a.dart#a}]}
+  - {id: b, label: B, states: [{name: s, preview: b.dart#b}]}
+''';
+      expect(
+        () => _parse('${pages}edges: [{from: a, to: b, kind: go, tab: b}]'),
+        _fails(
+          'contact_sheet/sheet.yaml, edges[0].tab: '
+          'b is not the first page of a tab in tabs',
+        ),
+      );
+      expect(
+        () => _parse('${pages}entries: [{to: b, via: /b, tab: b}]'),
+        _fails(
+          'contact_sheet/sheet.yaml, entries[0].tab: '
+          'b is not the first page of a tab in tabs',
+        ),
+      );
+    },
+  );
+
   test('an edge from every page is drawn once, from outside', () {
     final sheet = _parse('''
 pages:
@@ -629,6 +654,26 @@ edges:
           'not happen in it'),
       ('edges[1] from Shop: no way through the app reaches it there while '
           'its if holds'),
+    ]);
+  });
+
+  test('lint tells an item no way meets once from its page, though it be an '
+      'edge to each page under it', () {
+    final sheet = _parse('''
+conditions:
+  - {name: Login, values: [Guest, Member]}
+pages:
+  - {id: a, label: A, states: [{name: s, preview: a.dart#a}]}
+  - {id: b, label: B, states: [{name: s, preview: b.dart#b}]}
+  - {id: c, label: C, states: [{name: s, preview: c.dart#c}]}
+edges:
+  - {from: a, to: b, trigger: text:B}
+  - {from: a, to: c, trigger: text:C}
+  - {from: b, to: c, trigger: text:C}
+  - {from: c, trigger: text:Save, kind: pop, if: {Login: Member}}
+''');
+    expect(lintSheet(sheet, _m).where((f) => f.startsWith('edges[3]')), [
+      'edges[3] from C: no way through the app reaches it there while its if holds',
     ]);
   });
 
