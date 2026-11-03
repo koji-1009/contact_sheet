@@ -224,6 +224,7 @@ class _ExportCommand extends _AppCommand {
       m: m,
       words: locale == null ? cli.words : Messages.of(locale),
       log: cli.out,
+      warn: cli.err,
     ).run(args.option('out'), {...args.multiOption('only')});
     cli.out(m.exportDone(dir));
     if (missing > 0 && args.flag('strict')) {

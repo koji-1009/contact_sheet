@@ -44,7 +44,9 @@ class SheetExport {
     required this.m,
     Messages? words,
     this.log = _silent,
-  }) : words = words ?? m;
+    void Function(String line)? warn,
+  }) : words = words ?? m,
+       warn = warn ?? log;
 
   final SheetRepo repo;
   final ProcessRunner runner;
@@ -56,8 +58,12 @@ class SheetExport {
   /// The map's words: its labels and `index.html`'s.
   final Messages words;
 
-  /// Gets what is done, and what could not be shot.
+  /// Gets what is done.
   final void Function(String line) log;
+
+  /// Gets what went wrong: what could not be shot, and why, and what
+  /// `flutter pub get` said when it failed (to [log] unless given).
+  final void Function(String line) warn;
 
   static void _silent(String line) {}
 
@@ -344,10 +350,10 @@ class SheetExport {
               ? state.name
               : '${state.name} · ${variant.name}';
           if (shot == null && only.isNotEmpty && !only.contains(page.id)) {
-            log(m.exportNotShot(page.label, name));
+            warn(m.exportNotShot(page.label, name));
           } else if (shot == null) {
             final preview = variant.preview;
-            log(
+            warn(
               m.exportNoShot(
                 page.label,
                 name,
@@ -355,7 +361,7 @@ class SheetExport {
               ),
             );
           } else if (shot.status == ShotStatus.error) {
-            log(
+            warn(
               m.exportShotFailed(
                 page.label,
                 name,
@@ -460,7 +466,7 @@ class SheetExport {
     }
     if (result.exitCode != 0) {
       for (final line in '${result.stdout}${result.stderr}'.split('\n')) {
-        if (line.trim().isNotEmpty) log(line);
+        if (line.trim().isNotEmpty) warn(line);
       }
       throw ExportException(
         m.commandFailed('flutter ${args.join(' ')}', result.exitCode),

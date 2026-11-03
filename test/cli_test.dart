@@ -171,6 +171,9 @@ void main() {
         'states: [{name: s, preview: lib/home.dart#home}]}]',
       );
     expect(await cli(['export', app.path]), 0);
+    // What could not be shot is what went wrong: on err.
+    expect(err, ['Could not shoot Home (s): lib/home.dart does not exist']);
+    expect(out.last, startsWith('Exported: '));
     expect(await cli(['export', '--strict', app.path]), 65);
     expect(err.last, '1 states have no image');
     String lang() => RegExp(r'<html lang="(\w+)">').firstMatch(
