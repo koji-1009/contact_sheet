@@ -315,7 +315,7 @@ The layout: each section is an island of its own. In it, the flow runs left to r
 - `sheet.json`: what they are drawn from, for other tools and AI agents.
 - `images/`: each state's shot, named by its shot id (`sheet-` before it for the sheet package's).
 
-A state shutter could not draw has no image: its error is told by the command and shown in the HTML (`error` in `sheet.json`).
+A state shutter could not draw has no image: its error is told by the command and shown in the HTML (`error` in `sheet.json`); so is one whose preview file does not exist, is not under `lib/`, or has no `@Preview`.
 The export goes on for the rest.
 
 ### `sheet.json`
@@ -358,10 +358,9 @@ Once the images are copied into the map, the export deletes the runs it made, so
 | 64 | A wrong use: the message and the usage on stderr; `export --only`: the sheet has no such page |
 | 65 | `sheet.yaml` cannot be read (said with where); `changed`: the basis's commit is not in the repository; `export --strict`: a state has no image |
 | 66 | No `pubspec.yaml` in the directory; no `sheet.yaml`; `changed`: no basis yet |
-| 69 | `flutter pub get` failed |
+| 69 | `flutter pub get` failed; `export`: shutter cannot run (no Flutter SDK) |
 | 70 | An unexpected error (`--verbose` tells where it came from) |
-| 78 | `basis`: not a git repository |
-| shutter's | shutter could not shoot |
+| 78 | `basis`: not a git repository; `export`: the app or the sheet package is not set up for shutter (no `flutter_test` in `dev_dependencies`) |
 
 ## Commands
 

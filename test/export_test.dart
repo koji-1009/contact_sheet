@@ -118,6 +118,15 @@ void main() {
     repo = SheetRepo(app.path);
     scaffoldSheet(repo);
     repo.sheetFile.writeAsStringSync(_sheet);
+    // The preview files the sheet names, in the app and the sheet package.
+    for (final file in [
+      'lib/preview/home.dart',
+      'contact_sheet/lib/preview/detail.dart',
+    ]) {
+      File(p.join(app.path, file))
+        ..createSync(recursive: true)
+        ..writeAsStringSync('// previews\n');
+    }
   });
   tearDown(() => app.deleteSync(recursive: true));
 
@@ -570,6 +579,74 @@ pages:
       );
     },
   );
+
+  test('a preview file shutter cannot take is told of its states; the rest '
+      'are shot', () async {
+    repo.sheetFile.writeAsStringSync('''
+pages:
+  - id: home
+    label: Home
+    states:
+      - {name: Guest, preview: lib/preview/home.dart#home}
+      - {name: None, preview: lib/preview/none.dart#none}
+      - {name: Gone, preview: lib/preview/gone.dart#gone}
+      - {name: Out, preview: test/home.dart#home}
+''');
+    File(p.join(app.path, 'lib', 'preview', 'none.dart')).writeAsStringSync('');
+    final asked = <List<String>>[];
+    final shutter = _Shutter(shots.path);
+    Future<ShotRun> shoot(
+      String dir,
+      ShotSubject subject, {
+      ShotPlatform platform = ShotPlatform.android,
+      void Function(ShotProgress event)? onProgress,
+    }) {
+      final files = (subject as PreviewFiles).files;
+      asked.add(files);
+      // As shutter stops a run for a file with no @Preview.
+      if (files.contains('lib/preview/none.dart')) {
+        throw ShutterException.noInput(
+          'lib/preview/none.dart has no @Preview.',
+        );
+      }
+      return shutter.shot(dir, subject, platform: platform);
+    }
+
+    final lines = <String>[];
+    final (dir: out, :missing) = await SheetExport(
+      repo,
+      runner: Tools(),
+      shoot: shoot,
+      m: Messages.of('en'),
+      log: lines.add,
+    ).run();
+    // Those it would stop for, never asked; the one it stops for, alone.
+    expect(asked, [
+      ['lib/preview/home.dart', 'lib/preview/none.dart'],
+      ['lib/preview/home.dart'],
+      ['lib/preview/none.dart'],
+    ]);
+    expect(missing, 3);
+    const notInLib =
+        'test/home.dart is not under lib/, where shutter takes previews from';
+    expect(lines.where((l) => l.startsWith('Could not shoot')), [
+      'Could not shoot Home (None): lib/preview/none.dart has no @Preview.',
+      'Could not shoot Home (Gone): lib/preview/gone.dart does not exist',
+      'Could not shoot Home (Out): $notInLib',
+    ]);
+    final data = jsonDecode(
+      File(p.join(out, 'sheet.json')).readAsStringSync(),
+    ) as Map<String, Object?>;
+    final page = (data['pages']! as List).single as Map<String, Object?>;
+    final states = page['states']! as List;
+    expect(states.map((s) => (s as Map)['error']), [
+      null,
+      'lib/preview/none.dart has no @Preview.',
+      'lib/preview/gone.dart does not exist',
+      notInLib,
+    ]);
+    expect((states.first as Map)['image'], isNotNull);
+  });
 
   test('an export that fails after a shot deletes that run too', () async {
     final shutter = _Shutter(

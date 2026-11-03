@@ -907,7 +907,8 @@ class _Parser {
   /// `Class.method`, `Class.new`, `Class.named`), the annotation's place,
   /// and which of the `Preview`s it gives.
   static final _preview = RegExp(
-    r'^([^#@]+\.dart)#([\w$]+(?:\.[\w$]+)?)(?:@(\d+)(?:\.(\d+))?)?$',
+    r'^([^#@]+\.dart)#([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)?)'
+    r'(?:@(\d+)(?:\.(\d+))?)?$',
   );
 
   SheetState _state(Object? yaml, String where) {
@@ -921,6 +922,13 @@ class _Parser {
     final preview = _required(map, 'preview', where);
     final match = _preview.firstMatch(preview);
     if (match == null) _fail('$where.preview', m.sheetBadPreview(preview));
+    // Written as shutter names it, which its shot's id is of: `/` apart,
+    // nothing to resolve.
+    final file = match[1]!;
+    if (file.contains(r'\') ||
+        file.split('/').any((s) => s.isEmpty || s == '.' || s == '..')) {
+      _fail('$where.preview', m.sheetPreviewPath(file));
+    }
     final uses = map['uses'];
     if (uses != null && uses is! YamlMap) {
       _fail('$where.uses', m.sheetNotMap);
@@ -929,7 +937,7 @@ class _Parser {
     if (data is! bool) _fail('$where.data', m.sheetNotBool);
     return SheetState(
       name: _required(map, 'name', where),
-      file: match[1]!,
+      file: file,
       symbol: match[2]!,
       index: int.parse(match[3] ?? '0'),
       runtime: int.parse(match[4] ?? '0'),

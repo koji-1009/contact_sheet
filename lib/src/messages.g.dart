@@ -77,6 +77,8 @@ abstract class Messages {
   String get exportShooting;
   String exportShotFailed(Object page, Object state, Object error);
   String exportNoShot(Object page, Object state, Object preview);
+  String exportNoFile(Object file);
+  String exportNotInLib(Object file);
   String exportDone(Object dir);
   String pruneDone(Object count);
   String sheetNotYaml(Object error);
@@ -110,6 +112,7 @@ abstract class Messages {
   String sheetTabNotOf(Object tab, Object page);
   String get fromAnywhere;
   String sheetUnknownDependency(Object name);
+  String sheetPreviewPath(Object file);
   String sheetUnknownField(Object field, Object fields);
   String sheetBadPreview(Object value);
   String sheetBadTrigger(Object value);
@@ -423,6 +426,13 @@ class MessagesEn extends Messages {
       "${page} (${state}) has no shot: shutter found no preview ${preview}";
 
   @override
+  String exportNoFile(Object file) => "${file} does not exist";
+
+  @override
+  String exportNotInLib(Object file) =>
+      "${file} is not under lib/, where shutter takes previews from";
+
+  @override
   String exportDone(Object dir) => "Exported: ${dir}";
 
   @override
@@ -541,6 +551,10 @@ class MessagesEn extends Messages {
   @override
   String sheetUnknownDependency(Object name) =>
       "${name} is not in dependencies";
+
+  @override
+  String sheetPreviewPath(Object file) =>
+      "${file}: write the file relative to the app, / apart, without ./ or ../ (lib/preview/home.dart, contact_sheet/lib/preview/home.dart)";
 
   @override
   String sheetUnknownField(Object field, Object fields) =>
@@ -1034,6 +1048,13 @@ class MessagesJa extends Messages {
       "${page}（${state}）の撮影結果がありません: shutter が Preview ${preview} を見つけられませんでした";
 
   @override
+  String exportNoFile(Object file) => "${file} がありません";
+
+  @override
+  String exportNotInLib(Object file) =>
+      "${file} が lib/ の下にありません。shutter は lib/ の下の Preview を撮ります";
+
+  @override
   String exportDone(Object dir) => "書き出しました: ${dir}";
 
   @override
@@ -1142,6 +1163,10 @@ class MessagesJa extends Messages {
 
   @override
   String sheetUnknownDependency(Object name) => "${name} が dependencies にありません";
+
+  @override
+  String sheetPreviewPath(Object file) =>
+      "${file}: ファイルはアプリからの相対パスで、/ で区切り、./ や ../ を使わずに書きます（lib/preview/home.dart、contact_sheet/lib/preview/home.dart）";
 
   @override
   String sheetUnknownField(Object field, Object fields) =>

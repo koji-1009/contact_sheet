@@ -141,6 +141,30 @@ pages:
       () => _parse('pages: [oops'),
       _fails(startsWith('contact_sheet/sheet.yaml is not YAML')),
     );
+    // A file as shutter names it, which its shot's id is of.
+    for (final file in ['./lib/a.dart', r'lib\a.dart', 'lib/../lib/a.dart']) {
+      expect(
+        () => _parse(
+          'pages: [{id: a, label: A, states: [{name: s, '
+          "preview: '$file#a'}]}]",
+        ),
+        _fails(
+          startsWith(
+            'contact_sheet/sheet.yaml, pages[0].states[0].preview: $file: '
+            'write the file relative to the app',
+          ),
+        ),
+      );
+    }
+    // A declaration is named, not a number.
+    expect(
+      () => _parse(
+        'pages: [{id: a, label: A, states: [{name: s, preview: a.dart#fn.1}]}]',
+      ),
+      _fails(
+        startsWith('contact_sheet/sheet.yaml, pages[0].states[0].preview'),
+      ),
+    );
     // A field misspelt, or where it does not go, is not left out unread.
     expect(
       () => _parse('pages: [$page]\nedges: [{from: a, to: a, wehn: s}]'),

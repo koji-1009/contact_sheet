@@ -113,7 +113,7 @@ class SheetExport {
       // while the previews are shot.
       final drift = _drift();
       final at = currentCommit(runner, repo);
-      final shots = await _shootAll(sheet, runs, only);
+      final (shots, failed) = await _shootAll(sheet, runs, only);
       if (only.isNotEmpty) {
         shots.addAll(_keep(sheet, out, only, kept.path));
       }
@@ -121,6 +121,7 @@ class SheetExport {
       final map = SheetMap(
         sheet,
         shots: shots,
+        failed: failed,
         m: words,
         drift: await drift,
         release: (version: repo.appVersion, commit: commit, branch: branch),
@@ -211,43 +212,75 @@ class SheetExport {
 
   /// The previews' shots, by [shotKey]: the app's shot in the app and the
   /// sheet package's in it, at once, as each platform the variants are
-  /// drawn as; with [only], those pages' alone.
-  Future<Map<String, ShotResult>> _shootAll(
+  /// drawn as; with [only], those pages' alone. With them, the preview
+  /// files shutter could not take (by the sheet's path), and why: the rest
+  /// are shot all the same.
+  Future<(Map<String, ShotResult>, Map<String, String>)> _shootAll(
     Sheet sheet,
     ExportRuns runs,
     Set<String> only,
   ) async {
+    final failed = <String, String>{};
     Future<Iterable<MapEntry<String, ShotResult>>> shootIn(
       bool inSheetPackage,
       VariantPlatform platform,
     ) async {
-      final files = {
+      String inSheet(String file) =>
+          inSheetPackage ? '${SheetState.sheetPackage}/$file' : file;
+      final dir = inSheetPackage ? repo.sheetDir : repo.root;
+      final files = <String>[];
+      for (final file in {
         for (final page in sheet.pages)
           if (only.isEmpty || only.contains(page.id))
             for (final state in page.states)
               if (state.inSheetPackage == inSheetPackage) state.projectFile,
-      }.toList()..sort();
+      }.toList()..sort()) {
+        // What shutter would stop the whole run for, told of the file.
+        if (!file.startsWith('lib/')) {
+          failed[inSheet(file)] = m.exportNotInLib(inSheet(file));
+        } else if (!File(pathIn(dir, file)).existsSync()) {
+          failed[inSheet(file)] = m.exportNoFile(inSheet(file));
+        } else {
+          files.add(file);
+        }
+      }
       if (files.isEmpty) return const [];
-      final dir = inSheetPackage ? repo.sheetDir : repo.root;
       await _pubGet(dir, alsoWhen: [if (inSheetPackage) repo.pubspecFile]);
       log(m.exportShooting);
-      final ShotRun run;
-      try {
-        run = await shoot(
-          dir,
-          PreviewFiles(files),
-          platform: switch (platform) {
-            VariantPlatform.ios => ShotPlatform.ios,
-            VariantPlatform.android => ShotPlatform.android,
-          },
-          onProgress: (event) => log(event.message),
-        );
-      } on ShutterException catch (e) {
-        throw ExportException(m.shutterFailed(e.message), e.exitCode);
+      // A run shutter stops for one file (one with no @Preview): each file
+      // on its own, that one told and the others shot.
+      Future<List<ShotResult>> shootFiles(List<String> files) async {
+        try {
+          final run = await shoot(
+            dir,
+            PreviewFiles(files),
+            platform: switch (platform) {
+              VariantPlatform.ios => ShotPlatform.ios,
+              VariantPlatform.android => ShotPlatform.android,
+            },
+            onProgress: (event) => log(event.message),
+          );
+          runs.add(run.dir);
+          return run.shots;
+        } on ShutterException catch (e) {
+          final ofFile =
+              e.exitCode == ExitCode.usage.code ||
+              e.exitCode == ExitCode.noInput.code;
+          if (!ofFile) {
+            throw ExportException(m.shutterFailed(e.message), e.exitCode);
+          }
+          if (files.length == 1) {
+            failed[inSheet(files.single)] = e.message;
+            return const [];
+          }
+          return [
+            for (final file in files) ...await shootFiles([file]),
+          ];
+        }
       }
-      runs.add(run.dir);
+
       return [
-        for (final result in run.shots)
+        for (final result in await shootFiles(files))
           MapEntry(
             shotKey(
               inSheetPackage: inSheetPackage,
@@ -269,7 +302,7 @@ class SheetExport {
       ]);
       shots.addEntries(both.expand((s) => s));
     }
-    return shots;
+    return (shots, failed);
   }
 
   /// Tells which states have no image in which variant, and why; returns

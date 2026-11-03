@@ -64,6 +64,8 @@
   "exportShooting": "shutter で状態を撮っています",
   "exportShotFailed": "{page}（{state}）を撮れませんでした: {error}",
   "exportNoShot": "{page}（{state}）の撮影結果がありません: shutter が Preview {preview} を見つけられませんでした",
+  "exportNoFile": "{file} がありません",
+  "exportNotInLib": "{file} が lib/ の下にありません。shutter は lib/ の下の Preview を撮ります",
   "exportDone": "書き出しました: {dir}",
   "pruneDone": "Contact Sheet が残した shutter の撮影結果を {count} 回分消しました",
 
@@ -98,6 +100,7 @@
   "sheetTabNotOf": "{page} は {tab} のタブの中に表示される画面ではありません",
   "fromAnywhere": "どの画面からも",
   "sheetUnknownDependency": "{name} が dependencies にありません",
+  "sheetPreviewPath": "{file}: ファイルはアプリからの相対パスで、/ で区切り、./ や ../ を使わずに書きます（lib/preview/home.dart、contact_sheet/lib/preview/home.dart）",
   "sheetUnknownField": "{field} はここに書けるフィールドではありません: {fields}",
   "sheetBadPreview": "{value} は Preview の指定になっていません: <ファイル>#<宣言>、その宣言の n 番目（0 から）の注釈なら <ファイル>#<宣言>@<n> と書きます",
   "sheetBadTrigger": "{value} は操作の指定になっていません: text:・key:・label:・type:・other: に続けて対象を書くか、back と書きます",

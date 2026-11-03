@@ -25,6 +25,7 @@ Contact Sheet draws the sheet as it is: it does not check it against the app.
 ## Requirements
 
 - Flutter 3.47 or later (Dart 3.13 or later).
+- `flutter_test` in the app's `dev_dependencies`, as shutter shoots the previews in `flutter test` (the sheet package has it).
 - An AI agent to write the sheet: any that runs commands, such as [Claude Code](https://claude.com/claude-code) or [Codex](https://github.com/openai/codex).
 
 shutter comes with the command: nothing else to install.
@@ -66,10 +67,9 @@ The exit codes are sysexits':
 | 64 | A wrong use: the message and the usage on stderr; `export --only`: no such page |
 | 65 | The sheet cannot be read (said with where); `changed`: git does not have the basis's commit; `export --strict`: a state has no image |
 | 66 | No app (`pubspec.yaml`) or no sheet; `changed`: no basis yet |
-| 69 | `flutter pub get` failed |
+| 69 | `flutter pub get` failed; `export`: shutter cannot run (no Flutter SDK) |
 | 70 | An unexpected error |
-| 78 | `basis`: not a git repository |
-| shutter's | shutter could not shoot |
+| 78 | `basis`: not a git repository; `export`: the app or the sheet package is not set up for shutter (no `flutter_test` in `dev_dependencies`) |
 
 ## The map
 

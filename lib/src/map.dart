@@ -94,6 +94,7 @@ class SheetMap {
     this.sheet, {
     required this.shots,
     required this.m,
+    this.failed = const {},
     this.drift,
     this.release,
   });
@@ -102,6 +103,10 @@ class SheetMap {
 
   /// shutter's shot of each state, by [shotKeyOf].
   final Map<String, ShotResult> shots;
+
+  /// The preview files shutter could not take, by the sheet's path, and
+  /// why: each of their states is an error.
+  final Map<String, String> failed;
   final Messages m;
   final SheetDrift? drift;
   final SheetRelease? release;
@@ -159,6 +164,14 @@ class SheetMap {
   ShotResult? shotOf(SheetState state, [SheetVariant? variant]) {
     final v = variant ?? sheet.variants.first;
     final preview = v.preview;
+    if (failed[state.file] case final error?) {
+      return ShotResult(
+        id: shotIdOf(state),
+        status: ShotStatus.error,
+        name: preview ?? state.symbol,
+        error: error,
+      );
+    }
     if (preview == null) return shots[shotKeyOf(state, v.platform)];
     final given =
         _byStatic[shotKey(
