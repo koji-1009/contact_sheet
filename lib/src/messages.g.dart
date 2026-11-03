@@ -225,7 +225,7 @@ class MessagesEn extends Messages {
 
   @override
   String get usageFooter =>
-      "\nEach command but agent and manual runs on the app directory given last, the current one by default.\n\nAI agents: run `contact_sheet agent` first — it is the step-by-step playbook. `contact_sheet manual` is the reference: the sheet's fields, the map, the runs, the exit codes.";
+      "\nEach command but agent and manual runs on the app directory given last, the current one by default.\n\nAI agents: run `sheet agent` first — it is the step-by-step playbook. `sheet manual` is the reference: the sheet's fields, the map, the runs, the exit codes.";
 
   @override
   String get helpVersion => "Print the version of contact_sheet.";
@@ -406,7 +406,7 @@ class MessagesEn extends Messages {
 
   @override
   String get changedNoBasis =>
-      "No basis yet: run contact_sheet basis once the sheet is written";
+      "No basis yet: run sheet basis once the sheet is written";
 
   @override
   String changedUnknown(Object commit) =>
@@ -421,7 +421,7 @@ class MessagesEn extends Messages {
 
   @override
   String get noSheet =>
-      "There is no contact_sheet/sheet.yaml. Run contact_sheet init, then write the sheet";
+      "There is no contact_sheet/sheet.yaml. Run sheet init, then write the sheet";
 
   @override
   String shutterFailed(Object error) => "shutter could not shoot: ${error}";
@@ -884,7 +884,7 @@ class MessagesJa extends Messages {
 
   @override
   String get usageFooter =>
-      "\nagent と manual 以外のコマンドは、最後に渡したアプリのディレクトリ（省略時は現在のディレクトリ）で動きます。\n\nAI エージェントは、まず `contact_sheet agent` を実行してください。手順書です。`contact_sheet manual` は参照です（sheet の各項目・地図・撮影結果・終了コード）。";
+      "\nagent と manual 以外のコマンドは、最後に渡したアプリのディレクトリ（省略時は現在のディレクトリ）で動きます。\n\nAI エージェントは、まず `sheet agent` を実行してください。手順書です。`sheet manual` は参照です（sheet の各項目・地図・撮影結果・終了コード）。";
 
   @override
   String get helpVersion => "contact_sheet のバージョンを出す";
@@ -1056,8 +1056,7 @@ class MessagesJa extends Messages {
   String get basisNoGit => "git リポジトリではない（またはコミットがない）ため、記録していません";
 
   @override
-  String get changedNoBasis =>
-      "まだ記録がありません。sheet を書いたら contact_sheet basis を実行してください";
+  String get changedNoBasis => "まだ記録がありません。sheet を書いたら sheet basis を実行してください";
 
   @override
   String changedUnknown(Object commit) =>
@@ -1072,7 +1071,7 @@ class MessagesJa extends Messages {
 
   @override
   String get noSheet =>
-      "contact_sheet/sheet.yaml がありません。contact_sheet init の後に sheet を書いてください";
+      "contact_sheet/sheet.yaml がありません。sheet init の後に sheet を書いてください";
 
   @override
   String shutterFailed(Object error) => "shutter で撮影できませんでした: ${error}";

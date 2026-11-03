@@ -1,6 +1,6 @@
-# contact_sheet manual
+# sheet manual
 
-`contact_sheet agent` is the step-by-step playbook; this is the reference.
+`sheet agent` is the step-by-step playbook; this is the reference.
 
 ## What Contact Sheet draws
 
@@ -11,7 +11,7 @@ Contact Sheet draws the sheet as it is: it does not check it against the app, an
 ## Where the images come from
 
 Each state names a `@Preview`.
-The app's own previews are shot in the app; the previews the app does not have are written in the **sheet package** (`contact_sheet/`, a plain Flutter package that imports the app and does not depend on Contact Sheet; `contact_sheet init --package` writes its skeleton) and shot there.
+The app's own previews are shot in the app; the previews the app does not have are written in the **sheet package** (`contact_sheet/`, a plain Flutter package that imports the app and does not depend on Contact Sheet; `sheet init --package` writes its skeleton) and shot there.
 shutter shoots them as a library, in `flutter test`, drawn as iOS: nothing else to install.
 `flutter pub get` runs first in each project, unless its package config is newer than its pubspec and lock file.
 
@@ -147,7 +147,7 @@ Each platform the variants name is one more shot of every preview.
 
 ## The map
 
-`contact_sheet export` writes it to `contact_sheet/map/`; with `--out <folder>`, to `<app>_contact_sheet/` in that folder (or that folder itself, when it is named so).
+`sheet export` writes it to `contact_sheet/map/`; with `--out <folder>`, to `<app>_contact_sheet/` in that folder (or that folder itself, when it is named so).
 Each export replaces `images/`.
 
 - `index.html`: one file, the images in `images/` next to it, to be opened from disk or served anywhere. Three views of the same pages: the map, the tree (the pages top to bottom, as a site map draws an app) and the list (one page under the other, by section, each with its states and the pages it goes to and comes from), with the table of the transitions (by page: in which state, doing what, it leads where), the route between two pages, a page's details, search, and each image opening large.
@@ -181,8 +181,8 @@ Top level: `app`, `locale`, `generatedAt`, `conditions` (`name`, `values`, `sour
 
 ## Basis and changes
 
-`contact_sheet basis` records the app as it is now as what the sheet was written against, in `contact_sheet/basis.json`: the commit, and the files that differed from it then (changed, or not in git yet) with their content's hash. Do not edit it.
-`contact_sheet changed` lists the app's files changed since then (the sheet package's own are not the app's changes).
+`sheet basis` records the app as it is now as what the sheet was written against, in `contact_sheet/basis.json`: the commit, and the files that differed from it then (changed, or not in git yet) with their content's hash. Do not edit it.
+`sheet changed` lists the app's files changed since then (the sheet package's own are not the app's changes).
 The map marks a page, for developers, when one of its files changed: its `source`, its dependencies' sources, the sources of its edges out and of the deep links into it.
 A mark is a hint: a change does not make the sheet wrong.
 
@@ -190,7 +190,7 @@ A mark is a hint: a change does not make the sheet wrong.
 
 shutter writes each shot into a run (`.dart_tool/shutter/runs/` of the project it shoots in).
 Once the images are copied into the map, the export deletes the runs it made, so the team's own runs in the app stay as they were.
-`contact_sheet prune` deletes what an interrupted export left: every run in the sheet package, and in the app only those an export listed (`contact_sheet/.dart_tool/contact_sheet/runs`) or left half made, cut short while shutter shot it (a run with no manifest that was not there before the export shot).
+`sheet prune` deletes what an interrupted export left: every run in the sheet package, and in the app only those an export listed (`contact_sheet/.dart_tool/contact_sheet/runs`) or left half made, cut short while shutter shot it (a run with no manifest that was not there before the export shot).
 
 ## What goes into the app's git
 
@@ -227,7 +227,7 @@ Once the images are copied into the map, the export deletes the runs it made, so
 | `prune` | Delete the runs of shutter's Contact Sheet left |
 
 Each but `agent` and `manual` runs on the app directory given last, the current one by default.
-`contact_sheet help <command>` tells a command's options; `--version`, the version.
+`sheet help <command>` tells a command's options; `--version`, the version.
 
 ## What `lint` tells
 

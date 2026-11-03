@@ -1,7 +1,7 @@
 /// Contact Sheet's command line: the map of every page of a Flutter app,
 /// from its widget previews shot with shutter, written as HTML, SVG and
-/// JSON. An AI agent drives it, following the playbook `contact_sheet agent`
-/// prints (`contact_sheet manual`: the reference).
+/// JSON: the `sheet` command. An AI agent drives it, following the playbook
+/// `sheet agent` prints (`sheet manual`: the reference).
 library;
 
 export 'src/basis.dart' show currentBasis, writeBasis;

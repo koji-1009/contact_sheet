@@ -33,7 +33,7 @@ List<String> scaffoldSheet(SheetRepo repo, {bool package = false}) {
 # happen in it, found out from what tells how it works, such as its code and
 # its specifications: its pages, the @Preview each state of a page is, and the
 # transitions.
-# `contact_sheet agent` prints how to write it.
+# `sheet agent` prints how to write it.
 pages: []
 edges: []
 ''');

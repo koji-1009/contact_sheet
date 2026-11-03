@@ -17,7 +17,7 @@ import 'package:io/io.dart' show ExitCode;
 import 'package:shutter/shutter.dart';
 import 'package:stack_trace/stack_trace.dart';
 
-/// Runs `contact_sheet` with [args]: its exit code (sysexits). [out] gets
+/// Runs `sheet` with [args]: its exit code (sysexits). [out] gets
 /// what it gives (and the usage, when asked for), [err] what went wrong, in
 /// English; the map is in [words] (the machine's language) unless
 /// `--locale` says otherwise. [runner] runs flutter and git, [shoot] is
@@ -55,7 +55,7 @@ Future<int> runCli(
   }
 }
 
-/// The `contact_sheet` command and its subcommands.
+/// The `sheet` command and its subcommands.
 class ContactSheetRunner extends CommandRunner<int> {
   ContactSheetRunner({
     required this.m,
@@ -64,7 +64,7 @@ class ContactSheetRunner extends CommandRunner<int> {
     required this.err,
     required this.processes,
     required this.shoot,
-  }) : super('contact_sheet', m.runnerDescription) {
+  }) : super('sheet', m.runnerDescription) {
     argParser
       ..addFlag('version', negatable: false, help: m.helpVersion)
       ..addFlag('verbose', abbr: 'v', negatable: false, help: m.helpVerbose);
@@ -108,7 +108,7 @@ class ContactSheetRunner extends CommandRunner<int> {
   }
 }
 
-/// A command of `contact_sheet`, in [m]'s words, which prints its usage
+/// A command of `sheet`, in [m]'s words, which prints its usage
 /// through the runner's [ContactSheetRunner.out].
 abstract class _Command extends Command<int> {
   _Command(this.m);

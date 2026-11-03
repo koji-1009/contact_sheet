@@ -1,6 +1,6 @@
 # Examples
 
-Three Flutter apps, each with its sheet (`contact_sheet/sheet.yaml`) written as the playbook (`contact_sheet agent`) says, one for each place the previews can come from.
+Three Flutter apps, each with its sheet (`contact_sheet/sheet.yaml`) written as the playbook (`sheet agent`) says, one for each place the previews can come from.
 
 | App | Navigation | State | Previews |
 | --- | --- | --- | --- |
@@ -22,4 +22,4 @@ dart run contact_sheet export example/shop_app
 
 The map is then in `example/shop_app/contact_sheet/map/`: open `index.html`.
 
-To write the sheet of an app of your own, run `contact_sheet agent` in its directory and follow it, or ask an AI agent to.
+To write the sheet of an app of your own, run `sheet agent` in its directory and follow it, or ask an AI agent to.

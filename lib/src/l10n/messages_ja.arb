@@ -2,7 +2,7 @@
   "@@locale": "ja",
 
   "runnerDescription": "Flutter アプリの全画面を、shutter で撮った Preview から 1 枚の地図にします。",
-  "usageFooter": "\nagent と manual 以外のコマンドは、最後に渡したアプリのディレクトリ（省略時は現在のディレクトリ）で動きます。\n\nAI エージェントは、まず `contact_sheet agent` を実行してください。手順書です。`contact_sheet manual` は参照です（sheet の各項目・地図・撮影結果・終了コード）。",
+  "usageFooter": "\nagent と manual 以外のコマンドは、最後に渡したアプリのディレクトリ（省略時は現在のディレクトリ）で動きます。\n\nAI エージェントは、まず `sheet agent` を実行してください。手順書です。`sheet manual` は参照です（sheet の各項目・地図・撮影結果・終了コード）。",
   "helpVersion": "contact_sheet のバージョンを出す",
   "helpVerbose": "予期しないエラーの発生箇所も出す",
   "descAgent": "AI エージェント向けの手順書を出す: アプリの Preview を地図にする（最初に読む）",
@@ -55,12 +55,12 @@
   "basisWritten": "{commit} のアプリを sheet を書いた時点として記録しました",
   "basisNoGit": "git リポジトリではない（またはコミットがない）ため、記録していません",
 
-  "changedNoBasis": "まだ記録がありません。sheet を書いたら contact_sheet basis を実行してください",
+  "changedNoBasis": "まだ記録がありません。sheet を書いたら sheet basis を実行してください",
   "changedUnknown": "git に {commit} がないため、それ以降の変更は分かりません",
   "changedNone": "sheet を書いた時点から変わったファイルはありません",
 
   "commandFailed": "{command} が失敗しました（終了コード {code}）",
-  "noSheet": "contact_sheet/sheet.yaml がありません。contact_sheet init の後に sheet を書いてください",
+  "noSheet": "contact_sheet/sheet.yaml がありません。sheet init の後に sheet を書いてください",
   "shutterFailed": "shutter で撮影できませんでした: {error}",
   "exportShooting": "shutter で状態を撮っています",
   "exportShotFailed": "{page}（{state}）を撮れませんでした: {error}",

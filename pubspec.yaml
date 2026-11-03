@@ -21,7 +21,7 @@ environment:
   sdk: ^3.13.0
 
 executables:
-  contact_sheet:
+  sheet: contact_sheet
 
 dependencies:
   args: ^2.7.0

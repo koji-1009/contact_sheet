@@ -523,7 +523,7 @@ const stateHtml = (s) => {
 
 $('#app').textContent = S.app;
 // When the map was exported, for anyone to tell how old it is; what the
-// sheet was written against, when `contact_sheet basis` recorded it, for
+// sheet was written against, when `sheet basis` recorded it, for
 // developers.
 const exported = (() => {
   try { return new Date(S.generatedAt).toLocaleString(S.locale, { dateStyle: 'medium', timeStyle: 'short' }); } catch { return S.generatedAt; }

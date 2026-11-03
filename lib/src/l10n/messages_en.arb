@@ -2,7 +2,7 @@
   "@@locale": "en",
 
   "runnerDescription": "Every page of a Flutter app as one map, from its previews shot with shutter.",
-  "usageFooter": "\nEach command but agent and manual runs on the app directory given last, the current one by default.\n\nAI agents: run `contact_sheet agent` first — it is the step-by-step playbook. `contact_sheet manual` is the reference: the sheet's fields, the map, the runs, the exit codes.",
+  "usageFooter": "\nEach command but agent and manual runs on the app directory given last, the current one by default.\n\nAI agents: run `sheet agent` first — it is the step-by-step playbook. `sheet manual` is the reference: the sheet's fields, the map, the runs, the exit codes.",
   "helpVersion": "Print the version of contact_sheet.",
   "helpVerbose": "Tell where an unexpected error came from.",
   "descAgent": "Print the step-by-step playbook for AI agents: turn the app's previews into the map (start here).",
@@ -82,14 +82,14 @@
   "@basisWritten": {"placeholders": {"commit": {}}},
   "basisNoGit": "Not a git repository (or no commit yet): nothing recorded",
 
-  "changedNoBasis": "No basis yet: run contact_sheet basis once the sheet is written",
+  "changedNoBasis": "No basis yet: run sheet basis once the sheet is written",
   "changedUnknown": "git does not have {commit}: what changed since is not known",
   "@changedUnknown": {"placeholders": {"commit": {}}},
   "changedNone": "Nothing changed since the sheet was written",
 
   "commandFailed": "{command} failed (exit code {code})",
   "@commandFailed": {"placeholders": {"command": {}, "code": {}}},
-  "noSheet": "There is no contact_sheet/sheet.yaml. Run contact_sheet init, then write the sheet",
+  "noSheet": "There is no contact_sheet/sheet.yaml. Run sheet init, then write the sheet",
   "shutterFailed": "shutter could not shoot: {error}",
   "@shutterFailed": {"placeholders": {"error": {}}},
   "exportShooting": "Shooting the states with shutter",

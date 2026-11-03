@@ -2,7 +2,7 @@
 
 For AI coding agents (Claude Code, Codex, ...) working on this repository.
 Read [README.md](README.md) and [doc/development.md](doc/development.md) first.
-[doc/agent.md](doc/agent.md) and [doc/manual.md](doc/manual.md) are a different thing: the playbook and the reference for the agent that writes a target app's sheet, which `contact_sheet agent` and `contact_sheet manual` print (the usage's footer points an agent to them).
+[doc/agent.md](doc/agent.md) and [doc/manual.md](doc/manual.md) are a different thing: the playbook and the reference for the agent that writes a target app's sheet, which `sheet agent` and `sheet manual` print (the usage's footer points an agent to them).
 
 ## What matters
 
@@ -11,8 +11,8 @@ It is for the people outside the code as much as for developers: product manager
 
 Decisions already made; do not reintroduce what they removed:
 
-- One package, `contact_sheet`, pure Dart, at the repository's root: the command. No Flutter package of Contact Sheet's, no live app, no host, no launcher. Flutter draws only the app's previews, through shutter.
-- shutter is a library dependency (`package:shutter/shutter.dart`): `contact_sheet export` calls its `shot` for the previews the sheet names, drawn as iOS. Nothing else to install.
+- One package, `contact_sheet`, pure Dart, at the repository's root: the command, `sheet` (`bin/contact_sheet.dart`, so `dart run contact_sheet` runs it). No Flutter package of Contact Sheet's, no live app, no host, no launcher. Flutter draws only the app's previews, through shutter.
+- shutter is a library dependency (`package:shutter/shutter.dart`): `sheet export` calls its `shot` for the previews the sheet names, drawn as iOS. Nothing else to install.
 - The sheet is data: `contact_sheet/sheet.yaml` in the target app, read by the command (`lib/src/sheet.dart`, which says where a mistake is), written by an AI agent reading the app's code, following the playbook, and drawn as it is. There is no machine verification of the sheet against the app and no deterministic extraction; nothing is added to the target app.
 - The previews are the app's own first (a team on shutter has one per page), shot in the app. Only what the app has no preview of is written in the sheet package (`contact_sheet/`, made by `init --package`), a plain Flutter package that imports the app and does not depend on Contact Sheet, shot there. A state's `preview` is relative to the app; `contact_sheet/...` is the sheet package's.
 - What only developers read stays apart from what anyone reads: the code's names (`key:`, `type:` triggers), files, fakes, and `go` and `replace` are behind "For developers" in the HTML (`.dev`, hidden by CSS) and only in `map-dev.svg`, not in `map.svg`. The playbook has triggers written in the screen's words (`text:`, `label:`).
@@ -42,8 +42,8 @@ Decisions already made; do not reintroduce what they removed:
 | `lib/src/svg.dart`, `lib/src/html.dart` | The drawing and its palette (light and dark); `index.html`, its words from the ARB files |
 | `lib/src/runs.dart` | The runs of shutter's an export made in the app, deleted after it or by `prune` |
 | `lib/src/basis.dart`, `lib/src/process.dart` | The basis and what changed since, from git; running flutter and git |
-| `lib/src/scaffold.dart` | `contact_sheet init` |
-| `lib/src/lint.dart` | `contact_sheet lint`, and the hints `export` tells: what the sheet itself shows may be missing or written twice |
+| `lib/src/scaffold.dart` | `sheet init` |
+| `lib/src/lint.dart` | `sheet lint`, and the hints `export` tells: what the sheet itself shows may be missing or written twice |
 | `lib/src/l10n/*.arb`, `lib/src/messages.g.dart` | The command's words; generated from them by `dart run tool/gen_messages.dart` |
 | `doc/agent.md`, `doc/manual.md` | For the AI agent writing a sheet: the playbook and the reference |
 | `doc/development.md` | For people working on this repository: running it from a clone, the checks, the examples |

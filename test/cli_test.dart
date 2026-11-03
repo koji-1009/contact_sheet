@@ -41,18 +41,18 @@ void main() {
   test('the usage when asked for, on out; a wrong use said on err, with the '
       'usage, as a usage error', () async {
     expect(await cli([]), 0);
-    expect(out.single, contains('Usage: contact_sheet <command> [arguments]'));
+    expect(out.single, contains('Usage: sheet <command> [arguments]'));
     // Where an AI agent starts reading, from the usage.
-    expect(out.single, contains('AI agents: run `contact_sheet agent` first'));
+    expect(out.single, contains('AI agents: run `sheet agent` first'));
     expect(out.single, contains('  manual'));
     expect(await cli(['export', '--help']), 0);
-    expect(out.last, contains('contact_sheet export [<app directory>]'));
+    expect(out.last, contains('sheet export [<app directory>]'));
     expect(out.last, contains('--out=<folder>'));
     expect(err, isEmpty);
 
     expect(await cli(['draw', app.path]), 64);
     expect(err.first, contains('Could not find a command named "draw"'));
-    expect(err.last, contains('Usage: contact_sheet <command> [arguments]'));
+    expect(err.last, contains('Usage: sheet <command> [arguments]'));
     expect(await cli(['init', app.path, app.path]), 64);
     expect(err[err.length - 2], 'Give one app directory at most.');
     // Not an app.

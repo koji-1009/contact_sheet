@@ -10,7 +10,7 @@ The map is HTML, SVG and JSON, opened without any tool, for everyone who works o
 ![Code, specifications and the like, looked into by an AI agent, become the sheet; contact_sheet shoots the previews and draws the map](https://raw.githubusercontent.com/koji-1009/contact_sheet/main/doc/images/flow.png)
 
 1. An AI agent finds out the screen transitions that actually happen in the app, from whatever tells how the app works (its code, its specifications), and writes them as the app's **sheet** (`contact_sheet/sheet.yaml`), naming a `@Preview` for each state of each page.
-2. `contact_sheet export` shoots those previews with [shutter](https://pub.dev/packages/shutter), drawn as iOS (or Android, where the sheet asks for it), and draws the map.
+2. `sheet export` shoots those previews with [shutter](https://pub.dev/packages/shutter), drawn as iOS (or Android, where the sheet asks for it), and draws the map.
 
 The previews are the app's own where it has them (a team on shutter or the Widget Previewer has one per page).
 For the pages and states the app has none of, the agent writes them in the **sheet package**, a small Flutter package in `contact_sheet/` that imports the app.
@@ -47,29 +47,29 @@ shutter comes with the command: nothing else to install.
 
 ## Getting started
 
-1. Install the command (`dart install` compiles it to a native binary on the PATH):
+1. Install the command, `sheet` (`dart install` compiles it to a native binary on the PATH):
 
    ```sh
    dart install contact_sheet
    ```
 
-2. In the app's directory, ask the AI agent to run `contact_sheet agent` and follow it.
+2. In the app's directory, ask the AI agent to run `sheet agent` and follow it.
 3. Open `contact_sheet/map/index.html`.
 
 ## Commands
 
 | Command | What |
 | --- | --- |
-| `contact_sheet agent` | Prints the playbook the AI agent follows to write the sheet |
-| `contact_sheet manual` | Prints the reference: the sheet's fields, the map, the exit codes |
-| `contact_sheet init` | Writes an empty sheet; with `--package`, the sheet package's skeleton too |
-| `contact_sheet export` | Shoots the previews the sheet names and writes the map into `contact_sheet/map/` |
-| `contact_sheet lint` | Tells what the sheet may be missing or have written twice |
-| `contact_sheet basis` | Records the app as it is now as what the sheet was written against |
-| `contact_sheet changed` | Lists the app's files changed since then: the sheet may need bringing up to date for them |
-| `contact_sheet prune` | Deletes shutter's runs that Contact Sheet left |
+| `sheet agent` | Prints the playbook the AI agent follows to write the sheet |
+| `sheet manual` | Prints the reference: the sheet's fields, the map, the exit codes |
+| `sheet init` | Writes an empty sheet; with `--package`, the sheet package's skeleton too |
+| `sheet export` | Shoots the previews the sheet names and writes the map into `contact_sheet/map/` |
+| `sheet lint` | Tells what the sheet may be missing or have written twice |
+| `sheet basis` | Records the app as it is now as what the sheet was written against |
+| `sheet changed` | Lists the app's files changed since then: the sheet may need bringing up to date for them |
+| `sheet prune` | Deletes shutter's runs that Contact Sheet left |
 
-`contact_sheet help <command>` tells a command's options.
+`sheet help <command>` tells a command's options.
 An export deletes the runs of shutter's it made, so the team's own runs in the app stay as they were.
 
 ## In the app's repository

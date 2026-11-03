@@ -8,7 +8,7 @@ import 'package:contact_sheet/src/sheet.dart';
 /// What the app was when an AI agent read it to write the sheet: its commit,
 /// and the files that differed from it then (changed, or not in git yet),
 /// relative to the app, with the git blob hash of their content ('' for a
-/// file deleted). Written by `contact_sheet basis` into
+/// file deleted). Written by `sheet basis` into
 /// `contact_sheet/basis.json`, in git with the sheet: whoever exports later
 /// sees what changed since.
 typedef SheetBasis = ({String commit, Map<String, String> files});

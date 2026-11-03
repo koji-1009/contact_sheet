@@ -8,7 +8,7 @@ import 'package:path/path.dart' as p;
 /// copied into the map: then deleted, so the app's own runs (the team's,
 /// when it shoots in the app) stay as the team left them. Listed in
 /// `contact_sheet/.dart_tool/contact_sheet/runs` meanwhile, so that
-/// `contact_sheet prune` finds those an export did not get to delete; and,
+/// `sheet prune` finds those an export did not get to delete; and,
 /// before each is shot, the runs its project had (`shooting`), so that
 /// `prune` tells one an interrupted shot left half made from them.
 class ExportRuns {

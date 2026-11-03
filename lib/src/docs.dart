@@ -2,33 +2,33 @@
 // the user's language. Each mirrors a file under `doc/`, kept byte-identical
 // by test/docs_test.dart: edit both.
 
-/// `contact_sheet agent`: the step-by-step playbook, `doc/agent.md`.
+/// `sheet agent`: the step-by-step playbook, `doc/agent.md`.
 const agentText = r'''
-# contact_sheet — agent playbook
+# sheet — agent playbook
 
 Contact Sheet draws a Flutter app as a map: every page as an image, every transition as an arrow.
 The images are `@Preview`s, shot by shutter.
-Your task: find out and think through the screen transitions that actually happen in the app, write them as its **transition structure** in the sheet's schema (the sheet, `contact_sheet/sheet.yaml`), naming a `@Preview` for each state of each page, and make the map with `contact_sheet export`.
+Your task: find out and think through the screen transitions that actually happen in the app, write them as its **transition structure** in the sheet's schema (the sheet, `contact_sheet/sheet.yaml`), naming a `@Preview` for each state of each page, and make the map with `sheet export`.
 Refer to what tells how the app works, such as its code and its specifications. Write what happens: where they differ, the code is what the app does.
 
 The previews come first from the app itself: a team that uses shutter or the Widget Previewer has a `@Preview` per page already. Use those.
 Where a page, or a state of it, has none, write the preview in the **sheet package** (`contact_sheet/`, a small Flutter package inside the app's repository that imports the app).
 Do not add previews, or anything else, to the app: whether the app keeps previews of its own is the team's choice.
 
-`contact_sheet manual` is the reference: every field of the sheet, what the map holds, the runs, the exit codes.
+`sheet manual` is the reference: every field of the sheet, what the map holds, the runs, the exit codes.
 
 ## The steps
 
 Run the commands in the app's directory.
 
-1. `contact_sheet init`: writes an empty `contact_sheet/sheet.yaml`.
+1. `sheet init`: writes an empty `contact_sheet/sheet.yaml`.
 2. Look into what tells how the app works, such as its code (its router, its pages, and its `@Preview`s: search for `@Preview(`; a `@MultiPreview` subclass counts too) and its specifications.
-3. For the pages and states the app has no preview of: `contact_sheet init --package` writes the sheet package's skeleton, then write the previews there (see "Previews in the sheet package"). In `contact_sheet/`: `flutter pub get` and `flutter analyze`.
-4. Write `sheet.yaml` (see "Writing the sheet"). Then `contact_sheet lint`: what the sheet itself shows may be missing (a page no arrow leads to, a state nothing leaves from or arrives in, unless what the page loads decides it, a condition's value nothing gives) or written twice. Hints, not errors: look at each.
-5. `contact_sheet export`: has shutter shoot the previews the sheet names and writes the map to `contact_sheet/map/`. A mistake in `sheet.yaml` is told with where it is. A state that could not be shot is told with shutter's error and where it points: fix the sheet package's preview, or tell the user about the app's, and export again; `--only <page id>` shoots that page's previews alone and keeps the other images, and `--strict` fails while any state has no image. Look at `contact_sheet/map/map-dev.svg`: every page has its image, every transition its arrow. `map.svg` is the same for the people outside the code: an arrow's label without what only the code names.
-6. `contact_sheet basis`: records the app as the sheet was written from it (`contact_sheet/basis.json`).
+3. For the pages and states the app has no preview of: `sheet init --package` writes the sheet package's skeleton, then write the previews there (see "Previews in the sheet package"). In `contact_sheet/`: `flutter pub get` and `flutter analyze`.
+4. Write `sheet.yaml` (see "Writing the sheet"). Then `sheet lint`: what the sheet itself shows may be missing (a page no arrow leads to, a state nothing leaves from or arrives in, unless what the page loads decides it, a condition's value nothing gives) or written twice. Hints, not errors: look at each.
+5. `sheet export`: has shutter shoot the previews the sheet names and writes the map to `contact_sheet/map/`. A mistake in `sheet.yaml` is told with where it is. A state that could not be shot is told with shutter's error and where it points: fix the sheet package's preview, or tell the user about the app's, and export again; `--only <page id>` shoots that page's previews alone and keeps the other images, and `--strict` fails while any state has no image. Look at `contact_sheet/map/map-dev.svg`: every page has its image, every transition its arrow. `map.svg` is the same for the people outside the code: an arrow's label without what only the code names.
+6. `sheet basis`: records the app as the sheet was written from it (`contact_sheet/basis.json`).
 
-Later, to bring the sheet up to date: `contact_sheet changed --by-page` lists the app's files changed since the basis, by the pages the sheet names them for, then those on no page (a page the sheet does not have yet may be among them).
+Later, to bring the sheet up to date: `sheet changed --by-page` lists the app's files changed since the basis, by the pages the sheet names them for, then those on no page (a page the sheet does not have yet may be among them).
 Update the sheet for them (pages, edges, dependencies, the sheet package's previews and fakes they touch), keep the rest as it is, export, and record the basis again.
 
 ## Previews in the sheet package
@@ -134,7 +134,7 @@ entries:                         # deep links into a page, from outside the app
     source: lib/router.dart
 ```
 
-Each field, and how `preview` names a `@Preview`: `contact_sheet manual`, "The sheet".
+Each field, and how `preview` names a `@Preview`: `sheet manual`, "The sheet".
 
 - Read the router first: its routes give the pages and their paths, its redirects the guards. Write what the app does, including redirects and conditions far from the button (router redirects, listeners, guards).
 - Put the app's start first (its home, or what opens first): the map starts from the first page.
@@ -154,14 +154,14 @@ Each field, and how `preview` names a `@Preview`: `contact_sheet manual`, "The s
 - `entries`: the links the code handles on purpose (ones it publishes, a notification it opens), not every route a link could name; `then` where the link decides the state the page opens in (`/login?from=/checkout`); `if` where it opens the page only for some values of the conditions (the link the router sends a guest elsewhere with is another entry, to that page).
 - `memo`: what you found about the page that its image and arrows do not show. `links`: where more is written about it, such as its specification. People write these by hand too: keep the ones you did not write as they are.
 
-`basis.json` is written by `contact_sheet basis`. Do not edit it.
+`basis.json` is written by `sheet basis`. Do not edit it.
 ''';
 
-/// `contact_sheet manual`: the reference, `doc/manual.md`.
+/// `sheet manual`: the reference, `doc/manual.md`.
 const manualText = r'''
-# contact_sheet manual
+# sheet manual
 
-`contact_sheet agent` is the step-by-step playbook; this is the reference.
+`sheet agent` is the step-by-step playbook; this is the reference.
 
 ## What Contact Sheet draws
 
@@ -172,7 +172,7 @@ Contact Sheet draws the sheet as it is: it does not check it against the app, an
 ## Where the images come from
 
 Each state names a `@Preview`.
-The app's own previews are shot in the app; the previews the app does not have are written in the **sheet package** (`contact_sheet/`, a plain Flutter package that imports the app and does not depend on Contact Sheet; `contact_sheet init --package` writes its skeleton) and shot there.
+The app's own previews are shot in the app; the previews the app does not have are written in the **sheet package** (`contact_sheet/`, a plain Flutter package that imports the app and does not depend on Contact Sheet; `sheet init --package` writes its skeleton) and shot there.
 shutter shoots them as a library, in `flutter test`, drawn as iOS: nothing else to install.
 `flutter pub get` runs first in each project, unless its package config is newer than its pubspec and lock file.
 
@@ -308,7 +308,7 @@ Each platform the variants name is one more shot of every preview.
 
 ## The map
 
-`contact_sheet export` writes it to `contact_sheet/map/`; with `--out <folder>`, to `<app>_contact_sheet/` in that folder (or that folder itself, when it is named so).
+`sheet export` writes it to `contact_sheet/map/`; with `--out <folder>`, to `<app>_contact_sheet/` in that folder (or that folder itself, when it is named so).
 Each export replaces `images/`.
 
 - `index.html`: one file, the images in `images/` next to it, to be opened from disk or served anywhere. Three views of the same pages: the map, the tree (the pages top to bottom, as a site map draws an app) and the list (one page under the other, by section, each with its states and the pages it goes to and comes from), with the table of the transitions (by page: in which state, doing what, it leads where), the route between two pages, a page's details, search, and each image opening large.
@@ -342,8 +342,8 @@ Top level: `app`, `locale`, `generatedAt`, `conditions` (`name`, `values`, `sour
 
 ## Basis and changes
 
-`contact_sheet basis` records the app as it is now as what the sheet was written against, in `contact_sheet/basis.json`: the commit, and the files that differed from it then (changed, or not in git yet) with their content's hash. Do not edit it.
-`contact_sheet changed` lists the app's files changed since then (the sheet package's own are not the app's changes).
+`sheet basis` records the app as it is now as what the sheet was written against, in `contact_sheet/basis.json`: the commit, and the files that differed from it then (changed, or not in git yet) with their content's hash. Do not edit it.
+`sheet changed` lists the app's files changed since then (the sheet package's own are not the app's changes).
 The map marks a page, for developers, when one of its files changed: its `source`, its dependencies' sources, the sources of its edges out and of the deep links into it.
 A mark is a hint: a change does not make the sheet wrong.
 
@@ -351,7 +351,7 @@ A mark is a hint: a change does not make the sheet wrong.
 
 shutter writes each shot into a run (`.dart_tool/shutter/runs/` of the project it shoots in).
 Once the images are copied into the map, the export deletes the runs it made, so the team's own runs in the app stay as they were.
-`contact_sheet prune` deletes what an interrupted export left: every run in the sheet package, and in the app only those an export listed (`contact_sheet/.dart_tool/contact_sheet/runs`) or left half made, cut short while shutter shot it (a run with no manifest that was not there before the export shot).
+`sheet prune` deletes what an interrupted export left: every run in the sheet package, and in the app only those an export listed (`contact_sheet/.dart_tool/contact_sheet/runs`) or left half made, cut short while shutter shot it (a run with no manifest that was not there before the export shot).
 
 ## What goes into the app's git
 
@@ -388,7 +388,7 @@ Once the images are copied into the map, the export deletes the runs it made, so
 | `prune` | Delete the runs of shutter's Contact Sheet left |
 
 Each but `agent` and `manual` runs on the app directory given last, the current one by default.
-`contact_sheet help <command>` tells a command's options; `--version`, the version.
+`sheet help <command>` tells a command's options; `--version`, the version.
 
 ## What `lint` tells
 
