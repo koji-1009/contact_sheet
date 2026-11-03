@@ -78,6 +78,7 @@ abstract class Messages {
   String exportShotFailed(Object page, Object state, Object error);
   String exportNoShot(Object page, Object state, Object preview);
   String exportNotShot(Object page, Object state);
+  String noFlutter(Object error);
   String exportNoFile(Object file);
   String exportNotInLib(Object file);
   String exportDone(Object dir);
@@ -429,6 +430,10 @@ class MessagesEn extends Messages {
   @override
   String exportNotShot(Object page, Object state) =>
       "${page} (${state}) has no image: not shot, as --only leaves it out, and the map before has none";
+
+  @override
+  String noFlutter(Object error) =>
+      "Could not run flutter (${error}): set FLUTTER_ROOT or put flutter on the PATH";
 
   @override
   String exportNoFile(Object file) => "${file} does not exist";
@@ -1055,6 +1060,10 @@ class MessagesJa extends Messages {
   @override
   String exportNotShot(Object page, Object state) =>
       "${page}（${state}）には画像がありません: --only で外れたので撮っておらず、前の地図にもありません";
+
+  @override
+  String noFlutter(Object error) =>
+      "flutter を実行できませんでした（${error}）: FLUTTER_ROOT を設定するか、flutter を PATH に入れてください";
 
   @override
   String exportNoFile(Object file) => "${file} がありません";

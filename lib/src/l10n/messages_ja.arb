@@ -65,6 +65,7 @@
   "exportShotFailed": "{page}（{state}）を撮れませんでした: {error}",
   "exportNoShot": "{page}（{state}）の撮影結果がありません: shutter が Preview {preview} を見つけられませんでした",
   "exportNotShot": "{page}（{state}）には画像がありません: --only で外れたので撮っておらず、前の地図にもありません",
+  "noFlutter": "flutter を実行できませんでした（{error}）: FLUTTER_ROOT を設定するか、flutter を PATH に入れてください",
   "exportNoFile": "{file} がありません",
   "exportNotInLib": "{file} が lib/ の下にありません。shutter は lib/ の下の Preview を撮ります",
   "exportDone": "書き出しました: {dir}",

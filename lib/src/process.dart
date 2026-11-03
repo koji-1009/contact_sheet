@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+
 /// Runs commands. Tests give a fake one.
 abstract interface class ProcessRunner {
   /// Runs [executable] to its end: its exit code and output.
@@ -14,13 +16,23 @@ abstract interface class ProcessRunner {
 class SystemProcessRunner implements ProcessRunner {
   const SystemProcessRunner();
 
+  /// `flutter` as shutter finds it, that the two use one SDK: in
+  /// `FLUTTER_ROOT` when it is set, else on the PATH.
+  static String _resolve(String executable) {
+    final root = Platform.environment['FLUTTER_ROOT'];
+    if (executable != 'flutter' || root == null || root.isEmpty) {
+      return executable;
+    }
+    return p.join(root, 'bin', Platform.isWindows ? 'flutter.bat' : 'flutter');
+  }
+
   @override
   Future<ProcessResult> run(
     String executable,
     List<String> arguments, {
     String? workingDirectory,
   }) => Process.run(
-    executable,
+    _resolve(executable),
     arguments,
     workingDirectory: workingDirectory,
     // A name that is not UTF-8 (Linux allows it) as replacement characters,

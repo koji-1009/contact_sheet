@@ -78,6 +78,25 @@ class _Shutter {
   }
 }
 
+/// git as it is; no flutter on the machine.
+class _NoFlutter extends Tools {
+  @override
+  Future<ProcessResult> run(
+    String executable,
+    List<String> arguments, {
+    String? workingDirectory,
+  }) async {
+    if (executable == 'flutter') {
+      throw const ProcessException('flutter', [], 'No such file or directory');
+    }
+    return await super.run(
+      executable,
+      arguments,
+      workingDirectory: workingDirectory,
+    );
+  }
+}
+
 const _sheet = '''
 conditions:
   - {name: Login, values: [Guest, Member], source: lib/auth.dart}
@@ -780,6 +799,22 @@ pages:
       final svg = File(p.join(out, name)).readAsStringSync();
       expect('data:image/png;base64,'.allMatches(svg), hasLength(2));
     }
+  });
+
+  test('no flutter to run is told as unavailable, not as unexpected', () async {
+    await expectLater(
+      SheetExport(
+        repo,
+        runner: _NoFlutter(),
+        shoot: _Shutter(shots.path).shot,
+        m: Messages.of('en'),
+      ).run(),
+      throwsA(
+        isA<ExportException>()
+            .having((e) => e.exitCode, 'exitCode', 69)
+            .having((e) => e.message, 'message', contains('FLUTTER_ROOT')),
+      ),
+    );
   });
 
   test('an export that fails after a shot deletes that run too', () async {

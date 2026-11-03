@@ -358,7 +358,7 @@ Once the images are copied into the map, the export deletes the runs it made, so
 | 64 | A wrong use: the message and the usage on stderr; `export --only`: the sheet has no such page |
 | 65 | `sheet.yaml` cannot be read (said with where); `changed`: the basis's commit is not in the repository; `export --strict`: a state has no image |
 | 66 | No `pubspec.yaml` in the directory; no `sheet.yaml`; `changed`: no basis yet |
-| 69 | `flutter pub get` failed; `export`: shutter cannot run (no Flutter SDK) |
+| 69 | `export`: no `flutter` to run (`FLUTTER_ROOT`, else the PATH), `flutter pub get` failed, or shutter cannot run |
 | 70 | An unexpected error (`--verbose` tells where it came from) |
 | 78 | `basis`: not a git repository; `export`: the app or the sheet package is not set up for shutter (no `flutter_test` in `dev_dependencies`) |
 

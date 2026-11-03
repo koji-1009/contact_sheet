@@ -67,7 +67,7 @@ The exit codes are sysexits':
 | 64 | A wrong use: the message and the usage on stderr; `export --only`: no such page |
 | 65 | The sheet cannot be read (said with where); `changed`: git does not have the basis's commit; `export --strict`: a state has no image |
 | 66 | No app (`pubspec.yaml`) or no sheet; `changed`: no basis yet |
-| 69 | `flutter pub get` failed; `export`: shutter cannot run (no Flutter SDK) |
+| 69 | `export`: no `flutter` to run (`FLUTTER_ROOT`, else the PATH), `flutter pub get` failed, or shutter cannot run |
 | 70 | An unexpected error |
 | 78 | `basis`: not a git repository; `export`: the app or the sheet package is not set up for shutter (no `flutter_test` in `dev_dependencies`) |
 

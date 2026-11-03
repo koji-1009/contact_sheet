@@ -451,7 +451,13 @@ class SheetExport {
     }
     const args = ['pub', 'get'];
     log('\$ flutter ${args.join(' ')}');
-    final result = await runner.run('flutter', args, workingDirectory: dir);
+    final ProcessResult result;
+    try {
+      result = await runner.run('flutter', args, workingDirectory: dir);
+    } on ProcessException catch (e) {
+      // No flutter to run: as shutter tells it, unavailable.
+      throw ExportException(m.noFlutter(e.message), ExitCode.unavailable.code);
+    }
     if (result.exitCode != 0) {
       for (final line in '${result.stdout}${result.stderr}'.split('\n')) {
         if (line.trim().isNotEmpty) log(line);
