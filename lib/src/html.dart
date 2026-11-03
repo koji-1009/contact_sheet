@@ -632,12 +632,13 @@ const apply = () => {
   canvas.classList.toggle('far', islandChips.length >= 4 && view.k < 0.45);
 };
 // Moves the map to show [box] (in map pixels) whole, gliding there; clear
-// of the [left], [top] and [bottom] pixels a panel takes.
-function show(box, glide, { left = 0, top = 0, bottom = 0 } = {}) {
+// of the [left], [right], [top] and [bottom] pixels a panel takes.
+function show(box, glide, { left = 0, right = 0, top = 0, bottom = 0 } = {}) {
   const m = map.getBoundingClientRect();
   if (!m.width) return;
   top = Math.min(top, m.height * 2 / 3);
-  const w = m.width - left, h = Math.max(m.height - top - bottom, m.height / 3);
+  right = Math.min(right, m.width / 2);
+  const w = m.width - left - right, h = Math.max(m.height - top - bottom, m.height / 3);
   const k = Math.min(w / box.width, h / box.height, 1.6);
   view = { k, x: left + (w - box.width * k) / 2 - box.x * k, y: top + (h - box.height * k) / 2 - box.y * k };
   canvas.classList.toggle('moving', glide);
@@ -800,8 +801,9 @@ function focus(id, glide, { state } = {}) {
     <div class="actions"><button class="link" id="enlarge">${esc(T('enlarge'))}</button><button class="link" data-go="list/${esc(p.id)}">${esc(T('inList'))}</button><button class="link" data-detail="${esc(p.id)}">${esc(T('detail'))}</button></div>`;
   card.classList.add('on');
   $('#enlarge').onclick = () => enlarge(focused);
-  // On a phone the card lies across the bottom: the pages above it.
-  show(around(frame), glide, wide() ? {} : { bottom: card.offsetHeight + 68 });
+  // The pages beside the card, at the right; on a phone, where it lies
+  // across the bottom, above it.
+  show(around(frame), glide, wide() ? { right: card.offsetWidth + 24 } : { bottom: card.offsetHeight + 68 });
 }
 // A state chosen beside the page: the map shows it, and its address says it.
 $('#card').addEventListener('click', (e) => {
