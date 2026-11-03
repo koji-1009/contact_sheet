@@ -6,10 +6,10 @@ The map is written as HTML, SVG and JSON, to be opened without any tool and shar
 The app's code is never changed.
 
 An AI agent does the writing.
-It reads the app's code and writes the app's **sheet** (`contact_sheet/sheet.yaml`), naming a `@Preview` for each state of each page, then turns it into the map with the `contact_sheet` command.
+It looks into what tells how the app works, such as its code and its specifications, and writes the app's **sheet** (`contact_sheet/sheet.yaml`): the screen transitions that actually happen, naming a `@Preview` for each state of each page, then turns it into the map with the `contact_sheet` command.
 The previews are the app's own where it has them (a team on shutter or the Widget Previewer has one per page); for the pages and states it has none of, the agent writes them in the **sheet package**, a small Flutter package in `contact_sheet/` that imports the app.
 
-The sheet is the app's transition structure as data, read from its code and kept in git with the app:
+The sheet is the app's transition structure as data, found out from what tells how it works, such as its code and its specifications, and kept in git with the app:
 
 - pages: their widget and file, route path, and the states each one starts in (a `@Preview` each; those what it loads decides, such as empty or loading, marked);
 - what the app keeps across its pages, shown on them or not (signed in, what is in the cart): its values, the states of a page each is the look of, the transitions that happen only for some (a redirect for a guest) and those that change it (logging in);

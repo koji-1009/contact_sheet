@@ -5,7 +5,7 @@
 ## What Contact Sheet draws
 
 The map of a Flutter app: each state of each page as an image, each transition as an arrow, each deep link as an arrow from outside.
-It is drawn from the app's **sheet**, `contact_sheet/sheet.yaml`, the app's transition structure as data, written by an AI agent reading the app's code and kept in git with the app.
+It is drawn from the app's **sheet**, `contact_sheet/sheet.yaml`, the app's transition structure as data: the screen transitions that actually happen in it, written by an AI agent from what tells how the app works, such as its code and its specifications, and kept in git with the app.
 Contact Sheet draws the sheet as it is: it does not check it against the app, and it changes nothing in the app.
 
 ## Where the images come from

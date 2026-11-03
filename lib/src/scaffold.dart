@@ -29,8 +29,10 @@ List<String> scaffoldSheet(SheetRepo repo, {bool package = false}) {
   }
 
   write('sheet.yaml', '''
-# The transition structure of $app, written by reading its code: its pages,
-# the @Preview each state of a page is, and the transitions.
+# The transition structure of $app: the screen transitions that actually
+# happen in it, found out from what tells how it works, such as its code and
+# its specifications: its pages, the @Preview each state of a page is, and the
+# transitions.
 # `contact_sheet agent` prints how to write it.
 pages: []
 edges: []

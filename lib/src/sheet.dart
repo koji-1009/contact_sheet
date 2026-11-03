@@ -6,9 +6,9 @@ import 'package:yaml/yaml.dart';
 /// gives it: its pages, the state each `@Preview` of the sheet package
 /// starts a page in, and the transitions between them.
 ///
-/// An AI agent writes it by reading the app's code; nothing in the app is
-/// marked. Contact Sheet draws it as the map and does not check it against
-/// the app.
+/// An AI agent writes it from what tells how the app works, such as its code
+/// and its specifications; nothing in the app is marked. Contact Sheet draws
+/// it as the map and does not check it against the app.
 class Sheet {
   Sheet({
     required this.pages,
