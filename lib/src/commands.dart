@@ -204,7 +204,8 @@ class _ExportCommand extends _AppCommand {
         allowed: const ['en', 'ja'],
         help: m.helpLocale,
       )
-      ..addFlag('strict', negatable: false, help: m.helpStrict);
+      ..addFlag('strict', negatable: false, help: m.helpStrict)
+      ..addFlag('svg', negatable: false, help: m.helpSvg);
   }
 
   @override
@@ -223,6 +224,7 @@ class _ExportCommand extends _AppCommand {
       shoot: cli.shoot,
       m: m,
       words: locale == null ? cli.words : Messages.of(locale),
+      svg: args.flag('svg'),
       log: cli.out,
       warn: cli.err,
     ).run(args.option('out'), {...args.multiOption('only')});

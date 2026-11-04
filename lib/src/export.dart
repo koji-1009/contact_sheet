@@ -33,10 +33,10 @@ typedef Shoot = Future<ShotRun> Function(
 ///
 /// - `index.html`: the map and the list of the pages, the table of the
 ///   transitions; one file, the images next to it in `images/`;
-/// - `map.svg`: the whole map as one picture, images included, its labels
-///   what anyone reads; `map-dev.svg`, what developers read too;
 /// - `sheet.json`: what `index.html` is drawn from, for other tools and AI
-///   agents.
+///   agents;
+/// - with [svg], `map.svg`: the whole map as one picture, images included,
+///   its labels what anyone reads; `map-dev.svg`, what developers read too.
 ///
 /// The images are shutter's shots of the previews the sheet names, drawn as
 /// iOS rather than as Android, the platform `flutter test` runs as: the
@@ -49,6 +49,7 @@ class SheetExport {
     this.shoot = shot,
     required this.m,
     Messages? words,
+    this.svg = false,
     this.log = _silent,
     void Function(String line)? warn,
   }) : words = words ?? m,
@@ -57,6 +58,10 @@ class SheetExport {
   final SheetRepo repo;
   final ProcessRunner runner;
   final Shoot shoot;
+
+  /// Whether `map.svg` and `map-dev.svg` are written too; without, those an
+  /// export before wrote are deleted.
+  final bool svg;
 
   /// What the export tells, in the command's language.
   final Messages m;
@@ -475,7 +480,9 @@ class SheetExport {
           // Two states, or two variants, may share an image: written once,
           // and in the SVGs for each page whose first it is.
           final first =
-              state == page.states.first && variant == map.sheet.variants.first;
+              svg &&
+              state == page.states.first &&
+              variant == map.sheet.variants.first;
           if (first) {
             final bytes = File(image).readAsBytesSync();
             if (!file.existsSync()) file.writeAsBytesSync(bytes);
@@ -493,9 +500,15 @@ class SheetExport {
     File(p.join(out, 'index.html'))
         .writeAsStringSync(exportHtml(data, htmlStrings(words), map));
     for (final (name, plain) in [('map.svg', true), ('map-dev.svg', false)]) {
-      File(p.join(out, name)).writeAsStringSync(
-        exportSvg(map, (state) => firsts[state], plain: plain),
-      );
+      final file = File(p.join(out, name));
+      if (svg) {
+        file.writeAsStringSync(
+          exportSvg(map, (state) => firsts[state], plain: plain),
+        );
+      } else if (file.existsSync()) {
+        // One an export before wrote: not this map's.
+        file.deleteSync();
+      }
     }
   }
 

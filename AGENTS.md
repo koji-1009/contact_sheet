@@ -6,7 +6,7 @@ Read [README.md](README.md) and [doc/development.md](doc/development.md) first.
 
 ## What matters
 
-The core value is the map of every page: the sheet drawn with each state's image, shot from the app's `@Preview`s by shutter, and exported as HTML, SVG and JSON to be opened without any tool.
+The core value is the map of every page: the sheet drawn with each state's image, shot from the app's `@Preview`s by shutter, and exported as HTML and JSON (and SVG with `export --svg`) to be opened without any tool.
 It is for the people outside the code as much as for developers: product managers, designers, marketing, support.
 
 Decisions already made; do not reintroduce what they removed:
@@ -33,7 +33,7 @@ Decisions already made; do not reintroduce what they removed:
 | `lib/src/version.dart` | Generated from the pubspec's `version` by `dart run build_runner build`: `--version` |
 | `lib/src/sheet.dart` | `sheet.yaml`, read |
 | `lib/src/repo.dart` | Where things are in the target app |
-| `lib/src/export.dart` | The export: the shots (the app's and the sheet package's, at once), then `sheet.json`, `index.html`, `map.svg`, `map-dev.svg` and `images/` |
+| `lib/src/export.dart` | The export: the shots (the app's and the sheet package's, at once), made WebP, then `sheet.json`, `index.html`, `images/`, and with `--svg` `map.svg` and `map-dev.svg` |
 | `lib/src/map.dart` | The sheet with its shots: the arrows' labels, `sheet.json` |
 | `lib/src/layout.dart` | Where pages, arrows, bundles and labels go |
 | `lib/src/tree.dart` | The tree: the pages top to bottom, each under the page the app's start first reaches it from; `tree` in `sheet.json`, drawn by the HTML |
@@ -81,5 +81,5 @@ And `flutter analyze` in each `example/<app>/`, and in its `contact_sheet/` wher
 The export, end to end, with shutter; look at `index.html` (light and dark, and at a phone's width), `map.svg` and `map-dev.svg` when you change what is drawn:
 
 ```sh
-dart run contact_sheet export example/shop_app --out <folder>
+dart run contact_sheet export example/shop_app --out <folder> --svg
 ```

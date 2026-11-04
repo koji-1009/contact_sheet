@@ -159,7 +159,7 @@ Each export replaces `images/`.
   - How much the map shows, chosen under it: the pages alone, with the arrows, or with what each arrow says (the default); and the arrows back, shown or hidden (tapping "Back" in the legend). A page chosen, or a route, shows its own arrows whatever.
   - Variants: chosen in the header ("Shown as"), every image follows; the map and the tree are laid out again, each page's box its screen at the scale the first variant's is drawn at.
   - It says which app it was drawn from (its version and branch; its commit for developers), when it was exported, and, with a basis, how many changes of its code the sheet names for no page. What only developers read (the code's names, files, fakes, `go` and `replace`) is shown when "For developers" is ticked. Light or dark as the browser is set; on a phone, one column; printed, the list or the table.
-- `map.svg`: the whole map as one picture, the images in it, the labels what anyone reads, each page a link to it in `index.html`; `map-dev.svg`, with what developers read too.
+- With `--svg`, `map.svg`: the whole map as one picture, the images in it, to be passed around alone, the labels what anyone reads, each page a link to it in `index.html`; `map-dev.svg`, with what developers read too. Without it, those an export before wrote are deleted.
 
 The layout: each section is an island of its own. In it, the flow runs left to right from where it comes in (the first page, an arrow from another section, a deep link, in that order); the pages nothing in the section leads to are a row under the rest. The islands are laid in rows. Three or more arrows from other sections into one page that say the same (and all go back, dashed, or none) are drawn as one short arrow into it, `<label> ×<n>`; those from every page always, `<label> From any page`. A tab's first page has its bar drawn under it, its own tab lit; the first pages of one bar's tabs stand in one column.
 - `sheet.json`: what they are drawn from, for other tools and AI agents.
@@ -221,7 +221,7 @@ The WebP made of each shot is kept in `contact_sheet/.dart_tool/contact_sheet/we
 | `agent` | Print the playbook for AI agents |
 | `manual` | Print this reference |
 | `init [--package]` | Write an empty sheet; with `--package`, the sheet package's skeleton too |
-| `export [--out <folder>] [--only <page id>]... [--locale <en\|ja>] [--strict]` | Shoot the previews the sheet names and write the map; `--only`, those pages' alone, the others keeping their images; `--locale`, in that language; `--strict`, failing while a state has no image |
+| `export [--out <folder>] [--only <page id>]... [--locale <en\|ja>] [--strict] [--svg]` | Shoot the previews the sheet names and write the map; `--only`, those pages' alone, the others keeping their images; `--locale`, in that language; `--strict`, failing while a state has no image; `--svg`, with `map.svg` and `map-dev.svg` |
 | `lint` | Tell what the sheet itself shows may be missing or written twice |
 | `basis` | Record the app as the sheet was written against |
 | `changed [--by-page]` | List the app's files changed since the basis; `--by-page`, by the pages the sheet names them for |

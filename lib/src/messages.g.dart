@@ -31,6 +31,7 @@ abstract class Messages {
   String get helpOnly;
   String get helpLocale;
   String get helpStrict;
+  String get helpSvg;
   String exportUnknownPage(Object id);
   String exportKept(Object count);
   String get exportImageNotPng;
@@ -252,7 +253,7 @@ class MessagesEn extends Messages {
 
   @override
   String get descExport =>
-      "Shoot the previews the sheet names with shutter and write the map into contact_sheet/map/ (index.html, map.svg, map-dev.svg, sheet.json, images/).";
+      "Shoot the previews the sheet names with shutter and write the map into contact_sheet/map/ (index.html, sheet.json, images/; with --svg, map.svg and map-dev.svg).";
 
   @override
   String get helpOut =>
@@ -267,6 +268,10 @@ class MessagesEn extends Messages {
 
   @override
   String get helpStrict => "Fail (exit code 65) when a state has no image.";
+
+  @override
+  String get helpSvg =>
+      "Write map.svg and map-dev.svg too: the whole map as one picture, images included, to be passed around alone.";
 
   @override
   String exportUnknownPage(Object id) => "There is no page ${id} in the sheet";
@@ -915,7 +920,7 @@ class MessagesJa extends Messages {
 
   @override
   String get descExport =>
-      "sheet が指す Preview を shutter で撮り、地図（index.html・map.svg・map-dev.svg・sheet.json・images/）を contact_sheet/map/ に書き出す";
+      "sheet が指す Preview を shutter で撮り、地図（index.html・sheet.json・images/。--svg なら map.svg・map-dev.svg も）を contact_sheet/map/ に書き出す";
 
   @override
   String get helpOut => "代わりにこのフォルダの中の <app>_contact_sheet/ に書き出す";
@@ -929,6 +934,9 @@ class MessagesJa extends Messages {
 
   @override
   String get helpStrict => "画像のない状態があれば失敗にする（終了コード 65）";
+
+  @override
+  String get helpSvg => "map.svg と map-dev.svg も書き出す（画像を含む地図全体の 1 枚絵。単体で渡せる）";
 
   @override
   String exportUnknownPage(Object id) => "sheet に ${id} という画面はありません";

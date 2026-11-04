@@ -195,6 +195,7 @@ void main() {
       runner: tools,
       shoot: shutter.shot,
       m: Messages.of('en'),
+      svg: true,
       log: lines.add,
     ).run(p.join(app.path, 'share'));
     expect(out, p.join(app.path, 'share', 'shop_contact_sheet'));
@@ -844,24 +845,34 @@ pages:
   });
 
   test('two pages whose first states share an image each hold it in the '
-      'SVGs', () async {
+      'SVGs; an export without --svg deletes those', () async {
     repo.sheetFile.writeAsStringSync('''
 pages:
   - {id: a, label: A, states: [{name: s, preview: lib/preview/home.dart#home}]}
   - {id: b, label: B, states: [{name: s, preview: lib/preview/home.dart#home}]}
 ''');
-    final (dir: out, :missing) = await SheetExport(
+    SheetExport export({required bool svg}) => SheetExport(
       repo,
       runner: Tools(),
       shoot: _Shutter(shots.path).shot,
       m: Messages.of('en'),
-    ).run();
+      svg: svg,
+    );
+    final (dir: out, :missing) = await export(svg: true).run();
     expect(missing, 0);
     expect(Directory(p.join(out, 'images')).listSync(), hasLength(1));
-    for (final name in ['map.svg', 'map-dev.svg']) {
-      final svg = File(p.join(out, name)).readAsStringSync();
-      expect('data:image/webp;base64,'.allMatches(svg), hasLength(2));
+    final svgs = [
+      for (final name in ['map.svg', 'map-dev.svg']) File(p.join(out, name)),
+    ];
+    for (final svg in svgs) {
+      expect(
+        'data:image/webp;base64,'.allMatches(svg.readAsStringSync()),
+        hasLength(2),
+      );
     }
+    await export(svg: false).run();
+    expect(svgs.where((svg) => svg.existsSync()), isEmpty);
+    expect(File(p.join(out, 'index.html')).existsSync(), isTrue);
   });
 
   test('an image is WebP: a PNG\'s pixels as they are, one too long for a '

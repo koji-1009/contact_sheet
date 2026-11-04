@@ -26,9 +26,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: koji-1009/setup-flutter@158060745e545426c27a6e9814e5c5486a5f7dd8 # v1.4.2
       - run: dart pub get
-      - run: dart run contact_sheet export example/shop_app --out site --locale en --strict
-      - run: dart run contact_sheet export example/notes_app --out site --locale en --strict
-      - run: dart run contact_sheet export example/tabs_app --out site --locale en --strict
+      - run: dart run contact_sheet export example/shop_app --out site --locale en --strict --svg
+      - run: dart run contact_sheet export example/notes_app --out site --locale en --strict --svg
+      - run: dart run contact_sheet export example/tabs_app --out site --locale en --strict --svg
       - run: cp .github/pages/index.html site/
       - if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0

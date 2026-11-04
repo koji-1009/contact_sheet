@@ -1,5 +1,5 @@
 Every page of a Flutter app as one map: each state of each page as an image, each transition as an arrow.
-The map is HTML, SVG and JSON, opened without any tool, for everyone who works on the app, whether in its code or not: product managers, designers, marketing, support.
+The map is HTML and JSON (and SVG, when asked), opened without any tool, for everyone who works on the app, whether in its code or not: product managers, designers, marketing, support.
 
 ![The map of the shop example: its pages, each as its preview, and the transitions between them](https://raw.githubusercontent.com/koji-1009/contact_sheet/main/doc/images/map.png)
 
@@ -34,8 +34,8 @@ Contact Sheet draws the sheet as it is: it does not check it against the app.
 `contact_sheet/map/` holds:
 
 - `index.html`, with the images in `images/` next to it: opened from disk or served anywhere.
-- `map.svg`: the whole map as one picture; `map-dev.svg`, with what developers read too.
-- `sheet.json`: what they are drawn from, for other tools and AI agents.
+- `sheet.json`: what it is drawn from, for other tools and AI agents.
+- With `export --svg`, `map.svg`: the whole map as one picture, images included, to be passed around alone; `map-dev.svg`, with what developers read too.
 
 ## Requirements
 
@@ -77,7 +77,7 @@ An export deletes the runs of shutter's it made, so the team's own runs in the a
 Contact Sheet adds `contact_sheet/` to the app, and with `init --package`, a line to its `.gitignore`:
 
 - `sheet.yaml` and `basis.json`, and the sheet package where there is one: kept in git.
-- `map/`: the map (about 0.5 MB for the shop example's 11 states, its images WebP). Commit it, or ignore it and export it where it is shared (`export --out <folder>`), or have CI export it.
+- `map/`: the map (about 0.35 MB for the shop example's 11 states, its images WebP; 0.5 MB with `--svg`). Commit it, or ignore it and export it where it is shared (`export --out <folder>`), or have CI export it.
 - `.dart_tool/`: what an export keeps between runs, and the sheet package's shots: out of git. Flutter's `.gitignore` ignores `.dart_tool/` at any depth; where the app's `.gitignore` does not, `init --package` adds `contact_sheet/.dart_tool/` to it.
 
 ## More
