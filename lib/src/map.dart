@@ -261,8 +261,9 @@ class SheetMap {
     return all;
   }();
 
-  /// The image of [state] in [variant], if shutter drew it.
-  String? pngOf(SheetState state, [SheetVariant? variant]) =>
+  /// The image of [state] in [variant], if shutter drew it: its shot's file
+  /// (shutter's PNG; in an export, the WebP made of it).
+  String? imageOf(SheetState state, [SheetVariant? variant]) =>
       switch (shotOf(state, variant)) {
         ShotResult(status: ShotStatus.ok, :final png?) => png,
         _ => null,
@@ -275,16 +276,17 @@ class SheetMap {
         null => fallbackSize,
       };
 
-  /// The file name of [state]'s image in [variant] in an export (named by
-  /// the shot, and the platform when it is not iOS); null when it has none.
+  /// The file name of [state]'s image in [variant] in an export, a WebP
+  /// (named by the shot, and the platform when it is not iOS); null when it
+  /// has none.
   String? imageNameOf(SheetState state, [SheetVariant? variant]) {
     final v = variant ?? sheet.variants.first;
     final shot = shotOf(state, v);
-    if (shot == null || pngOf(state, v) == null) return null;
+    if (shot == null || imageOf(state, v) == null) return null;
     return [
       if (state.inSheetPackage) 'sheet-',
       if (v.platform != VariantPlatform.ios) '${v.platform.name}-',
-      '${shot.id}.png',
+      '${shot.id}.webp',
     ].join();
   }
 

@@ -1,13 +1,28 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:contact_sheet/contact_sheet.dart';
+import 'package:contact_sheet/src/export.dart' show webpMaxSide, webpOf;
 import 'package:contact_sheet/src/map.dart';
+import 'package:crypto/crypto.dart' show sha256;
+import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 import 'package:shutter/shutter.dart';
 import 'package:test/test.dart';
 
 import 'support.dart';
+
+/// A PNG of 2 by 2 pixels of one gray, [shade], as shutter writes a shot.
+Uint8List _png(int shade) => img.encodePng(
+  img.fill(
+    img.Image(width: 2, height: 2),
+    color: img.ColorRgb8(shade, shade, shade),
+  ),
+);
+
+/// A PNG whose header's checksum is wrong: its width changed after it.
+Uint8List _brokenPng() => _png(0)..[19] ^= 1;
 
 /// Plays shutter's `shot` of the files asked, in the app (`home.dart`) or
 /// the sheet package (`detail.dart`): the preview `#broken` comes out as an
@@ -58,8 +73,7 @@ class _Shutter {
         ),
       );
       final broken = preview.symbol == 'broken';
-      final png = File(p.join(run.path, '$id.png'))
-        ..writeAsBytesSync([i, 1, 2]);
+      final png = File(p.join(run.path, '$id.png'))..writeAsBytesSync(_png(i));
       shots.add(
         ShotResult(
           id: id,
@@ -234,7 +248,7 @@ void main() {
         .cast<Map<String, Object?>>();
     expect(states.map((s) => s['image']), [
       // Named apart from the app's, whose ids may be alike.
-      'images/sheet-${shotIdOf(SheetState(name: '', file: 'contact_sheet/lib/preview/detail.dart', symbol: 'detail'))}.png',
+      'images/sheet-${shotIdOf(SheetState(name: '', file: 'contact_sheet/lib/preview/detail.dart', symbol: 'detail'))}.webp',
       null,
       null,
     ]);
@@ -355,7 +369,9 @@ void main() {
     expect(svg, startsWith('<svg xmlns="http://www.w3.org/2000/svg"'));
     expect(
       svg,
-      contains('href="data:image/png;base64,${base64Encode([0, 1, 2])}"'),
+      contains(
+        'href="data:image/webp;base64,${base64Encode(webpOf(_png(0))!)}"',
+      ),
     );
     expect(svg, contains('>ホーム</text>'));
     expect(svg, contains('>/products/:id</text>'));
@@ -497,7 +513,7 @@ pages:
               size: size,
               png: (File(
                 p.join(run.path, '$base.$k.png'),
-              )..writeAsBytesSync([k, platform.index])).path,
+              )..writeAsBytesSync(_png(k * 2 + platform.index))).path,
             ),
         ],
       );
@@ -526,10 +542,10 @@ pages:
       for (final v in (state! as Map)['variants'] as List) (v as Map)['image'],
     ];
     expect(images(guest), [
-      'images/$base.0.png',
-      'images/android-$base.0.png',
+      'images/$base.0.webp',
+      'images/android-$base.0.webp',
       // The Desktop Preview the annotation gives besides.
-      'images/$base.1.png',
+      'images/$base.1.webp',
     ]);
     expect(
       ((guest! as Map)['variants'] as List)[2],
@@ -537,7 +553,7 @@ pages:
     );
     // The second Preview of the MultiPreview, named as shutter ids it.
     expect((wide! as Map)['preview'], 'lib/preview/home.dart#home@0.1');
-    expect(images(wide).first, 'images/$base.1.png');
+    expect(images(wide).first, 'images/$base.1.webp');
     expect(Directory(p.join(out, 'images')).listSync(), hasLength(4));
     // The HTML can switch between them.
     final html = File(p.join(out, 'index.html')).readAsStringSync();
@@ -578,7 +594,7 @@ pages:
       p.join(
         first.dir,
         'images',
-        'sheet-${shotIdOf(SheetState(name: '', file: 'contact_sheet/lib/preview/detail.dart', symbol: 'detail'))}.png',
+        'sheet-${shotIdOf(SheetState(name: '', file: 'contact_sheet/lib/preview/detail.dart', symbol: 'detail'))}.webp',
       ),
     );
     expect(detail.existsSync(), isTrue);
@@ -664,7 +680,7 @@ pages:
                 size: const LogicalSize(390, 844),
                 png: (File(
                   p.join(run.path, '$base.$k.png'),
-                )..writeAsBytesSync([k])).path,
+                )..writeAsBytesSync(_png(k))).path,
               ),
           if (files.contains('lib/preview/detail.dart'))
             ShotResult(
@@ -680,7 +696,7 @@ pages:
               size: const LogicalSize(390, 844),
               png: (File(
                 p.join(run.path, 'detail.png'),
-              )..writeAsBytesSync([9])).path,
+              )..writeAsBytesSync(_png(9))).path,
             ),
         ],
       );
@@ -844,8 +860,103 @@ pages:
     expect(Directory(p.join(out, 'images')).listSync(), hasLength(1));
     for (final name in ['map.svg', 'map-dev.svg']) {
       final svg = File(p.join(out, name)).readAsStringSync();
-      expect('data:image/png;base64,'.allMatches(svg), hasLength(2));
+      expect('data:image/webp;base64,'.allMatches(svg), hasLength(2));
     }
+  });
+
+  test('an image is WebP: a PNG\'s pixels as they are, one too long for a '
+      'WebP made smaller', () {
+    // Transparent where the preview paints nothing, as shutter leaves it.
+    final shot = img.Image(width: 3, height: 2, numChannels: 4);
+    for (var y = 0; y < 2; y++) {
+      for (var x = 0; x < 3; x++) {
+        shot.setPixelRgba(x, y, x * 80, y * 120, 200, x == 0 ? 0 : 255);
+      }
+    }
+    final webp = webpOf(img.encodePng(shot))!;
+    final back = img.decodeWebP(webp)!;
+    expect((back.width, back.height), (3, 2));
+    List<num> rgba(img.Pixel p) => [p.r, p.g, p.b, p.a];
+    for (var y = 0; y < 2; y++) {
+      for (var x = 0; x < 3; x++) {
+        expect(rgba(back.getPixel(x, y)), rgba(shot.getPixel(x, y)));
+      }
+    }
+    expect(webpOf(webp), isNull);
+    expect(() => webpOf(_brokenPng()), throwsA(isA<img.ImageException>()));
+    final long = img.decodeWebP(
+      webpOf(img.encodePng(img.Image(width: 2, height: 20000)))!,
+    )!;
+    expect(long.height, inInclusiveRange(webpMaxSide - 1, webpMaxSide));
+    expect(long.width, 1);
+  });
+
+  test('a shot whose image cannot be read has no image, said why; the rest '
+      'are written', () async {
+    final shutter = _Shutter(shots.path);
+    Future<ShotRun> shoot(
+      String dir,
+      ShotSubject subject, {
+      ShotPlatform platform = ShotPlatform.android,
+      void Function(ShotProgress event)? onProgress,
+    }) async {
+      final run = await shutter.shot(dir, subject, platform: platform);
+      // home's first Preview not a PNG, its second a broken one.
+      final home = run.shots.where((s) => s.file == 'lib/preview/home.dart');
+      for (final (i, shot) in home.indexed) {
+        File(shot.png!).writeAsBytesSync(i == 0 ? [1, 2, 3] : _brokenPng());
+      }
+      return run;
+    }
+
+    final lines = <String>[];
+    final (dir: out, :missing) = await SheetExport(
+      repo,
+      runner: Tools(),
+      shoot: shoot,
+      m: Messages.of('en'),
+      log: lines.add,
+    ).run();
+    expect(missing, 4);
+    const unreadable =
+        'Could not shoot ホーム (Member): its image cannot be read: '
+        'Invalid IHDR checksum';
+    expect(
+      lines,
+      containsAll([
+        'Could not shoot ホーム (Guest): its image is not a PNG',
+        unreadable,
+      ]),
+    );
+    expect(Directory(p.join(out, 'images')).listSync(), hasLength(1));
+  });
+
+  test('a shot drawn as it was is not encoded again; an export of every '
+      'page deletes what the cache holds of no shot', () async {
+    final export = SheetExport(
+      repo,
+      runner: Tools(),
+      shoot: _Shutter(shots.path).shot,
+      m: Messages.of('en'),
+    );
+    // home's first Preview, as if encoded before; and one of no shot now.
+    final cache = export.webpCache..createSync(recursive: true);
+    final known = File(p.join(cache.path, '${sha256.convert(_png(0))}.webp'))
+      ..writeAsBytesSync([7, 7, 7]);
+    final stale = File(p.join(cache.path, 'stale.webp'))..writeAsBytesSync([1]);
+    final (:dir, missing: _) = await export.run();
+    final home = shotIdOf(
+      SheetState(name: '', file: 'lib/preview/home.dart', symbol: 'home'),
+    );
+    expect(File(p.join(dir, 'images', '$home.webp')).readAsBytesSync(), [
+      7,
+      7,
+      7,
+    ]);
+    expect(known.existsSync(), isTrue);
+    expect(stale.existsSync(), isFalse);
+    // home's two Previews and detail's.
+    expect(cache.listSync(), hasLength(3));
   });
 
   test('no flutter to run is told as unavailable, not as unexpected', () async {

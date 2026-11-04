@@ -265,7 +265,7 @@ String exportSvg(
     if (bytes != null) {
       out.write(
         '<image $box preserveAspectRatio="xMidYMin slice" '
-        'href="data:image/png;base64,${base64Encode(bytes)}"/>',
+        'href="data:image/webp;base64,${base64Encode(bytes)}"/>',
       );
     }
     out.write(

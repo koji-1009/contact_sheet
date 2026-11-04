@@ -33,6 +33,8 @@ abstract class Messages {
   String get helpStrict;
   String exportUnknownPage(Object id);
   String exportKept(Object count);
+  String get exportImageNotPng;
+  String exportImageUnreadable(Object reason);
   String exportIncomplete(Object count);
   String get exportIncompleteOne;
   String get descLint;
@@ -272,6 +274,13 @@ class MessagesEn extends Messages {
   @override
   String exportKept(Object count) =>
       "Images kept from the map before: ${count}";
+
+  @override
+  String get exportImageNotPng => "its image is not a PNG";
+
+  @override
+  String exportImageUnreadable(Object reason) =>
+      "its image cannot be read: ${reason}";
 
   @override
   String exportIncomplete(Object count) => "${count} states have no image";
@@ -926,6 +935,12 @@ class MessagesJa extends Messages {
 
   @override
   String exportKept(Object count) => "前の地図から使った画像: ${count}";
+
+  @override
+  String get exportImageNotPng => "画像が PNG ではありません";
+
+  @override
+  String exportImageUnreadable(Object reason) => "画像を読めません: ${reason}";
 
   @override
   String exportIncomplete(Object count) => "画像のない状態が ${count} 個あります";

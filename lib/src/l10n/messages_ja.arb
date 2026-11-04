@@ -16,6 +16,8 @@
   "helpStrict": "画像のない状態があれば失敗にする（終了コード 65）",
   "exportUnknownPage": "sheet に {id} という画面はありません",
   "exportKept": "前の地図から使った画像: {count}",
+  "exportImageNotPng": "画像が PNG ではありません",
+  "exportImageUnreadable": "画像を読めません: {reason}",
   "exportIncomplete": "画像のない状態が {count} 個あります",
   "exportIncompleteOne": "画像のない状態が 1 個あります",
   "descLint": "sheet だけから分かる、抜けていそうなものと重複を出す（エージェント向けのヒントで、誤りではない）",

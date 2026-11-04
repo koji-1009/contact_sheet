@@ -1,5 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
+import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:contact_sheet/src/basis.dart';
 import 'package:contact_sheet/src/html.dart';
@@ -11,6 +14,8 @@ import 'package:contact_sheet/src/repo.dart';
 import 'package:contact_sheet/src/runs.dart';
 import 'package:contact_sheet/src/sheet.dart';
 import 'package:contact_sheet/src/svg.dart';
+import 'package:crypto/crypto.dart' show sha256;
+import 'package:image/image.dart' as img;
 import 'package:io/io.dart' show ExitCode;
 import 'package:path/path.dart' as p;
 import 'package:shutter/shutter.dart';
@@ -35,7 +40,8 @@ typedef Shoot = Future<ShotRun> Function(
 ///
 /// The images are shutter's shots of the previews the sheet names, drawn as
 /// iOS rather than as Android, the platform `flutter test` runs as: the
-/// app's own, shot in the app, and the sheet package's, shot there.
+/// app's own, shot in the app, and the sheet package's, shot there. They
+/// are written as WebP ([webpOf]).
 class SheetExport {
   SheetExport(
     this.repo, {
@@ -120,6 +126,7 @@ class SheetExport {
       final drift = _drift();
       final at = currentCommit(runner, repo);
       final (shots, failed) = await _shootAll(sheet, runs, only);
+      await _toWebp(sheet, shots, failed, prune: only.isEmpty);
       if (only.isNotEmpty) {
         shots.addAll(_keep(sheet, out, only, kept.path));
       }
@@ -214,17 +221,20 @@ class SheetExport {
                   );
                   continue;
                 }
-                if (d['image'] case final String image) {
+                // A WebP, as the export writes them (not a map's from before
+                // they were).
+                if (d['image'] case final String image
+                    when image.endsWith('.webp')) {
                   final from = File(pathIn(out, image));
                   if (!from.existsSync()) continue;
-                  final png = from.copySync(p.join(into, p.basename(image)));
+                  final copy = from.copySync(p.join(into, p.basename(image)));
                   if (kept[key]?.png == null) images++;
                   kept[key] = ShotResult(
                     id: shot,
                     status: ShotStatus.ok,
                     name: name,
                     size: size,
-                    png: png.path,
+                    png: copy.path,
                   );
                 }
               }
@@ -344,7 +354,7 @@ class SheetExport {
         var lacks = false;
         for (final variant in map.sheet.variants) {
           final shot = map.shotOf(state, variant);
-          if (map.pngOf(state, variant) == null) lacks = true;
+          if (map.imageOf(state, variant) == null) lacks = true;
           // The state, and the variant when the sheet names several.
           final name = map.sheet.variants.length == 1
               ? state.name
@@ -376,6 +386,77 @@ class SheetExport {
     return missing;
   }
 
+  /// The shots shutter took ([shots], with the preview files it could not
+  /// take, [failed]) that the map draws, made WebP ([webpOf]): only those,
+  /// as shutter shoots every `Preview` of a file, as each platform. Each is
+  /// kept in [webpCache] by its PNG's hash, so a preview drawn as it was is
+  /// not encoded again; with [prune], what the cache holds of no shot now
+  /// is deleted. One whose image cannot be read becomes a shot that failed,
+  /// saying so, and the export goes on. Encoded on as many isolates at once
+  /// as the machine has processors.
+  Future<void> _toWebp(
+    Sheet sheet,
+    Map<String, ShotResult> shots,
+    Map<String, String> failed, {
+    required bool prune,
+  }) async {
+    final map = SheetMap(sheet, shots: shots, failed: failed, m: words);
+    final drawn = Set<ShotResult>.identity();
+    for (final page in sheet.pages) {
+      for (final state in page.states) {
+        for (final variant in sheet.variants) {
+          if (map.shotOf(state, variant) case final shot?
+              when shot.status == ShotStatus.ok && shot.png != null) {
+            drawn.add(shot);
+          }
+        }
+      }
+    }
+    final queue = [
+      for (final MapEntry(:key, :value) in shots.entries)
+        if (drawn.contains(value)) key,
+    ];
+    final cache = webpCache..createSync(recursive: true);
+    final used = <String>{};
+    var next = 0;
+    Future<void> work() async {
+      while (next < queue.length) {
+        final key = queue[next++];
+        final shot = shots[key]!;
+        final (:webp, :error) = await _webpOn(shot.png!, cache.path, m);
+        if (webp != null) used.add(p.basename(webp));
+        shots[key] = ShotResult(
+          id: shot.id,
+          status: webp == null ? ShotStatus.error : ShotStatus.ok,
+          name: shot.name,
+          file: shot.file,
+          line: shot.line,
+          size: shot.size,
+          brightness: shot.brightness,
+          textScaleFactor: shot.textScaleFactor,
+          png: webp,
+          error: error,
+          at: shot.at,
+        );
+      }
+    }
+
+    await Future.wait([
+      for (var i = 0; i < min(Platform.numberOfProcessors, queue.length); i++)
+        work(),
+    ]);
+    if (prune) {
+      for (final file in cache.listSync()) {
+        if (!used.contains(p.basename(file.path))) file.deleteSync();
+      }
+    }
+  }
+
+  /// Where the WebP made of each shot is kept, by its PNG's hash: with the
+  /// export's other records.
+  Directory get webpCache =>
+      Directory(p.join(repo.sheetDir, '.dart_tool', 'contact_sheet', 'webp'));
+
   void _write(String out, SheetMap map) {
     Directory(out).createSync(recursive: true);
     final images = Directory(p.join(out, 'images'));
@@ -387,22 +468,20 @@ class SheetExport {
     for (final page in map.sheet.pages) {
       for (final state in page.states) {
         for (final variant in map.sheet.variants) {
-          final png = map.pngOf(state, variant);
+          final image = map.imageOf(state, variant);
           final name = map.imageNameOf(state, variant);
-          if (png == null || name == null) continue;
+          if (image == null || name == null) continue;
           final file = File(p.join(images.path, name));
           // Two states, or two variants, may share an image: written once,
           // and in the SVGs for each page whose first it is.
-          final List<int> bytes;
-          if (file.existsSync()) {
-            bytes = file.readAsBytesSync();
-          } else {
-            bytes = File(png).readAsBytesSync();
-            file.writeAsBytesSync(bytes);
-          }
-          if (state == page.states.first &&
-              variant == map.sheet.variants.first) {
+          final first =
+              state == page.states.first && variant == map.sheet.variants.first;
+          if (first) {
+            final bytes = File(image).readAsBytesSync();
+            if (!file.existsSync()) file.writeAsBytesSync(bytes);
             firsts[state] = bytes;
+          } else if (!file.existsSync()) {
+            File(image).copySync(file.path);
           }
         }
       }
@@ -475,6 +554,55 @@ class SheetExport {
     }
     stamps[dir] = stampOf();
   }
+}
+
+/// The PNG at [from] as WebP ([webpOf]), on an isolate of its own: the file
+/// in [cache] named by the PNG's hash, encoded into it unless it is there
+/// already; or, when it cannot be read, why not, in [m]'s words.
+Future<({String? webp, String? error})> _webpOn(
+  String from,
+  String cache,
+  Messages m,
+) => Isolate.run(() {
+  final png = File(from).readAsBytesSync();
+  final webp = p.join(cache, '${sha256.convert(png)}.webp');
+  if (File(webp).existsSync()) return (webp: webp, error: null);
+  try {
+    final bytes = webpOf(png);
+    if (bytes == null) return (webp: null, error: m.exportImageNotPng);
+    // Written whole, then named: two shots alike may be encoded at once.
+    File('$webp.${from.hashCode}')
+      ..writeAsBytesSync(bytes)
+      ..renameSync(webp);
+    return (webp: webp, error: null);
+  } on img.ImageException catch (e) {
+    return (webp: null, error: m.exportImageUnreadable(e.message));
+  }
+});
+
+/// The longest side a WebP can have.
+const webpMaxSide = 16383;
+
+/// [png] as `images/` and the SVGs hold it: WebP, lossless, so it is the
+/// shot as shutter drew it, in fewer bytes, and every browser opens it;
+/// made smaller first when a side is longer than a WebP's can be
+/// ([webpMaxSide]: a preview of unbounded height, shot at its own). Null
+/// when it is not a PNG; throws an [img.ImageException] for a broken one.
+Uint8List? webpOf(Uint8List png) {
+  final image = img.decodePng(png);
+  if (image == null) return null;
+  final scale = webpMaxSide / max(image.width, image.height);
+  return img.encodeWebP(
+    scale >= 1
+        ? image
+        : img.copyResize(
+            image,
+            width: max(1, (image.width * scale).floor()),
+            height: max(1, (image.height * scale).floor()),
+            interpolation: img.Interpolation.average,
+          ),
+    singleFrame: true,
+  );
 }
 
 /// When `flutter pub get` last ran in each project, as the times of the

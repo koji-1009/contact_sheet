@@ -163,9 +163,9 @@ Each export replaces `images/`.
 
 The layout: each section is an island of its own. In it, the flow runs left to right from where it comes in (the first page, an arrow from another section, a deep link, in that order); the pages nothing in the section leads to are a row under the rest. The islands are laid in rows. Three or more arrows from other sections into one page that say the same (and all go back, dashed, or none) are drawn as one short arrow into it, `<label> ×<n>`; those from every page always, `<label> From any page`. A tab's first page has its bar drawn under it, its own tab lit; the first pages of one bar's tabs stand in one column.
 - `sheet.json`: what they are drawn from, for other tools and AI agents.
-- `images/`: each state's shot, named by its shot id (`sheet-` before it for the sheet package's, then `android-` for an Android variant's).
+- `images/`: each state's shot, as WebP (lossless: as shutter drew it, in fewer bytes than its PNG; a side longer than a WebP's can be, 16383 pixels, made smaller), named by its shot id (`sheet-` before it for the sheet package's, then `android-` for an Android variant's). The SVGs hold them so too.
 
-A state shutter could not draw has no image: its error is told by the command and shown in the HTML (`error` in `sheet.json`); so is one whose preview file does not exist, is not under `lib/`, or has no `@Preview`.
+A state shutter could not draw has no image: its error is told by the command and shown in the HTML (`error` in `sheet.json`); so is one whose preview file does not exist, is not under `lib/`, or has no `@Preview`, and one whose image cannot be read.
 The export goes on for the rest.
 
 ### `sheet.json`
@@ -189,7 +189,8 @@ A mark is a hint: a change does not make the sheet wrong.
 ## Runs
 
 shutter writes each shot into a run (`.dart_tool/shutter/runs/` of the project it shoots in).
-Once the images are copied into the map, the export deletes the runs it made, so the team's own runs in the app stay as they were.
+Once the images are in the map, the export deletes the runs it made, so the team's own runs in the app stay as they were.
+The WebP made of each shot is kept in `contact_sheet/.dart_tool/contact_sheet/webp/`, named by its PNG's hash: an export encodes only the shots that changed, and one of every page (without `--only`) deletes the rest.
 `sheet prune` deletes what an interrupted export left: every run in the sheet package, and in the app only those an export listed (`contact_sheet/.dart_tool/contact_sheet/runs`) or left half made, cut short while shutter shot it (a run with no manifest that was not there before the export shot).
 
 ## What goes into the app's git
@@ -198,7 +199,7 @@ Once the images are copied into the map, the export deletes the runs it made, so
 | --- | --- |
 | `contact_sheet/sheet.yaml`, `contact_sheet/basis.json` | yes |
 | The sheet package (`contact_sheet/pubspec.yaml`, `analysis_options.yaml`, `lib/`) | yes |
-| `contact_sheet/map/` | as the team chooses: mostly images |
+| `contact_sheet/map/` | as the team chooses |
 | `contact_sheet/.dart_tool/` | no (`init --package` adds it to the app's `.gitignore` unless `.dart_tool/` is ignored already) |
 
 ## Exit codes
