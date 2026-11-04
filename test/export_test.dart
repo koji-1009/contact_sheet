@@ -542,6 +542,28 @@ pages:
     // The HTML can switch between them.
     final html = File(p.join(out, 'index.html')).readAsStringSync();
     expect(html, contains('id="variant-pick"'));
+    // Laid out in each: Android as the iPhone, the Desktop's screen at the
+    // iPhone's scale, larger, with the map's drawing of its own.
+    final maps = jsonDecode(
+      RegExp(r'<script id="maps" type="application/json">(.*?)</script>')
+          .firstMatch(html)![1]!,
+    ) as Map<String, Object?>;
+    expect(maps['variants'], [0, 0, 1]);
+    final [first, desktop] = maps['drawings']! as List<Object?>;
+    expect(first, isNull);
+    final at = desktop! as Map<String, Object?>;
+    expect((at['pages']! as Map)['home'], {
+      'x': isA<num>(),
+      'y': isA<num>(),
+      'width': 315.1,
+      'height': 196.9,
+    });
+    expect(
+      (((at['tree']! as Map)['pages'] as List).single as Map)['width'],
+      315.1,
+    );
+    expect(at['under'], contains('<marker id="arrow-sheet"'));
+    expect((data['pages']! as List).single, containsPair('width', 96));
   });
 
   test('with only some pages, only theirs are shot; the others keep the '

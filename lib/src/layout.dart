@@ -106,7 +106,7 @@ class MapLayout {
     this.bundles,
   );
 
-  /// [sizeOf] is the screen each page's first state was shot at; [gap] the
+  /// [sizeOf] is each page's image on the map (without its label); [gap] the
   /// room between columns, where the arrows' labels go. [labelOf] is what an
   /// arrow says: those from other sections into one page that say the same
   /// are bundled, from [bundleFrom] of them.
@@ -189,20 +189,33 @@ class MapLayout {
       final first = (name.isEmpty ? 0 : sectionLabelHeight) + marksHeight;
       final local = <String, Box>{};
       final columns = <int, double>{};
-      Box place(SheetPage page, int column, double at) {
+      // Each column as wide as its widest page, the others in its middle.
+      final widths = <int, double>{};
+      for (final page in pages) {
+        if (depth[page.id] case final column?) {
+          widths[column] = math.max(widths[column] ?? 0, sizeOf(page).$1);
+        }
+      }
+      final lefts = <int, double>{};
+      var left = 0.0;
+      for (var column = 0; widths.containsKey(column); column++) {
+        lefts[column] = left;
+        left += widths[column]! + gap;
+      }
+      Box place(SheetPage page, double left, double width, double at) {
         final (w, h) = sizeOf(page);
-        return local[page.id] = Box(
-          column * (thumbWidth + gap),
-          at,
-          thumbWidth,
-          thumbWidth * h / w,
-        );
+        return local[page.id] = Box(left + (width - w) / 2, at, w, h);
       }
 
       for (final page in pages) {
         final column = depth[page.id];
         if (column == null) continue;
-        final box = place(page, column, columns[column] ?? first);
+        final box = place(
+          page,
+          lefts[column]!,
+          widths[column]!,
+          columns[column] ?? first,
+        );
         columns[column] = box.bottom + labelHeight + rowGap;
       }
       var bottom = columns.values.reduce(math.max) - rowGap;
@@ -212,8 +225,11 @@ class MapLayout {
           if (!depth.containsKey(p.id)) p,
       ];
       final restTop = bottom + rowGap;
-      for (final (i, page) in rest.indexed) {
-        final box = place(page, i, restTop);
+      var restLeft = 0.0;
+      for (final page in rest) {
+        final width = sizeOf(page).$1;
+        final box = place(page, restLeft, width, restTop);
+        restLeft += width + gap;
         bottom = math.max(bottom, box.bottom + labelHeight);
       }
       final right = local.values.map((b) => b.right).reduce(math.max);

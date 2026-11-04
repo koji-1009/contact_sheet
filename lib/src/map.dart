@@ -104,9 +104,26 @@ class SheetMap {
     this.failed = const {},
     this.drift,
     this.release,
+    this.laidOutIn,
   });
 
   final Sheet sheet;
+
+  /// The variant the map is laid out in (the first by default): each page's
+  /// box is its first state as that variant shot it, at the scale the first
+  /// variant's is drawn at, so a larger screen is drawn larger, not smaller.
+  final SheetVariant? laidOutIn;
+
+  /// The map laid out in [variant]: the shots, words and the rest the same.
+  SheetMap laidOutAs(SheetVariant variant) => SheetMap(
+    sheet,
+    shots: shots,
+    m: m,
+    failed: failed,
+    drift: drift,
+    release: release,
+    laidOutIn: variant,
+  );
 
   /// shutter's shot of each state, by [shotKeyOf].
   final Map<String, ShotResult> shots;
@@ -123,10 +140,20 @@ class SheetMap {
 
   late final MapLayout layout = MapLayout.of(
     sheet,
-    (page) => sizeOf(page.states.first),
+    boxOf,
     gap: _columnGap,
     labelOf: edgeLabel,
   );
+
+  /// The size of [page]'s image on the map: its first state, the first
+  /// variant's [MapLayout.thumbWidth] wide, and in [laidOutIn] at that scale.
+  (double, double) boxOf(SheetPage page) {
+    final state = page.states.first;
+    final (w, h) = sizeOf(state);
+    final scale = MapLayout.thumbWidth / w;
+    final (vw, vh) = laidOutIn == null ? (w, h) : sizeOf(state, laidOutIn);
+    return (vw * scale, vh * scale);
+  }
 
   /// The pages as a tree, top to bottom, each the size the map draws it.
   late final PageTree tree = PageTree.of(
@@ -355,13 +382,8 @@ class SheetMap {
   /// where they sit, the image of each state, the edges with their curves,
   /// and the deep links. Only the labels are in [m]'s words.
   Map<String, Object?> json({required String app, DateTime? at}) {
-    List<double> point(Point p) => [_round(p.x), _round(p.y)];
-    Map<String, double> box(Box b) => {
-      'x': _round(b.left),
-      'y': _round(b.top),
-      'width': _round(b.width),
-      'height': _round(b.height),
-    };
+    const point = _point;
+    const box = _box;
     final drift = this.drift;
     final release = this.release;
     // Which transition, which deep link: the same from one export to the
@@ -431,10 +453,7 @@ class SheetMap {
         'labelHeight': MapLayout.labelHeight,
       },
       // Each section's island on the map; unnamed for the pages without.
-      'sections': [
-        for (final island in layout.sections)
-          {'name': island.name, ...box(island.box)},
-      ],
+      'sections': _sections,
       'pages': [
         for (final page in sheet.pages)
           {
@@ -519,31 +538,7 @@ class SheetMap {
       ],
       // The pages as a tree, top to bottom: each under the page the fewest
       // steps from the app's start first reach it from.
-      'tree': {
-        'width': _round(tree.width),
-        'height': _round(tree.height),
-        'outside': tree.outside,
-        'pages': [
-          for (final page in sheet.pages)
-            {
-              'page': page.id,
-              ...box(tree.nodes[page.id]!),
-              'parent': tree.parent[page.id],
-              'depth': tree.depth[page.id],
-              'edge': switch (tree.link[page.id]!.edge) {
-                final e? => sheet.edges.indexOf(e),
-                null => null,
-              },
-              'tab': tree.link[page.id]!.tab?.page,
-              if (tree.lines[page.id] case final line?)
-                'line': [for (final p in line) ...point(p)],
-              if (tree.labels[page.id] case final b?) ...{
-                'label': treeLabel(tree.link[page.id]!),
-                'labelAt': point(b.center),
-              },
-            },
-        ],
-      },
+      'tree': _tree,
       'entries': [
         for (final entry in sheet.entries)
           {
@@ -561,6 +556,57 @@ class SheetMap {
       ],
     };
   }
+
+  /// What the HTML lays the map and the tree out by, as this map is laid
+  /// out: the map's size, the sections' islands, each page's box by its id
+  /// and the tree; in `sheet.json`, the first variant's.
+  Map<String, Object?> get laidOut => {
+    'canvas': {'width': _round(canvas.$1), 'height': _round(canvas.$2)},
+    'sections': _sections,
+    'pages': {
+      for (final page in sheet.pages) page.id: _box(layout.nodes[page.id]!),
+    },
+    'tree': _tree,
+  };
+
+  List<Map<String, Object?>> get _sections => [
+    for (final island in layout.sections)
+      {'name': island.name, ..._box(island.box)},
+  ];
+
+  Map<String, Object?> get _tree => {
+    'width': _round(tree.width),
+    'height': _round(tree.height),
+    'outside': tree.outside,
+    'pages': [
+      for (final page in sheet.pages)
+        {
+          'page': page.id,
+          ..._box(tree.nodes[page.id]!),
+          'parent': tree.parent[page.id],
+          'depth': tree.depth[page.id],
+          'edge': switch (tree.link[page.id]!.edge) {
+            final e? => sheet.edges.indexOf(e),
+            null => null,
+          },
+          'tab': tree.link[page.id]!.tab?.page,
+          if (tree.lines[page.id] case final line?)
+            'line': [for (final p in line) ..._point(p)],
+          if (tree.labels[page.id] case final b?) ...{
+            'label': treeLabel(tree.link[page.id]!),
+            'labelAt': _point(b.center),
+          },
+        },
+    ],
+  };
+
+  static List<double> _point(Point p) => [_round(p.x), _round(p.y)];
+  static Map<String, double> _box(Box b) => {
+    'x': _round(b.left),
+    'y': _round(b.top),
+    'width': _round(b.width),
+    'height': _round(b.height),
+  };
 
   /// [state] in [variant]: its shot, size, image and error.
   Map<String, Object?> _drawn(SheetState state, SheetVariant variant) {

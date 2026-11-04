@@ -118,6 +118,27 @@ String exportHtml(
   // `\u` escape means the same; so neither `</script>` nor `<!--` can end
   // or escape it.
   String block(Object data) => jsonEncode(data).replaceAll('<', '\\u003c');
+  // Each variant's map, laid out at the sizes of its screens: which drawing
+  // each variant is, those laid out alike drawn once. The first variant's is
+  // the one drawn below and `sheet.json`'s: null here.
+  String sizes(SheetMap laid) =>
+      [for (final page in laid.sheet.pages) laid.boxOf(page)].join();
+  final drawings = <Object?>[null];
+  final drawn = {sizes(map): 0};
+  final variants = [0];
+  for (final variant in map.sheet.variants.skip(1)) {
+    final laid = map.laidOutAs(variant);
+    final key = sizes(laid);
+    if (!drawn.containsKey(key)) {
+      drawn[key] = drawings.length;
+      drawings.add({
+        ...laid.laidOut,
+        'under': mapDefs + mapUnder(laid),
+        'over': mapOver(laid),
+      });
+    }
+    variants.add(drawn[key]!);
+  }
   final filled = {
     'TITLE': const HtmlEscape().convert('${sheet['app']}'),
     'LANG': const HtmlEscape().convert('${sheet['locale']}'),
@@ -126,6 +147,7 @@ String exportHtml(
     'MAP_UNDER': mapUnder(map),
     'MAP_OVER': mapOver(map),
     'SHEET_JSON': block(sheet),
+    'MAPS_JSON': block({'variants': variants, 'drawings': drawings}),
     'STRINGS_JSON': block(strings),
     // Compiled from Dart; it holds no `</script` (test/route_test.dart).
     'ROUTE_JS': routeJs,
@@ -157,8 +179,6 @@ header h1 { font-size: 16px; margin: 0; }
 header input[type=search] { font: inherit; padding: 4px 10px; border: 1px solid var(--line); border-radius: 6px; min-width: 200px; }
 header label { font-size: 12px; color: var(--muted); display: flex; gap: 4px; align-items: center; cursor: pointer; }
 header select { font: inherit; font-size: 13px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--text); }
-/* Another variant than the map's: its images in the map's boxes, whole. */
-:is(#canvas, #tree-canvas).contain .node img { object-fit: contain; object-position: center; background: var(--surface); }
 nav { display: flex; gap: 4px; margin-left: auto; }
 nav button { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 6px; padding: 4px 12px; cursor: pointer; font: inherit; }
 nav button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -287,8 +307,10 @@ h2 { font-size: 15px; margin: 24px 0 8px; color: var(--muted); }
 .row h3 { font-size: 15px; margin: 0; }
 .row .actions { margin-left: auto; display: flex; gap: 6px; }
 .states { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
-.state { width: 150px; }
-.state img, .state .none { width: 150px; border: 1px solid var(--line); display: block; background: var(--bg); border-radius: 4px; }
+/* As wide as its screen is to the first variant's (--k). */
+.states > * { max-width: 100%; }
+.state { width: calc(150px * var(--k, 1)); max-width: 100%; }
+.state img, .state .none { width: 100%; border: 1px solid var(--line); display: block; background: var(--bg); border-radius: 4px; }
 .state img { cursor: zoom-in; }
 .state .none { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; padding: 8px; text-align: center; }
 .state .none.error { color: var(--error); }
@@ -314,7 +336,7 @@ tr.group td { border-top: 2px solid var(--line); }
 #detail.on { display: block; }
 #detail .panel { position: absolute; right: 0; top: 0; bottom: 0; width: min(920px, 100%); background: var(--bg); overflow: auto; overscroll-behavior: contain; padding: 16px 20px; box-shadow: -4px 0 24px rgba(0,0,0,.2); }
 #detail .close { float: right; }
-#detail .state, #detail .state img, #detail .state .none { width: 240px; }
+#detail .state { width: calc(240px * var(--k, 1)); }
 /* An image, large. */
 #zoom { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none; z-index: 20; align-items: center; justify-content: center; flex-direction: column; gap: 8px; cursor: zoom-out; }
 #zoom.on { display: flex; }
@@ -374,6 +396,7 @@ tr.group td { border-top: 2px solid var(--line); }
 <div id="detail"><div class="panel" id="panel"></div></div>
 <div id="zoom"><img alt=""><div></div></div>
 <script id="sheet" type="application/json">__SHEET_JSON__</script>
+<script id="maps" type="application/json">__MAPS_JSON__</script>
 <script id="strings" type="application/json">__STRINGS_JSON__</script>
 <script>__ROUTE_JS__</script>
 <script>
@@ -512,10 +535,11 @@ let variant = (() => {
 const drawn = (s) => s.variants?.[variant] ?? s;
 const variantName = () => variants[variant]?.name ?? '';
 // A state shutter could not draw says why; one the variant has none of
-// says so.
+// says so. As wide as its screen is to the first variant's: a larger screen
+// drawn larger, not smaller.
 const stateHtml = (s) => {
   const d = drawn(s);
-  return `<div class="state">${d.image
+  return `<div class="state" style="--k:${d.width / s.width}">${d.image
     ? `<img src="${esc(d.image)}" alt="${esc(s.name)}" loading="lazy" style="aspect-ratio:${d.width}/${d.height}" data-zoom="${esc(s.name)}">`
     : `<div class="none${d.error ? ' error' : ''}" style="aspect-ratio:${d.width}/${d.height}" title="${esc(d.error ?? '')}">${esc(d.error ?? (d.shot == null && variant ? T('notInVariant', { variant: variantName() }) : T('noImage')))}</div>`}
   <div class="name">${esc(s.name)}</div></div>`;
@@ -557,17 +581,18 @@ document.documentElement.style.setProperty('--label-height', S.canvas.labelHeigh
 // --- map: the drawing is the export's, as map.svg draws it ---
 const map = $('#map-view');
 const canvas = $('#canvas');
-canvas.style.width = S.canvas.width + 'px';
-canvas.style.height = S.canvas.height + 'px';
-for (const svg of canvas.querySelectorAll('svg')) { svg.setAttribute('width', S.canvas.width); svg.setAttribute('height', S.canvas.height); }
+// The map and the tree as the variant shown lays them out, each page's box
+// its screen at the scale the first variant's is drawn at: the first
+// variant's is sheet.json's, drawn below; another's, from its own block,
+// those laid out alike once.
+const M = JSON.parse(document.getElementById('maps').textContent);
+const firstLaid = { canvas: S.canvas, sections: S.sections, pages: pageById, tree: S.tree, under: $('#under').innerHTML, over: $('#over').innerHTML };
+const laidOut = () => M.drawings[M.variants[variant] ?? 0] ?? firstLaid;
+let laid = laidOut();
+const boxOf = (id) => laid.pages[id];
 const byIndex = (selector) => { const all = []; for (const el of canvas.querySelectorAll(selector)) all[el.dataset.i] = el; return all; };
-const edgePaths = byIndex('#under path.edge');
-const edgeLabels = byIndex('#over g.lbl');
-const entryLines = byIndex('#under g.entry');
-const entryLabels = byIndex('#over g.entry');
 const bundles = S.bundles;
-const bundleLines = byIndex('#under g.bundle');
-const bundleLabels = byIndex('#over g.blbl');
+let edgePaths, edgeLabels, entryLines, entryLabels, bundleLines, bundleLabels, edgeHits;
 // Each arrow, and each bundle's line, has a wide line over it to tap,
 // unseen, shown or hidden as its own is.
 const hitOf = (path) => {
@@ -577,17 +602,39 @@ const hitOf = (path) => {
   path.after(hit);
   return hit;
 };
-const edgeHits = edgePaths.map((p) => p && hitOf(p));
-for (const g of bundleLines) if (g) hitOf(g.querySelector('path'));
 const nodes = {};
+let islandChips = [];
+// The map drawn as [laid] lays it out: its arrows, its pages' boxes and its
+// sections' names.
+function layMap() {
+  canvas.style.width = laid.canvas.width + 'px';
+  canvas.style.height = laid.canvas.height + 'px';
+  for (const svg of canvas.querySelectorAll('svg')) { svg.setAttribute('width', laid.canvas.width); svg.setAttribute('height', laid.canvas.height); }
+  $('#under').innerHTML = laid.under;
+  $('#over').innerHTML = laid.over;
+  edgePaths = byIndex('#under path.edge');
+  edgeLabels = byIndex('#over g.lbl');
+  entryLines = byIndex('#under g.entry');
+  entryLabels = byIndex('#over g.entry');
+  bundleLines = byIndex('#under g.bundle');
+  bundleLabels = byIndex('#over g.blbl');
+  edgeHits = edgePaths.map((p) => p && hitOf(p));
+  for (const g of bundleLines) if (g) hitOf(g.querySelector('path'));
+  for (const [id, n] of Object.entries(nodes)) {
+    const b = boxOf(id);
+    n.style.left = b.x + 'px'; n.style.top = b.y + 'px'; n.style.width = b.width + 'px';
+    n.querySelector('.img').style.height = b.height + 'px';
+  }
+  for (const chip of islandChips) chip.remove();
+  islandChips = laid.sections.filter((s) => s.name).map(islandChip);
+}
 for (const p of S.pages) {
   const n = document.createElement('div');
   n.className = 'node';
   n.dataset.id = p.id;
-  n.style.left = p.x + 'px'; n.style.top = p.y + 'px'; n.style.width = p.width + 'px';
   const s = drawn(p.states[0]);
   const marks =(p.memo ? '<span class="mark">ⓘ</span>' : '') + (p.links.length ? `<span class="mark">↗ ${p.links.length}</span>` : '');
-  n.innerHTML = `<div class="img" style="height:${p.height}px">${s.image ? `<img src="${esc(s.image)}" alt="${esc(p.label)}" loading="lazy">` : ''}</div><div class="label"><span>${esc(p.label)}</span><small></small></div>${marks ? `<div class="marks">${marks}</div>` : ''}`;
+  n.innerHTML = `<div class="img">${s.image ? `<img src="${esc(s.image)}" alt="${esc(p.label)}" loading="lazy">` : ''}</div><div class="label"><span>${esc(p.label)}</span><small></small></div>${marks ? `<div class="marks">${marks}</div>` : ''}`;
   n.title = T(p.states.length === 1 ? 'statesOfOne' : 'statesOf', { page: p.label, count: p.states.length });
   // In the state it shows (where an arrow arrived): what is looked at stays.
   n.addEventListener('click', () => {
@@ -601,9 +648,9 @@ for (const p of S.pages) {
   canvas.insertBefore(n, $('#over'));
   nodes[p.id] = n;
 }
-// The sections, to go into from the whole map, where their names are too
-// small to read: a name of a size to read, whatever the map's.
-const islandChips = S.sections.filter((s) => s.name).map((s) => {
+// A section, to go into from the whole map, where its name is too small to
+// read: a name of a size to read, whatever the map's.
+function islandChip(s) {
   const chip = document.createElement('button');
   chip.className = 'island-chip';
   chip.textContent = s.name;
@@ -612,7 +659,8 @@ const islandChips = S.sections.filter((s) => s.name).map((s) => {
   chip.addEventListener('click', (e) => { e.stopPropagation(); if (!moved) show({ x: s.x - 24, y: s.y - 24, width: s.width + 48, height: s.height + 48 }, true); });
   canvas.appendChild(chip);
   return chip;
-});
+}
+layMap();
 // Each label's background, at the size the browser draws its text: all
 // measured first, then all set. Only while the map is shown; again when
 // what a label shows changes.
@@ -706,7 +754,7 @@ function show(box, glide, { left = 0, right = 0, top = 0, bottom = 0 } = {}) {
   apply();
   if (glide) setTimeout(() => canvas.classList.remove('moving'), 460);
 }
-const whole = () => ({ x: 0, y: 0, width: S.canvas.width, height: S.canvas.height });
+const whole = () => ({ x: 0, y: 0, width: laid.canvas.width, height: laid.canvas.height });
 // Whether the panels sit beside what the map shows, or across it (a phone):
 // as the CSS lays them out.
 const wide = () => !matchMedia('(max-width: 640px)').matches;
@@ -753,7 +801,7 @@ function highlight(near, edgeOn, entryOn, sel) {
 }
 // The pages [ids] with their labels, and room around them, in map pixels.
 function around(ids) {
-  const boxes = [...ids].map((nid) => pageById[nid]);
+  const boxes = [...ids].map(boxOf);
   const lh = S.canvas.labelHeight;
   const x0 = Math.min(...boxes.map((q) => q.x)), y0 = Math.min(...boxes.map((q) => q.y));
   const x1 = Math.max(...boxes.map((q) => q.x + q.width)), y1 = Math.max(...boxes.map((q) => q.y + q.height + lh));
@@ -1163,8 +1211,7 @@ $('#edge-table').innerHTML = edgeRows([...once].sort((a, b) => rowOrder(a) - row
 
 // --- tree: the pages top to bottom, as a site map draws an app; each under
 // the page the fewest steps from the app's start first reach it from ---
-const tree = S.tree;
-const treeById = Object.fromEntries(tree.pages.map((t) => [t.page, t]));
+let tree, treeById;
 const treeView = $('#tree-view'), treeCanvas = $('#tree-canvas'), treeSizer = $('#tree-sizer');
 // An arrow's words part by part, as the map draws them: what only the code
 // names and how it keeps its pages, for developers.
@@ -1176,8 +1223,10 @@ const partsHtml = (e) => [
 // Each tree's root, to tell the trees not reached from the app's start.
 const rootOf = (t) => { while (t.parent) t = treeById[t.parent]; return t.page; };
 let treeNodes = {};
-// Drawn again when another variant is shown.
+// Drawn again when another variant is shown, as it lays the tree out.
 function renderTree() {
+  tree = laid.tree;
+  treeById = Object.fromEntries(tree.pages.map((t) => [t.page, t]));
   const lines = tree.pages.filter((t) => t.line).map((t) => {
     const pts = [];
     for (let i = 0; i < t.line.length; i += 2) pts.push(t.line[i] + ',' + t.line[i + 1]);
@@ -1397,22 +1446,31 @@ function setCode(on) {
   // What the search finds follows what is shown.
   filter();
 }
-// The variant shown: every image follows; the map's boxes stay the first
-// variant's. Kept in the address (?variant=) to pass around, and for the
-// viewer.
+// The variant shown: every image follows, and the map and the tree are laid
+// out at its screens' sizes. Kept in the address (?variant=) to pass around,
+// and for the viewer.
 function setVariant(i) {
   variant = i;
-  canvas.classList.toggle('contain', i > 0);
-  treeCanvas.classList.toggle('contain', i > 0);
   try { localStorage.setItem('contact_sheet.variant', variantName()); } catch {}
   const url = new URL(location.href);
   if (i) url.searchParams.set('variant', variantName()); else url.searchParams.delete('variant');
   history.replaceState(null, '', url);
+  laid = laidOut();
+  layMap();
+  measured = false;
   for (const p of S.pages) showState(p.id, shownState[p.id] ?? 0);
   renderList();
   renderTree();
+  zoomTree(tk);
   filter();
-  if (current === 'map' && focused) focus(focused, false, { state: chosen(focused) ?? undefined });
+  // What the map showed, shown again where it is now.
+  if (current === 'map') requestAnimationFrame(() => {
+    backgrounds();
+    if (routed) showRoute(...routed.slice(0, 2), false, ...routed.slice(2));
+    else if (picked) pick(picked, false);
+    else focus(focused, false, { state: focused ? chosen(focused) ?? undefined : undefined });
+  });
+  if (current === 'tree' && location.hash.startsWith('#tree/')) showTree(decodeURIComponent(location.hash.slice('#tree/'.length)), false);
   if ($('#detail').classList.contains('on') && location.hash.startsWith('#page/')) openPage(decodeURIComponent(location.hash.slice('#page/'.length)));
 }
 if (variants.length > 1) {
@@ -1421,8 +1479,6 @@ if (variants.length > 1) {
   pick.value = String(variant);
   pick.onchange = () => setVariant(+pick.value);
   $('#variant-pick').hidden = false;
-  canvas.classList.toggle('contain', variant > 0);
-  treeCanvas.classList.toggle('contain', variant > 0);
 }
 code.checked = load('contact_sheet.code', false);
 setCode(code.checked);
