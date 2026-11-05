@@ -361,7 +361,7 @@ class MapLayout {
   static const double sectionGap = 56;
   static const double islandPadding = 16;
 
-  /// Room above each page's image for the HTML's marks (a memo, links),
+  /// Room above each page's image for the HTML's marks (a memo, tags),
   /// drawn there and not on the image.
   static const double marksHeight = 22;
 
@@ -674,12 +674,12 @@ class MapLayout {
   }
 
   /// What arrow labels keep off: the pages with their labels (and, above
-  /// them, their marks in the HTML, for those with a memo or links), and the
+  /// them, their marks in the HTML, for those with a memo or tags), and the
   /// sections' names, [sizeOf] giving a name's size at a label's font.
   List<Box> _keepOff((double, double) Function(String) sizeOf) => [
     for (final page in _sheet.pages)
       if (nodes[page.id] case final box?)
-        page.memo != null || page.links.isNotEmpty
+        page.memo != null || page.tags.isNotEmpty
             ? Box(
                 box.left,
                 box.top - marksHeight,

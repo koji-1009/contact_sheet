@@ -15,6 +15,8 @@ void main() {
     final sheet = _parse('''
 dependencies:
   - {name: Auth, target: authProvider, source: lib/auth.dart}
+tags:
+  - {name: Spec}
 pages:
   - id: home
     label: ホーム
@@ -23,7 +25,7 @@ pages:
     source: lib/home.dart
     path: /
     memo: Lists the products.
-    links: [{label: Spec, url: 'https://example.com/spec'}]
+    tags: {Spec: {label: Spec, url: 'https://example.com/spec'}}
     dependencies: [Auth]
     states:
       - {name: Guest, preview: lib/preview/home.dart#home, uses: {Auth: guest}}
@@ -40,7 +42,7 @@ entries:
     final [home, detail] = sheet.pages;
     expect(home.label, 'ホーム');
     expect(home.path, '/');
-    expect(home.links.single.url, 'https://example.com/spec');
+    expect(home.tags.single.url, 'https://example.com/spec');
     expect(sheet.dependenciesOf(home).single.target, 'authProvider');
     final [guest, member] = home.states;
     expect(
@@ -56,6 +58,65 @@ entries:
     expect(go.kind, NavigationKind.go);
     expect(back.trigger!.isBack, isTrue);
     expect(sheet.entries.single.via, '/products/:id');
+  });
+
+  test('a tag is set alike for every page: a value goes in its url', () {
+    final sheet = _parse('''
+tags:
+  - {name: Analytics, url: 'https://analytics.example.com/screens/{value}'}
+  - {name: Spec}
+  - {name: Owner}
+pages:
+  - id: home
+    label: Home
+    tags:
+      Analytics: [home view, home_scroll]
+      Spec: {label: Home spec, url: 'https://example.com/spec'}
+      Owner: Shop team
+    states: [{name: s, preview: lib/home.dart#home}]
+  - id: cart
+    label: Cart
+    tags: {Analytics: {label: Cart dashboard, url: 'https://example.com/cart'}}
+    states: [{name: s, preview: lib/cart.dart#cart}]
+''');
+    expect(
+      [for (final t in sheet.pages.first.tags) (t.tag, t.label, t.url)],
+      [
+        (
+          'Analytics',
+          'home view',
+          'https://analytics.example.com/screens/home%20view',
+        ),
+        (
+          'Analytics',
+          'home_scroll',
+          'https://analytics.example.com/screens/home_scroll',
+        ),
+        ('Spec', 'Home spec', 'https://example.com/spec'),
+        ('Owner', 'Shop team', null),
+      ],
+    );
+    // A link of its own, whatever the tag's url.
+    expect(sheet.pages.last.tags.single.url, 'https://example.com/cart');
+  });
+
+  test('a tag a page names is one of tags, named once', () {
+    const page = 'states: [{name: s, preview: lib/a.dart#a}]';
+    expect(
+      () => _parse('pages:\n  - {id: a, label: A, tags: {Spec: x}, $page}'),
+      _fails(contains('pages[0].tags.Spec: Spec is not in tags')),
+    );
+    expect(
+      () => _parse('tags: [{name: Spec}, {name: Spec}]\npages: []'),
+      _fails(contains('tags[1]: another tag is named Spec')),
+    );
+    expect(
+      () => _parse(
+        'tags: [{name: Spec}]\n'
+        'pages:\n  - {id: a, label: A, tags: {Spec: [[x]]}, $page}',
+      ),
+      _fails(contains('pages[0].tags.Spec[0]: write a value')),
+    );
   });
 
   test('a preview is the app\'s, or the sheet package\'s, on any declaration '
@@ -722,6 +783,29 @@ entries:
       'entries[1] is entries[0] again',
     ]);
     expect(lintSheet(_parse(''), _m), isEmpty);
+  });
+
+  test('lint tells a tag no page has, and one most pages have that some do '
+      'not', () {
+    String page(String id, String tags) =>
+        '  - {id: $id, label: ${id.toUpperCase()}, tags: {$tags}, '
+        'states: [{name: s, preview: $id.dart#$id}]}';
+    final sheet = _parse('''
+tags: [{name: Analytics}, {name: Figma}, {name: Unused}]
+pages:
+${page('a', 'Analytics: a, Figma: a')}
+${page('b', 'Analytics: b')}
+${page('c', 'Analytics: c')}
+${page('d', '')}
+edges:
+  - {from: a, to: b, trigger: text:B}
+  - {from: a, to: c, trigger: text:C}
+  - {from: a, to: d, trigger: text:D}
+''');
+    expect(lintSheet(sheet, _m), [
+      'the tag Analytics: 3 of the 4 pages have it, not D',
+      'the tag Unused: no page has it',
+    ]);
   });
 
   test('triggers are named as shutter names targets', () {

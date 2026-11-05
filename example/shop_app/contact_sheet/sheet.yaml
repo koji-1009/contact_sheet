@@ -25,6 +25,13 @@ conditions:
     values: [Empty, Has items]
     source: lib/data/cart_repository.dart
 
+# What the pages are tagged with: a page's design is at the same place for
+# each, by its name.
+tags:
+  - name: Spec
+  - name: Design
+    url: https://example.com/designs/{value}
+
 pages:
   - id: home
     label: Home
@@ -35,11 +42,9 @@ pages:
     memo: |-
       The products. A guest can start shopping here too.
       No search or sorting yet.
-    links:
-      - label: Spec
-        url: https://example.com/specs/home
-      - label: Design
-        url: https://example.com/designs/home
+    tags:
+      Spec: {label: Home spec, url: https://example.com/specs/home}
+      Design: home
     dependencies: [AuthRepository, ProductRepository]
     states:
       - name: Guest
@@ -59,6 +64,7 @@ pages:
     widget: ProductDetailPage
     source: lib/features/product_detail_page.dart
     path: /products/:id
+    tags: {Design: product}
     dependencies: [ProductRepository, CartRepository]
     states:
       - name: Default
@@ -71,6 +77,7 @@ pages:
     widget: CartPage
     source: lib/features/cart_page.dart
     path: /cart
+    tags: {Design: cart}
     dependencies: [CartRepository]
     states:
       - name: Two items
@@ -88,6 +95,7 @@ pages:
     widget: CheckoutPage
     source: lib/features/checkout_page.dart
     path: /checkout
+    tags: {Design: checkout}
     dependencies: [CartRepository]
     states:
       - name: Two items
@@ -105,6 +113,7 @@ pages:
     widget: CompletePage
     source: lib/features/complete_page.dart
     path: /complete
+    tags: {Design: complete}
     states:
       - name: Default
         preview: contact_sheet/lib/preview/complete.dart#complete
@@ -115,6 +124,7 @@ pages:
     widget: LoginPage
     source: lib/features/login_page.dart
     path: /login
+    tags: {Design: login}
     dependencies: [AuthRepository]
     states:
       - name: From checkout
@@ -130,6 +140,7 @@ pages:
     widget: OrdersPage
     source: lib/features/orders_page.dart
     path: /orders
+    tags: {Design: orders}
     states:
       - name: Default
         preview: contact_sheet/lib/preview/orders.dart#orders

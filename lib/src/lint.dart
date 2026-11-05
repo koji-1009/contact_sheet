@@ -19,7 +19,8 @@ import 'package:contact_sheet/src/sheet.dart';
 ///   names; a page with states of the conditions that has none for some of
 ///   their values, or two for the same; the first page with none for the
 ///   launch's; an arrow whose `if` no history meets where it happens, or
-///   that names in `when` a state its `if` leaves out.
+///   that names in `when` a state its `if` leaves out;
+/// - a tag no page has, or one most pages have that some do not.
 List<String> lintSheet(Sheet sheet, Messages m) {
   final findings = <String>[];
   if (sheet.pages.isEmpty) return findings;
@@ -129,7 +130,28 @@ List<String> lintSheet(Sheet sheet, Messages m) {
     ...findings,
     ..._lintConditions(sheet, m, reached),
     ..._lintTabs(sheet, m),
+    ..._lintTags(sheet, m),
   ];
+}
+
+/// The hints of the tags: one no page has; one most pages have (three
+/// quarters or more), the pages without it named.
+List<String> _lintTags(Sheet sheet, Messages m) {
+  final findings = <String>[];
+  final all = sheet.pages.length;
+  for (final tag in sheet.tags) {
+    final without = [
+      for (final page in sheet.pages)
+        if (!page.tags.any((t) => t.tag == tag.name)) page.label,
+    ];
+    final has = all - without.length;
+    if (has == 0) {
+      findings.add(m.lintTagUnused(tag.name));
+    } else if (without.isNotEmpty && has * 4 >= all * 3) {
+      findings.add(m.lintTagMissing(tag.name, has, all, without.join(', ')));
+    }
+  }
+  return findings;
 }
 
 /// The hints of the tab bars whose tabs keep their histories.

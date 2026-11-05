@@ -45,6 +45,10 @@ Map<String, String> htmlStrings(Messages m) => {
   'level_flow': m.htmlLevelFlow,
   'level_actions': m.htmlLevelActions,
   'backToggle': m.htmlBackToggle,
+  'notes': m.htmlNotes,
+  'noteSays': m.htmlNoteSays,
+  'noteMemo': m.htmlNoteMemo,
+  'noteToggle': m.htmlNoteToggle,
   'routeButton': m.htmlRouteButton,
   'entries': m.htmlEntries,
   'colVia': m.htmlColVia,
@@ -191,14 +195,15 @@ button.link { border: 1px solid var(--line); background: var(--surface); color: 
 button.badge { background: none; font: inherit; font-size: 12px; cursor: pointer; }
 .meta { color: var(--muted); font-size: 12px; }
 code { font: 12px ui-monospace, Menlo, monospace; }
-/* What the sheet says of a page: its memo and links. */
+/* What the sheet says of a page: its memo and tags, each value with its
+   tag's name. */
 .memo { white-space: pre-wrap; margin: 6px 0 10px; padding: 8px 12px; background: var(--surface); border-left: 3px solid var(--accent); border-radius: 4px; }
-.links { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
-.links a, .links span { display: inline-flex; gap: 6px; align-items: baseline; border: 1px solid var(--line); border-radius: 999px; padding: 1px 10px; font-size: 12px; background: var(--surface); color: var(--accent); text-decoration: none; }
-.links a:hover { border-color: var(--accent); background: var(--hover); }
-.links a::after { content: '↗'; }
-.links small { color: var(--muted); font-size: 11px; }
-.links span { color: var(--muted); }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.tags a, .tags span { display: inline-flex; gap: 6px; align-items: baseline; border: 1px solid var(--line); border-radius: 999px; padding: 1px 10px; font-size: 12px; background: var(--surface); color: var(--accent); text-decoration: none; }
+.tags a:hover { border-color: var(--accent); background: var(--hover); }
+.tags a::after { content: '↗'; }
+.tags small { color: var(--muted); font-size: 11px; }
+.tags span { color: var(--text); }
 /* map */
 /* Under the header, however many lines it takes (--header-h, measured). */
 /* No element's id is a view's address (#map, #list, #table), or opening one would scroll to it. */
@@ -223,9 +228,11 @@ code { font: 12px ui-monospace, Menlo, monospace; }
 #canvas.far .island-name { visibility: hidden; }
 .node:hover .img { border: 2px solid var(--accent); }
 .node.sel .img { border: 3px solid var(--accent); }
-/* Above the image, not on it: the image stays readable. On the right, clear of the section's name. */
+/* Above the image, not on it: the image stays readable. On the right, in one row (the room the layout keeps above the page), to the left past the page where they are many: the section's name is above the row. */
 .node .marks { position: absolute; bottom: calc(100% + 4px); right: 0; display: flex; gap: 4px; }
-.mark { background: var(--accent); color: #fff; border-radius: 999px; padding: 0 6px; font-size: 11px; line-height: 18px; }
+.node .marks:empty { display: none; }
+.mark { background: var(--accent); color: #fff; border-radius: 999px; padding: 0 6px; font-size: 11px; line-height: 18px; white-space: nowrap; text-decoration: none; }
+a.mark::after { content: ' ↗'; }
 path.edge, g.lbl, g.entry, g.bundle, g.blbl { transition: opacity .3s; }
 /* A page chosen: it and the pages next to it, the rest faint. */
 #canvas.focusing .node:not(.near) { opacity: .25; }
@@ -236,7 +243,6 @@ path.edge, g.lbl, g.entry, g.bundle, g.blbl { transition: opacity .3s; }
    panel, says it as sentences. */
 #map-view[data-level="pages"] :is(path.edge, g.entry, g.bundle):not(.near),
 #map-view:is([data-level="pages"], [data-level="flow"]) :is(g.lbl, g.blbl, #over g.entry) { visibility: hidden; pointer-events: none; }
-#map-view:is([data-level="pages"], [data-level="flow"]) .node .marks,
 #map-view[data-level="pages"] .legend { display: none; }
 /* The arrows back, hidden when the viewer chose so: those of a page chosen,
    or of a route, stay. */
@@ -249,8 +255,9 @@ path.edge, g.lbl, g.entry, g.bundle, g.blbl { transition: opacity .3s; }
 .tools #routeOpen { font-size: 13px; padding: 0 10px; }
 /* Under the map: how much it shows, and what its lines are. */
 .bar { position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; pointer-events: none; }
-.bar > * { pointer-events: auto; }
-.levels { display: flex; align-items: center; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 3px 3px 3px 10px; font-size: 12px; }
+/* Each group whole on its line, to the next where it does not fit; one wider than the map, its buttons over lines. */
+.bar > * { pointer-events: auto; flex: none; max-width: 100%; }
+.levels { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 3px 3px 3px 10px; font-size: 12px; }
 .levels > span { color: var(--muted); margin-right: 4px; }
 .levels button { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 6px; padding: 2px 10px; cursor: pointer; font: inherit; }
 .levels button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -389,7 +396,7 @@ tr.group td { border-top: 2px solid var(--line); }
 <main>
   <section id="sec-map"><div id="map-view"><div class="tools"><button id="routeOpen" data-title="route">⇢ <span data-t="routeButton"></span></button><button id="zin" data-title="zoomIn">＋</button><button id="zout" data-title="zoomOut">－</button><button id="fit" data-title="fit">⤢</button></div>
     <div id="canvas"><svg id="under">__MAP_DEFS____MAP_UNDER__</svg><svg id="over">__MAP_OVER__</svg></div>
-    <div class="bar" id="bar"><div class="levels" id="levels"></div><div class="legend" id="legend"></div></div><div id="card"></div><div id="route"></div></div></section>
+    <div class="bar" id="bar"><div class="levels" id="levels"></div><div class="levels" id="notes" hidden></div><div class="legend" id="legend"></div></div><div id="card"></div><div id="route"></div></div></section>
   <section id="sec-tree"><div class="tree-wrap"><div class="tools"><button id="tzin" data-title="zoomIn">＋</button><button id="tzout" data-title="zoomOut">－</button><button id="tfit" data-title="fit">⤢</button></div>
     <div id="tree-view"><div id="tree-sizer"><div id="tree-canvas"></div></div></div></div></section>
   <section id="sec-list"><div class="wrap"><p id="nomatch" data-t="noMatch"></p><div id="page-list"></div></div></section>
@@ -437,7 +444,7 @@ const tabMeta = (p) => tabItem[p.id]
   : p.tab.length ? `<div class="meta">${esc(T('inTabs', { tabs: p.tab.map(label).join(T('stateSeparator')) }))}</div>` : '';
 // What switches to a tab, in the screen's words.
 const tapWords = (t) => t.trigger.startsWith('other:') ? tabText(t) : T('tap', { text: tabText(t) });
-// What a search looks for in a page: its names, memo, states and links, and
+// What a search looks for in a page: its names, memo, states and tags, and
 // what is done on it (a button's words find the page it is on); with [dev],
 // what developers read too (its id and path, a key or a widget class
 // tapped), as only they are shown it.
@@ -450,7 +457,7 @@ const findText = (p, dev) => [
   p.label, p.section, p.memo,
   ...(dev ? [p.path, p.id] : []),
   ...p.states.map((s) => s.name),
-  ...p.links.map((l) => l.label),
+  ...p.tags.flatMap((t) => [t.tag, t.label]),
   ...edges.filter((e) => e.from === p.id).map((e) => said(e, dev)),
 ].filter(Boolean).join(' ').toLowerCase();
 // What it looks for in a transition: its pages, states, and what is done.
@@ -515,13 +522,17 @@ function sentence(e, { from = false, state = null, sets = e.set } = {}) {
   // [from]: its page's name said first, or what to say instead.
   return `${from ? `<b>${esc(typeof from === 'string' ? from : label(e.from))}</b>: ` : ''}${when}${what}${to}${then}${redirected}${setting(sets)}`;
 }
-// What the sheet says of a page. Only web and mail links are followed: a
-// `javascript:` one would run here.
+// What the sheet says of a page: its memo, and its tags' values, those of
+// the tags [shown] (by name), each its tag's name before it. Only web and
+// mail links are followed: a `javascript:` one would run here.
 const memoHtml = (p) => p.memo ? `<p class="memo">${esc(p.memo)}</p>` : '';
-const where = (url) => { try { const u = new URL(url); return u.protocol === 'mailto:' ? u.pathname : u.host; } catch { return ''; } };
-const linksHtml = (p) => p.links.length ? `<p class="links">${p.links.map((l) => /^(https?:|mailto:)/i.test(l.url)
-  ? `<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer" title="${esc(l.url)}">${esc(l.label)}<small>${esc(where(l.url))}</small></a>`
-  : `<span title="${esc(l.url)}">${esc(l.label)}</span>`).join('')}</p>` : '';
+const followed = (url) => /^(https?:|mailto:)/i.test(url ?? '');
+const tagsHtml = (p, shown = () => true) => {
+  const values = p.tags.filter((t) => shown(t.tag));
+  return values.length ? `<p class="tags">${values.map((t) => followed(t.url)
+    ? `<a href="${esc(t.url)}" target="_blank" rel="noopener noreferrer" title="${esc(t.url)}"><small>${esc(t.tag)}</small>${esc(t.label)}</a>`
+    : `<span${t.url ? ` title="${esc(t.url)}"` : ''}><small>${esc(t.tag)}</small>${esc(t.label)}</span>`).join('')}</p>` : '';
+};
 const codeMeta = (p) => [p.path, p.widget, p.route, p.source].filter(Boolean).map((c) => `<code>${esc(c)}</code>`).join(' · ');
 // The ways every state is shot (a platform, a size), the first the map's:
 // the one shown, chosen in the header, from the address or as the viewer
@@ -607,10 +618,10 @@ const hitOf = (path) => {
 const nodes = {};
 let islandChips = [];
 // A page's image on the map, loaded only once the map shows it
-// ([loadImages]).
-const nodeImage = (s, p) => {
+// ([loadImages]); its name is under it.
+const nodeImage = (s) => {
   const d = drawn(s);
-  return d.image ? `<img data-src="${esc(d.image)}" alt="${esc(p.label)}">` : '';
+  return d.image ? `<img data-src="${esc(d.image)}" alt="">` : '';
 };
 // The map drawn as [laid] lays it out: its arrows, its pages' boxes and its
 // sections' names.
@@ -641,12 +652,12 @@ for (const p of S.pages) {
   n.className = 'node';
   n.dataset.id = p.id;
   const s = drawn(p.states[0]);
-  const marks =(p.memo ? '<span class="mark">ⓘ</span>' : '') + (p.links.length ? `<span class="mark">↗ ${p.links.length}</span>` : '');
-  n.innerHTML = `<div class="img">${nodeImage(s, p)}</div><div class="label"><span>${esc(p.label)}</span><small></small></div>${marks ? `<div class="marks">${marks}</div>` : ''}`;
+  n.innerHTML = `<div class="img">${nodeImage(s)}</div><div class="label"><span>${esc(p.label)}</span><small></small></div><div class="marks"></div>`;
   n.title = T(p.states.length === 1 ? 'statesOfOne' : 'statesOf', { page: p.label, count: p.states.length });
   // In the state it shows (where an arrow arrived): what is looked at stays.
-  n.addEventListener('click', () => {
-    if (moved) return;
+  // A mark that links goes there instead.
+  n.addEventListener('click', (e) => {
+    if (moved || e.target.closest('a.mark')) return;
     const i = shownState[p.id] ?? 0;
     const hash = `#map/${encodeURIComponent(p.id)}${i ? '/' + encodeURIComponent(p.states[i].name) : ''}`;
     if (location.hash === hash) route(); else location.hash = hash;
@@ -699,7 +710,15 @@ $('#legend').innerHTML = [
   edges.some((e) => e.kind === 'pop') ? `<button class="key e-sheet" id="backToggle" aria-pressed="true" title="${esc(T('backToggle'))}"><i class="dash"></i>${esc(T('legendBack'))}</button>` : '',
   entries.length ? `<span class="key e-entry"><i class="dot"></i>${esc(T('legendEntries'))}</span>` : '',
 ].join('');
-if (!edges.length && !entries.length) $('#bar').style.display = 'none';
+// What is shown with the pages, on the map and beside a page chosen, each
+// shown (the default) or hidden: its transitions as sentences, its memo,
+// each tag. Their keys: `says`, `memo`, `tag:<name>`.
+const notes = [
+  ...(edges.length ? [{ key: 'says', name: T('noteSays') }] : []),
+  ...(S.pages.some((p) => p.memo) ? [{ key: 'memo', name: T('noteMemo') }] : []),
+  ...(S.tags ?? []).map((t) => ({ key: 'tag:' + t.name, name: t.name })),
+];
+if (!edges.length && !entries.length && !notes.length) $('#bar').style.display = 'none';
 // How tall what is under the map is, for the card on a phone to sit above it.
 const fitBar = () => map.style.setProperty('--bar-h', $('#bar').offsetHeight + 'px');
 // The pages alone (to look at the screens), with the arrows (to see how they
@@ -740,6 +759,59 @@ function setBack(on, { remember = true } = {}) {
 }
 setBack(new URLSearchParams(location.search).get('back') === 'hide' ? false : load('contact_sheet.back', true), { remember: false });
 $('#backToggle')?.addEventListener('click', () => setBack(map.classList.contains('no-back')));
+// What is shown with the pages, hidden as the viewer chose: kept in the
+// address (?hide=<key>, once for each) to pass around, and for the viewer.
+const hidden = (() => {
+  const asked = new URLSearchParams(location.search).getAll('hide');
+  if (asked.length) return new Set(asked);
+  try { return new Set(JSON.parse(localStorage.getItem('contact_sheet.hide') ?? '[]')); } catch { return new Set(); }
+})();
+const noteOn = (key) => !hidden.has(key);
+// Each page's marks above it: its memo, and each tag it has, a link where
+// it is one value that is.
+function renderMarks() {
+  for (const p of S.pages) {
+    const marks = [];
+    if (p.memo && noteOn('memo')) marks.push(`<span class="mark" title="${esc(p.memo)}">ⓘ</span>`);
+    for (const t of S.tags ?? []) {
+      const values = p.tags.filter((v) => v.tag === t.name);
+      if (!values.length || !noteOn('tag:' + t.name)) continue;
+      const title = esc(values.map((v) => v.label).join('\n'));
+      marks.push(values.length === 1 && followed(values[0].url)
+        ? `<a class="mark" href="${esc(values[0].url)}" target="_blank" rel="noopener noreferrer" title="${title}">${esc(t.name)}</a>`
+        : `<span class="mark" title="${title}">${esc(t.name)}${values.length > 1 ? ' ×' + values.length : ''}</span>`);
+    }
+    nodes[p.id].querySelector('.marks').innerHTML = marks.join('');
+  }
+}
+// What the card says of [p], of what is shown with the pages.
+const cardNotes = (p) => (noteOn('memo') ? memoHtml(p) : '')
+  + tagsHtml(p, (tag) => noteOn('tag:' + tag)) + (noteOn('says') ? sentences(p) : '');
+function setNote(key, on) {
+  if (on) hidden.delete(key); else hidden.add(key);
+  try { localStorage.setItem('contact_sheet.hide', JSON.stringify([...hidden])); } catch {}
+  const url = new URL(location.href);
+  url.searchParams.delete('hide');
+  for (const k of hidden) url.searchParams.append('hide', k);
+  history.replaceState(null, '', url);
+  for (const b of $('#notes').querySelectorAll('[data-note]')) b.setAttribute('aria-pressed', noteOn(b.dataset.note));
+  renderMarks();
+  if (focused && $('#card-notes')) $('#card-notes').innerHTML = cardNotes(pageById[focused]);
+  requestAnimationFrame(fitBar);
+}
+if (notes.length) {
+  const box = $('#notes');
+  box.hidden = false;
+  box.setAttribute('role', 'group');
+  box.setAttribute('aria-label', T('notes'));
+  box.innerHTML = `<span>${esc(T('notes'))}</span>${notes.map((n) =>
+    `<button data-note="${esc(n.key)}" aria-pressed="${noteOn(n.key)}" title="${esc(T('noteToggle'))}">${esc(n.name)}</button>`).join('')}`;
+  box.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-note]');
+    if (b) setNote(b.dataset.note, hidden.has(b.dataset.note));
+  });
+}
+renderMarks();
 
 let view = { x: 0, y: 0, k: 1 };
 // The scales the map reads at: from [readable] up, the arrows' words (12px)
@@ -752,9 +824,10 @@ const apply = () => {
   canvas.classList.toggle('far', islandChips.length >= 4 && view.k < far);
   loadImages();
 };
-// The pages' images, loaded where the map shows them large enough to make
-// out: on it, or a quarter of the view off it (to be there when moved to),
-// and not far out. Once loaded, kept.
+// The pages' images, loaded where the map shows them: on it, or a quarter
+// of the view off it (to be there when moved to); not far out, where they
+// are too small to make out, but for a page chosen and the pages next to
+// it, or a route's. Once loaded, kept.
 let loading = false;
 function loadImages() {
   if (loading) return;
@@ -762,13 +835,13 @@ function loadImages() {
   requestAnimationFrame(() => {
     loading = false;
     const m = map.getBoundingClientRect();
-    if (!m.width || view.k < far) return;
+    if (!m.width) return;
     const mx = m.width / 4, my = m.height / 4;
     const x0 = (-view.x - mx) / view.k, x1 = (-view.x + m.width + mx) / view.k;
     const y0 = (-view.y - my) / view.k, y1 = (-view.y + m.height + my) / view.k;
     for (const [id, n] of Object.entries(nodes)) {
       const img = n.querySelector('img[data-src]');
-      if (!img) continue;
+      if (!img || (view.k < far && !n.classList.contains('near'))) continue;
       const b = boxOf(id);
       if (b.x < x1 && b.x + b.width > x0 && b.y < y1 && b.y + b.height > y0) {
         img.src = img.dataset.src;
@@ -905,7 +978,7 @@ function showState(id, i) {
   if (!s) return;
   shownState[id] = i;
   const n = nodes[id];
-  n.querySelector('.img').innerHTML = nodeImage(s, p);
+  n.querySelector('.img').innerHTML = nodeImage(s);
   loadImages();
   n.querySelector('.label small').textContent = i ? s.name : '';
   n.classList.toggle('other-state', i > 0);
@@ -998,7 +1071,7 @@ function focus(id, glide, { state } = {}) {
     }
   });
   highlight(near, (i) => on.has(i), (i) => entries[i].to === focused, focused);
-  card.innerHTML = `<h3>${esc(p.label)}</h3><div class="meta">${esc(p.section)}</div>${tabMeta(p)}<div class="meta dev">${codeMeta(p)}</div>${statesHtml(p)}${memoHtml(p)}${linksHtml(p)}${sentences(p)}
+  card.innerHTML = `<h3>${esc(p.label)}</h3><div class="meta">${esc(p.section)}</div>${tabMeta(p)}<div class="meta dev">${codeMeta(p)}</div>${statesHtml(p)}<div id="card-notes">${cardNotes(p)}</div>
     <div class="actions"><button class="link" id="enlarge">${esc(T('enlarge'))}</button><button class="link" data-go="list/${esc(p.id)}">${esc(T('inList'))}</button><button class="link" data-detail="${esc(p.id)}">${esc(T('detail'))}</button></div>`;
   card.classList.add('on');
   $('#enlarge').onclick = () => enlarge(focused);
@@ -1208,7 +1281,7 @@ const renderList = () => $('#page-list').innerHTML = Object.entries(sections).ma
       <header><h3>${esc(p.label)}</h3><span class="meta dev">${codeMeta(p)}</span>
         ${p.sheetChanged.length ? `<span class="badge changed dev" title="${esc(p.sheetChanged.join('\n'))}">${esc(T('sheetChanged'))}</span>` : ''}
         <span class="actions"><button class="link" data-go="map/${esc(p.id)}">${esc(T('onMap'))}</button><button class="link" data-detail="${esc(p.id)}">${esc(T('detail'))}</button></span></header>
-      ${memoHtml(p)}${linksHtml(p)}
+      ${memoHtml(p)}${tagsHtml(p)}
       <div class="states">${p.states.map(stateHtml).join('')}</div>
       <div class="flows">
         <div><h4>${esc(T('goesTo'))}</h4><div class="chips">${goes || none}</div></div>
@@ -1407,7 +1480,7 @@ function openPage(id) {
   if (!p) return;
   openPanel(`<h2 style="margin-top:0;color:var(--text)">${esc(p.label)}</h2>
     <p class="meta">${esc(p.section)}</p><p class="meta dev">${codeMeta(p)}</p>
-    ${memoHtml(p)}${linksHtml(p)}
+    ${memoHtml(p)}${tagsHtml(p)}
     ${p.sheetChanged.length ? `<p class="meta dev"><span class="badge changed">${esc(T('sheetChanged'))}</span> ${p.sheetChanged.map((f) => `<code>${esc(f)}</code>`).join(' ')}</p>` : ''}
     <div class="states">${p.states.map((s) => `<div>${stateHtml(s)}${
       Object.keys(s.uses).length ? `<div class="meta dev">${Object.entries(s.uses).map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(' · ')}</div>` : ''}</div>`).join('')}</div>

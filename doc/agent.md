@@ -51,6 +51,10 @@ conditions:              # what the app keeps across pages, shown on them or not
   - name: Login
     values: [Guest, Logged in]          # the first is what the app launches with
     source: lib/data/auth_repository.dart
+tags:                    # what pages are tagged with, alike for each
+  - name: Analytics
+    url: https://analytics.example.com/screens/{value}   # a page's value goes in it
+  - name: Spec
 pages:
   - id: home
     label: Home
@@ -61,9 +65,9 @@ pages:
     dependencies: [AuthRepository]
     memo: |                              # optional, for the people reading
       The product list. Guests can shop from here.
-    links:                               # optional
-      - label: Spec
-        url: https://example.com/specs/home
+    tags:                                # optional: by a tag's name, its value
+      Analytics: home                    # → https://analytics.example.com/screens/home
+      Spec: {label: Home spec, url: https://example.com/specs/home}   # a link of its own
     states:                              # one per @Preview; the first is drawn on the map
       - name: Guest
         if: {Login: Guest}               # the page's look while the condition has this value
@@ -146,6 +150,6 @@ Each field, and how `preview` names a `@Preview`: `sheet manual`, "The sheet".
 - What can happen on every page (a session that expires, a forced update) is one edge `from: '*'`, with `if` for when (not `when`): drawn once, from outside.
 - Screens outside the app (signing in through the browser, a payment sheet, sharing, the OS settings) are not pages: write the step as one edge from the button to where the app comes back, with what it gives (`set: {Login: Logged in}`), and another for each other outcome (cancelled). Nor are written: the pages a deep link builds under its page, pops through several pages to one in between, the browser's back and forward.
 - `entries`: the links the code handles on purpose (ones it publishes, a notification it opens), not every route a link could name; `then` where the link decides the state the page opens in (`/login?from=/checkout`); `if` where it opens the page only for some values of the conditions (the link the router sends a guest elsewhere with is another entry, to that page).
-- `memo`: what you found about the page that its image and arrows do not show. `links`: where more is written about it, such as its specification. People write these by hand too: keep the ones you did not write as they are.
+- `memo`: what you found about the page that its image and arrows do not show. `tags` (top level): what pages are tagged with, alike for each (where their analytics are, their design, their specification), with the `url` a page's value goes in; a page's `tags`: its value of each it has, where what you read tells it (the screen name the code logs), or a link of its own. People write these by hand too: keep the tags and values you did not write as they are. `lint` tells a page without a tag most pages have.
 
 `basis.json` is written by `sheet basis`. Do not edit it.

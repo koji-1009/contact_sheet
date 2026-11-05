@@ -48,6 +48,8 @@ abstract class Messages {
   String lintSplitEdge(Object first, Object second);
   String lintUnarrivedState(Object state, Object page);
   String lintDuplicateEntry(Object first, Object second);
+  String lintTagUnused(Object tag);
+  String lintTagMissing(Object tag, Object count, Object total, Object pages);
   String lintValueUnused(Object value, Object condition);
   String lintValueNeverSet(Object value, Object condition);
   String lintNoLaunchState(Object page);
@@ -99,6 +101,9 @@ abstract class Messages {
   String get sheetNoStates;
   String sheetDuplicatePage(Object id);
   String sheetDuplicateState(Object name);
+  String sheetDuplicateTag(Object name);
+  String sheetUnknownTag(Object name);
+  String get sheetBadTag;
   String sheetDuplicateVariant(Object name);
   String sheetBadPlatform(Object value);
   String sheetUnknownPage(Object id);
@@ -140,6 +145,10 @@ abstract class Messages {
   String get htmlLevelFlow;
   String get htmlLevelActions;
   String get htmlBackToggle;
+  String get htmlNotes;
+  String get htmlNoteSays;
+  String get htmlNoteMemo;
+  String get htmlNoteToggle;
   String get htmlRouteButton;
   String get htmlTabMap;
   String get htmlTabTree;
@@ -334,6 +343,13 @@ class MessagesEn extends Messages {
       "entries[${second}] is entries[${first}] again";
 
   @override
+  String lintTagUnused(Object tag) => "the tag ${tag}: no page has it";
+
+  @override
+  String lintTagMissing(Object tag, Object count, Object total, Object pages) =>
+      "the tag ${tag}: ${count} of the ${total} pages have it, not ${pages}";
+
+  @override
   String lintValueUnused(Object value, Object condition) =>
       "${value} of ${condition}: no state, if or set names it";
 
@@ -517,6 +533,16 @@ class MessagesEn extends Messages {
       "the page has two states named ${name}: when and then name a state by it";
 
   @override
+  String sheetDuplicateTag(Object name) => "another tag is named ${name}";
+
+  @override
+  String sheetUnknownTag(Object name) => "${name} is not in tags";
+
+  @override
+  String get sheetBadTag =>
+      "write a value, a link ({label: ..., url: ...}) or a list of them";
+
+  @override
   String sheetDuplicateVariant(Object name) =>
       "another variant is named ${name}";
 
@@ -659,6 +685,19 @@ class MessagesEn extends Messages {
 
   @override
   String get htmlBackToggle => "Show or hide the arrows back";
+
+  @override
+  String get htmlNotes => "With";
+
+  @override
+  String get htmlNoteSays => "Transitions";
+
+  @override
+  String get htmlNoteMemo => "Memo";
+
+  @override
+  String get htmlNoteToggle =>
+      "Show or hide it with the pages: on the map and beside a page chosen";
 
   @override
   String get htmlRouteButton => "Route";
@@ -1002,6 +1041,13 @@ class MessagesJa extends Messages {
       "entries[${second}] は entries[${first}] と同じです";
 
   @override
+  String lintTagUnused(Object tag) => "タグ ${tag}: どのページにもありません";
+
+  @override
+  String lintTagMissing(Object tag, Object count, Object total, Object pages) =>
+      "タグ ${tag}: ${total} ページ中 ${count} ページにあり、${pages} にはありません";
+
+  @override
   String lintValueUnused(Object value, Object condition) =>
       "${condition} の ${value}: どの状態・if・set にも書かれていません";
 
@@ -1181,6 +1227,15 @@ class MessagesJa extends Messages {
       "${name} という状態が 2 つあります: when と then はこの名前で状態を指します";
 
   @override
+  String sheetDuplicateTag(Object name) => "${name} という名前のタグが他にもあります";
+
+  @override
+  String sheetUnknownTag(Object name) => "${name} が tags にありません";
+
+  @override
+  String get sheetBadTag => "値、リンク（{label: ..., url: ...}）、またはそれらのリストを書いてください";
+
+  @override
   String sheetDuplicateVariant(Object name) => "${name} という名前のバリエーションが他にもあります";
 
   @override
@@ -1314,6 +1369,18 @@ class MessagesJa extends Messages {
 
   @override
   String get htmlBackToggle => "戻る矢印を表示・非表示";
+
+  @override
+  String get htmlNotes => "添える";
+
+  @override
+  String get htmlNoteSays => "遷移";
+
+  @override
+  String get htmlNoteMemo => "メモ";
+
+  @override
+  String get htmlNoteToggle => "ページに添えて表示・非表示（地図上と、選んだページの横）";
 
   @override
   String get htmlRouteButton => "経路";

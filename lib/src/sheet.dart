@@ -18,6 +18,7 @@ class Sheet {
     this.tabBars = const [],
     this.dependencies = const [],
     this.variants = const [SheetVariant(name: '')],
+    this.tags = const [],
   });
 
   /// Reads [yaml], the text of `sheet.yaml`. Throws a [SheetException],
@@ -56,6 +57,10 @@ class Sheet {
   /// The ways every state is shot, the first the map's: one, unnamed, when
   /// the sheet names none.
   final List<SheetVariant> variants;
+
+  /// What the pages are tagged with, alike for each: its analytics, its
+  /// design.
+  final List<SheetTag> tags;
 
   /// The dependencies [page] names, in its order.
   List<SheetDependency> dependenciesOf(SheetPage page) => [
@@ -176,7 +181,7 @@ class SheetPage {
     this.path,
     this.route,
     this.memo,
-    this.links = const [],
+    this.tags = const [],
     this.dependencies = const [],
     this.tabs = const [],
   });
@@ -214,21 +219,40 @@ class SheetPage {
   /// What a reader of the map should know of the page.
   final String? memo;
 
-  /// Where more about the page is: its design, its spec, an issue.
-  final List<SheetLink> links;
+  /// What it is tagged with, in the order written: of the [Sheet.tags],
+  /// each value its own.
+  final List<SheetPageTag> tags;
 
   /// The names of the [Sheet.dependencies] the page reads.
   final List<String> dependencies;
 }
 
-/// A link from a page to more about it.
-class SheetLink {
-  SheetLink(this.label, this.url);
+/// What pages are tagged with, alike for each (its analytics, its design,
+/// its spec): a name, and where a page's value of it is.
+class SheetTag {
+  SheetTag(this.name, {this.url});
+
+  final String name;
+
+  /// Where a page's value is, `{value}` in it the value (URL-encoded):
+  /// `https://analytics.example.com/screens/{value}`. None: each page says
+  /// where, or its value is text.
+  final String? url;
+}
+
+/// A value of a [SheetTag] on a page: what it says, and where it leads.
+class SheetPageTag {
+  SheetPageTag(this.tag, this.label, {this.url});
+
+  /// The [SheetTag.name].
+  final String tag;
 
   final String label;
 
-  /// An `https:` (or `http:`, `mailto:`) URL; the HTML links no other kind.
-  final String url;
+  /// The tag's `url` with the value in it, or the page's own; none for a
+  /// value that is text. An `https:` (or `http:`, `mailto:`) URL: the HTML
+  /// links no other kind.
+  final String? url;
 }
 
 /// Something pages read that their previews replace: a repository, an API
@@ -551,7 +575,18 @@ class _Parser {
       'entries',
       'dependencies',
       'variants',
+      'tags',
     });
+    final tags = [
+      for (final (i, t) in _list(root, 'tags', 'sheet.yaml').indexed)
+        _tag(t, 'tags[$i]'),
+    ];
+    final tagByName = <String, SheetTag>{};
+    for (final (i, t) in tags.indexed) {
+      if (tagByName.putIfAbsent(t.name, () => t) != t) {
+        _fail('tags[$i]', m.sheetDuplicateTag(t.name));
+      }
+    }
     final dependencies = [
       for (final (i, d) in _list(root, 'dependencies', 'sheet.yaml').indexed)
         _dependency(d, 'dependencies[$i]'),
@@ -587,7 +622,7 @@ class _Parser {
 
     final pages = [
       for (final (i, p) in _list(root, 'pages', 'sheet.yaml').indexed)
-        _page(p, 'pages[$i]', names),
+        _page(p, 'pages[$i]', names, tagByName),
     ];
     for (final (i, page) in pages.indexed) {
       for (final (j, state) in page.states.indexed) {
@@ -778,7 +813,57 @@ class _Parser {
       tabBars: tabBars,
       dependencies: dependencies,
       variants: variants.isEmpty ? const [SheetVariant(name: '')] : variants,
+      tags: tags,
     );
+  }
+
+  SheetTag _tag(Object? yaml, String where) {
+    final map = _map(yaml, where, const {'name', 'url'});
+    return SheetTag(
+      _required(map, 'name', where),
+      url: _optional(map, 'url', where),
+    );
+  }
+
+  /// A page's `tags`: by a tag's name, a value, a link (`label` and `url`)
+  /// or a list of them; a value goes in the tag's `url`, where it has one.
+  List<SheetPageTag> _pageTags(
+    YamlMap map,
+    String where,
+    Map<String, SheetTag> tags,
+  ) {
+    final given = map['tags'];
+    if (given == null) return const [];
+    if (given is! YamlMap) _fail('$where.tags', m.sheetNotMap);
+    SheetPageTag one(SheetTag tag, Object? value, String at) => switch (value) {
+      String() || num() => SheetPageTag(
+        tag.name,
+        '$value',
+        url: tag.url?.replaceAll('{value}', Uri.encodeComponent('$value')),
+      ),
+      YamlMap() => () {
+        final link = _map(value, at, const {'label', 'url'});
+        return SheetPageTag(
+          tag.name,
+          _required(link, 'label', at),
+          url: _required(link, 'url', at),
+        );
+      }(),
+      _ => _fail(at, m.sheetBadTag),
+    };
+    final all = <SheetPageTag>[];
+    for (final MapEntry(:key, :value) in given.entries) {
+      final at = '$where.tags.$key';
+      final tag = tags['$key'] ?? _fail(at, m.sheetUnknownTag('$key'));
+      if (value is YamlList) {
+        for (final (i, v) in value.indexed) {
+          all.add(one(tag, v, '$at[$i]'));
+        }
+      } else {
+        all.add(one(tag, value, at));
+      }
+    }
+    return all;
   }
 
   SheetCondition _condition(Object? yaml, String where) {
@@ -845,7 +930,12 @@ class _Parser {
     );
   }
 
-  SheetPage _page(Object? yaml, String where, Set<String> dependencyNames) {
+  SheetPage _page(
+    Object? yaml,
+    String where,
+    Set<String> dependencyNames,
+    Map<String, SheetTag> tags,
+  ) {
     final map = _map(yaml, where, const {
       'id',
       'label',
@@ -856,7 +946,7 @@ class _Parser {
       'route',
       'dependencies',
       'memo',
-      'links',
+      'tags',
       'states',
       'tab',
     });
@@ -887,23 +977,12 @@ class _Parser {
       path: _optional(map, 'path', where),
       route: _optional(map, 'route', where),
       memo: _optional(map, 'memo', where),
-      links: [
-        for (final (i, l) in _list(map, 'links', where).indexed)
-          _link(l, '$where.links[$i]'),
-      ],
+      tags: _pageTags(map, where, tags),
       dependencies: dependencies,
       states: states,
       tabs: map['tab'] is YamlList
           ? _strings(map, 'tab', where)
           : [?_optional(map, 'tab', where)],
-    );
-  }
-
-  SheetLink _link(Object? yaml, String where) {
-    final map = _map(yaml, where, const {'label', 'url'});
-    return SheetLink(
-      _required(map, 'label', where),
-      _required(map, 'url', where),
     );
   }
 

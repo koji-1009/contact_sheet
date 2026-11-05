@@ -429,6 +429,10 @@ class SheetMap {
             'source': bar.source,
           },
       ],
+      // What the pages are tagged with, alike for each.
+      'tags': [
+        for (final t in sheet.tags) {'name': t.name, 'url': t.url},
+      ],
       // The ways every state is shot, the first the map's.
       'variants': [
         for (final v in sheet.variants)
@@ -467,9 +471,9 @@ class SheetMap {
             'path': page.path,
             'route': page.route,
             'memo': page.memo,
-            'links': [
-              for (final link in page.links)
-                {'label': link.label, 'url': link.url},
+            'tags': [
+              for (final t in page.tags)
+                {'tag': t.tag, 'label': t.label, 'url': t.url},
             ],
             'dependencies': [
               for (final d in sheet.dependenciesOf(page))

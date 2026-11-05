@@ -115,12 +115,14 @@ class _NoFlutter extends Tools {
 const _sheet = '''
 conditions:
   - {name: Login, values: [Guest, Member], source: lib/auth.dart}
+tags:
+  - {name: Analytics, url: 'https://analytics.example.com/{value}'}
 pages:
   - id: home
     label: ホーム
     source: lib/home.dart
     memo: The product list.
-    links: [{label: Spec, url: 'https://example.com/spec'}]
+    tags: {Analytics: home}
     states:
       - {name: Guest, preview: lib/preview/home.dart#home, if: {Login: Guest}}
       - {name: Member, preview: lib/preview/home.dart#home@1, if: {Login: Member}}
@@ -246,6 +248,17 @@ void main() {
         .cast<Map<String, Object?>>();
     expect(pages.map((p) => p['id']), ['home', 'detail']);
     expect(pages.first['memo'], 'The product list.');
+    // Its tags' values, in their tags' urls.
+    expect(pages.first['tags'], [
+      {
+        'tag': 'Analytics',
+        'label': 'home',
+        'url': 'https://analytics.example.com/home',
+      },
+    ]);
+    expect(data['tags'], [
+      {'name': 'Analytics', 'url': 'https://analytics.example.com/{value}'},
+    ]);
     final states = (pages.last['states']! as List<Object?>)
         .cast<Map<String, Object?>>();
     expect(states.map((s) => s['image']), [
