@@ -163,7 +163,7 @@ Each export replaces `images/`.
 
 The layout: each section is an island of its own. In it, the flow runs left to right from where it comes in (the first page, an arrow from another section, a deep link, in that order); the pages nothing in the section leads to are a row under the rest. The islands are laid in rows. Three or more arrows from other sections into one page that say the same (and all go back, dashed, or none) are drawn as one short arrow into it, `<label> ×<n>`; those from every page always, `<label> From any page`. A tab's first page has its bar drawn under it, its own tab lit; the first pages of one bar's tabs stand in one column.
 - `sheet.json`: what they are drawn from, for other tools and AI agents.
-- `images/`: each state's shot, as WebP (lossless: as shutter drew it, in fewer bytes than its PNG; a side longer than a WebP's can be, 16383 pixels, made smaller), named by its shot id (`sheet-` before it for the sheet package's, then `android-` for an Android variant's). The SVGs hold them so too.
+- `images/`: each state's shot, drawn at a pixel ratio of 1.5 (`--pixel-ratio`: 2 as sharp as a phone, 1 smaller), as WebP (lossless: as shutter drew it, in fewer bytes than its PNG; a side longer than a WebP's can be, 16383 pixels, made smaller), named by its shot id (`sheet-` before it for the sheet package's, then `android-` for an Android variant's). The SVGs hold them so too.
 
 A state shutter could not draw has no image: its error is told by the command and shown in the HTML (`error` in `sheet.json`); so is one whose preview file does not exist, is not under `lib/`, or has no `@Preview`, and one whose image cannot be read.
 The export goes on for the rest.
@@ -221,7 +221,7 @@ The WebP made of each shot is kept in `contact_sheet/.dart_tool/contact_sheet/we
 | `agent` | Print the playbook for AI agents |
 | `manual` | Print this reference |
 | `init [--package]` | Write an empty sheet; with `--package`, the sheet package's skeleton too |
-| `export [--out <folder>] [--only <page id>]... [--locale <en\|ja>] [--strict] [--svg]` | Shoot the previews the sheet names and write the map; `--only`, those pages' alone, the others keeping their images; `--locale`, in that language; `--strict`, failing while a state has no image; `--svg`, with `map.svg` and `map-dev.svg` |
+| `export [--out <folder>] [--only <page id>]... [--locale <en\|ja>] [--strict] [--svg] [--pixel-ratio <ratio>]` | Shoot the previews the sheet names and write the map; `--only`, those pages' alone, the others keeping their images; `--locale`, in that language; `--strict`, failing while a state has no image; `--svg`, with `map.svg` and `map-dev.svg`; `--pixel-ratio`, the images drawn at it (1.5 by default) |
 | `lint` | Tell what the sheet itself shows may be missing or written twice |
 | `basis` | Record the app as the sheet was written against |
 | `changed [--by-page]` | List the app's files changed since the basis; `--by-page`, by the pages the sheet names them for |

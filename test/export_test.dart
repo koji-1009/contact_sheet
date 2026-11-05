@@ -43,6 +43,7 @@ class _Shutter {
     String projectDir,
     ShotSubject subject, {
     ShotPlatform platform = ShotPlatform.android,
+    double pixelRatio = 2,
     void Function(ShotProgress event)? onProgress,
   }) async {
     asked.add((projectDir, subject, platform));
@@ -494,6 +495,7 @@ pages:
       String dir,
       ShotSubject subject, {
       ShotPlatform platform = ShotPlatform.android,
+      double pixelRatio = 2,
       void Function(ShotProgress event)? onProgress,
     }) async {
       asked.add(platform);
@@ -664,6 +666,7 @@ pages:
       String dir,
       ShotSubject subject, {
       ShotPlatform platform = ShotPlatform.android,
+      double pixelRatio = 2,
       void Function(ShotProgress event)? onProgress,
     }) async {
       final run = Directory(p.join(dir, 'run'))..createSync(recursive: true);
@@ -795,6 +798,7 @@ pages:
       String dir,
       ShotSubject subject, {
       ShotPlatform platform = ShotPlatform.android,
+      double pixelRatio = 2,
       void Function(ShotProgress event)? onProgress,
     }) {
       final files = (subject as PreviewFiles).files;
@@ -909,6 +913,7 @@ pages:
       String dir,
       ShotSubject subject, {
       ShotPlatform platform = ShotPlatform.android,
+      double pixelRatio = 2,
       void Function(ShotProgress event)? onProgress,
     }) async {
       final run = await shutter.shot(dir, subject, platform: platform);

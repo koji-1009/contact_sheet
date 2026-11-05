@@ -20,13 +20,18 @@ void main() {
   });
   tearDown(() => app.deleteSync(recursive: true));
 
-  // shutter, drawing nothing.
+  // shutter, drawing nothing; the pixel ratios it is asked to draw at.
+  final ratios = <double>[];
   Future<ShotRun> nothing(
     String dir,
     ShotSubject subject, {
     ShotPlatform platform = ShotPlatform.ios,
+    double pixelRatio = 2,
     void Function(ShotProgress event)? onProgress,
-  }) async => ShotRun(id: 'run', dir: p.join(dir, 'run'), shots: const []);
+  }) async {
+    ratios.add(pixelRatio);
+    return ShotRun(id: 'run', dir: p.join(dir, 'run'), shots: const []);
+  }
 
   // [words]: the machine's language.
   Future<int> cli(List<String> args, {String words = 'en'}) => runCli(
@@ -191,6 +196,29 @@ void main() {
     expect(lang(), 'en');
     expect(await cli(['export', '--strict', app.path], words: 'ja'), 65);
     expect(err.last, '1 state has no image');
+  });
+
+  test('export --pixel-ratio draws the previews at it; one that is no ratio '
+      'is a wrong use', () async {
+    File('${app.path}/contact_sheet/sheet.yaml')
+      ..createSync(recursive: true)
+      ..writeAsStringSync(
+        'pages: [{id: home, label: Home, '
+        'states: [{name: s, preview: lib/home.dart#home}]}]',
+      );
+    File('${app.path}/lib/home.dart')
+      ..createSync(recursive: true)
+      ..writeAsStringSync('// previews\n');
+    expect(await cli(['export', app.path]), 0);
+    expect(ratios.last, SheetExport.defaultPixelRatio);
+    expect(await cli(['export', '--pixel-ratio', '1.5', app.path]), 0);
+    expect(ratios.last, 1.5);
+    for (final wrong in ['0', '-1', 'two', 'Infinity']) {
+      ratios.clear();
+      expect(await cli(['export', '--pixel-ratio', wrong, app.path]), 64);
+      expect(err.reversed.elementAt(1), 'No pixel ratio: $wrong');
+      expect(ratios, isEmpty);
+    }
   });
 
   test('lint tells what the sheet itself shows may be missing', () async {

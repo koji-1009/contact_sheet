@@ -31,6 +31,8 @@ abstract class Messages {
   String get helpOnly;
   String get helpLocale;
   String get helpStrict;
+  String get helpPixelRatio;
+  String noPixelRatio(Object ratio);
   String get helpSvg;
   String exportUnknownPage(Object id);
   String exportKept(Object count);
@@ -268,6 +270,13 @@ class MessagesEn extends Messages {
 
   @override
   String get helpStrict => "Fail (exit code 65) when a state has no image.";
+
+  @override
+  String get helpPixelRatio =>
+      "The device pixel ratio the previews are drawn at: pixels of an image per logical pixel of its screen.";
+
+  @override
+  String noPixelRatio(Object ratio) => "No pixel ratio: ${ratio}";
 
   @override
   String get helpSvg =>
@@ -934,6 +943,12 @@ class MessagesJa extends Messages {
 
   @override
   String get helpStrict => "画像のない状態があれば失敗にする（終了コード 65）";
+
+  @override
+  String get helpPixelRatio => "Preview を描く画素の倍率（画面の 1 論理ピクセルあたりの画像のピクセル数）";
+
+  @override
+  String noPixelRatio(Object ratio) => "画素の倍率ではありません: ${ratio}";
 
   @override
   String get helpSvg => "map.svg と map-dev.svg も書き出す（画像を含む地図全体の 1 枚絵。単体で渡せる）";

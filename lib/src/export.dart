@@ -25,6 +25,7 @@ typedef Shoot = Future<ShotRun> Function(
   String projectDir,
   ShotSubject subject, {
   ShotPlatform platform,
+  double pixelRatio,
   void Function(ShotProgress event)? onProgress,
 });
 
@@ -50,6 +51,7 @@ class SheetExport {
     required this.m,
     Messages? words,
     this.svg = false,
+    this.pixelRatio = defaultPixelRatio,
     this.log = _silent,
     void Function(String line)? warn,
   }) : words = words ?? m,
@@ -62,6 +64,15 @@ class SheetExport {
   /// Whether `map.svg` and `map-dev.svg` are written too; without, those an
   /// export before wrote are deleted.
   final bool svg;
+
+  /// The device pixel ratio the previews are drawn at: pixels of an image
+  /// per logical pixel of its screen.
+  final double pixelRatio;
+
+  /// The pixel ratio the previews are drawn at unless told: an image shown
+  /// large on a high-density screen stays sharp, and is three quarters the
+  /// pixels of a phone's 2 on each side.
+  static const defaultPixelRatio = 1.5;
 
   /// What the export tells, in the command's language.
   final Messages m;
@@ -302,6 +313,7 @@ class SheetExport {
               VariantPlatform.ios => ShotPlatform.ios,
               VariantPlatform.android => ShotPlatform.android,
             },
+            pixelRatio: pixelRatio,
             onProgress: (event) => log(event.message),
           );
           runs.add(run.dir);

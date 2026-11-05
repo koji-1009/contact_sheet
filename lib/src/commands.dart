@@ -205,7 +205,13 @@ class _ExportCommand extends _AppCommand {
         help: m.helpLocale,
       )
       ..addFlag('strict', negatable: false, help: m.helpStrict)
-      ..addFlag('svg', negatable: false, help: m.helpSvg);
+      ..addFlag('svg', negatable: false, help: m.helpSvg)
+      ..addOption(
+        'pixel-ratio',
+        valueHelp: 'ratio',
+        defaultsTo: '${SheetExport.defaultPixelRatio}',
+        help: m.helpPixelRatio,
+      );
   }
 
   @override
@@ -218,6 +224,11 @@ class _ExportCommand extends _AppCommand {
   Future<int> runOn(SheetRepo repo) async {
     final args = argResults!;
     final locale = args.option('locale');
+    final ratio = args.option('pixel-ratio')!;
+    final pixelRatio = double.tryParse(ratio);
+    if (pixelRatio == null || !(pixelRatio > 0) || !pixelRatio.isFinite) {
+      usageException(m.noPixelRatio(ratio));
+    }
     final (:dir, :missing) = await SheetExport(
       repo,
       runner: cli.processes,
@@ -225,6 +236,7 @@ class _ExportCommand extends _AppCommand {
       m: m,
       words: locale == null ? cli.words : Messages.of(locale),
       svg: args.flag('svg'),
+      pixelRatio: pixelRatio,
       log: cli.out,
       warn: cli.err,
     ).run(args.option('out'), {...args.multiOption('only')});

@@ -77,7 +77,7 @@ An export deletes the runs of shutter's it made, so the team's own runs in the a
 Contact Sheet adds `contact_sheet/` to the app, and with `init --package`, a line to its `.gitignore`:
 
 - `sheet.yaml` and `basis.json`, and the sheet package where there is one: kept in git.
-- `map/`: the map (about 0.35 MB for the shop example's 11 states, its images WebP; 0.5 MB with `--svg`). Commit it, or ignore it and export it where it is shared (`export --out <folder>`), or have CI export it.
+- `map/`: the map (about 0.33 MB for the shop example's 11 states, its images WebP drawn at a pixel ratio of 1.5). Commit it, or ignore it and export it where it is shared (`export --out <folder>`), or have CI export it.
 - `.dart_tool/`: what an export keeps between runs, and the sheet package's shots: out of git. Flutter's `.gitignore` ignores `.dart_tool/` at any depth; where the app's `.gitignore` does not, `init --package` adds `contact_sheet/.dart_tool/` to it.
 
 ## More
