@@ -231,9 +231,11 @@ path.edge, g.lbl, g.entry, g.bundle, g.blbl { transition: opacity .3s; }
 #canvas.focusing .node:not(.near) { opacity: .25; }
 #canvas.focusing path.edge:not(.near), #canvas.focusing g.lbl:not(.near), #canvas.focusing g.entry:not(.near), #canvas.focusing g.bundle:not(.near), #canvas.focusing g.blbl:not(.near) { opacity: .12; }
 /* How much the map shows: the pages alone, with the arrows, or with what
-   each arrow says too. A page chosen, or a route, shows its own whatever. */
+   each arrow says too. A page chosen, or a route, shows its own arrows
+   whatever; what they say, as much shows it: the card, or the route's
+   panel, says it as sentences. */
 #map-view[data-level="pages"] :is(path.edge, g.entry, g.bundle):not(.near),
-#map-view:is([data-level="pages"], [data-level="flow"]) :is(g.lbl, g.blbl, #over g.entry):not(.near) { visibility: hidden; pointer-events: none; }
+#map-view:is([data-level="pages"], [data-level="flow"]) :is(g.lbl, g.blbl, #over g.entry) { visibility: hidden; pointer-events: none; }
 #map-view:is([data-level="pages"], [data-level="flow"]) .node .marks,
 #map-view[data-level="pages"] .legend { display: none; }
 /* The arrows back, hidden when the viewer chose so: those of a page chosen,
@@ -604,6 +606,12 @@ const hitOf = (path) => {
 };
 const nodes = {};
 let islandChips = [];
+// A page's image on the map, loaded only once the map shows it
+// ([loadImages]).
+const nodeImage = (s, p) => {
+  const d = drawn(s);
+  return d.image ? `<img data-src="${esc(d.image)}" alt="${esc(p.label)}">` : '';
+};
 // The map drawn as [laid] lays it out: its arrows, its pages' boxes and its
 // sections' names.
 function layMap() {
@@ -634,7 +642,7 @@ for (const p of S.pages) {
   n.dataset.id = p.id;
   const s = drawn(p.states[0]);
   const marks =(p.memo ? '<span class="mark">ⓘ</span>' : '') + (p.links.length ? `<span class="mark">↗ ${p.links.length}</span>` : '');
-  n.innerHTML = `<div class="img">${s.image ? `<img src="${esc(s.image)}" alt="${esc(p.label)}" loading="lazy">` : ''}</div><div class="label"><span>${esc(p.label)}</span><small></small></div>${marks ? `<div class="marks">${marks}</div>` : ''}`;
+  n.innerHTML = `<div class="img">${nodeImage(s, p)}</div><div class="label"><span>${esc(p.label)}</span><small></small></div>${marks ? `<div class="marks">${marks}</div>` : ''}`;
   n.title = T(p.states.length === 1 ? 'statesOfOne' : 'statesOf', { page: p.label, count: p.states.length });
   // In the state it shows (where an arrow arrived): what is looked at stays.
   n.addEventListener('click', () => {
@@ -734,27 +742,101 @@ setBack(new URLSearchParams(location.search).get('back') === 'hide' ? false : lo
 $('#backToggle')?.addEventListener('click', () => setBack(map.classList.contains('no-back')));
 
 let view = { x: 0, y: 0, k: 1 };
+// The scales the map reads at: from [readable] up, the arrows' words (12px)
+// are 9px or more; under [far], a page is too small to make out, and the
+// sections' names stand out to go into.
+const readable = 0.75, far = 0.45;
 const apply = () => {
   canvas.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.k})`;
-  // Far out, the sections' names stand out to go into.
   canvas.style.setProperty('--inv', 1 / view.k);
-  canvas.classList.toggle('far', islandChips.length >= 4 && view.k < 0.45);
+  canvas.classList.toggle('far', islandChips.length >= 4 && view.k < far);
+  loadImages();
 };
+// The pages' images, loaded where the map shows them large enough to make
+// out: on it, or a quarter of the view off it (to be there when moved to),
+// and not far out. Once loaded, kept.
+let loading = false;
+function loadImages() {
+  if (loading) return;
+  loading = true;
+  requestAnimationFrame(() => {
+    loading = false;
+    const m = map.getBoundingClientRect();
+    if (!m.width || view.k < far) return;
+    const mx = m.width / 4, my = m.height / 4;
+    const x0 = (-view.x - mx) / view.k, x1 = (-view.x + m.width + mx) / view.k;
+    const y0 = (-view.y - my) / view.k, y1 = (-view.y + m.height + my) / view.k;
+    for (const [id, n] of Object.entries(nodes)) {
+      const img = n.querySelector('img[data-src]');
+      if (!img) continue;
+      const b = boxOf(id);
+      if (b.x < x1 && b.x + b.width > x0 && b.y < y1 && b.y + b.height > y0) {
+        img.src = img.dataset.src;
+        img.removeAttribute('data-src');
+      }
+    }
+  });
+}
+// Whether the map has been moved to show something yet: until then, it
+// opens where the app starts ([showStart]).
+let placed = false;
 // Moves the map to show [box] (in map pixels) whole, gliding there; clear
-// of the [left], [right], [top] and [bottom] pixels a panel takes.
-function show(box, glide, { left = 0, right = 0, top = 0, bottom = 0 } = {}) {
+// of the [left], [right], [top] and [bottom] pixels a panel takes. No
+// smaller than [min]: then from its top left, [keep] (a box) in the view.
+function show(box, glide, { left = 0, right = 0, top = 0, bottom = 0, min = 0, keep = null } = {}) {
   const m = map.getBoundingClientRect();
   if (!m.width) return;
   top = Math.min(top, m.height * 2 / 3);
   right = Math.min(right, m.width / 2);
   const w = m.width - left - right, h = Math.max(m.height - top - bottom, m.height / 3);
   const k = Math.min(w / box.width, h / box.height, 1.6);
-  view = { k, x: left + (w - box.width * k) / 2 - box.x * k, y: top + (h - box.height * k) / 2 - box.y * k };
+  if (k >= min) {
+    view = { k, x: left + (w - box.width * k) / 2 - box.x * k, y: top + (h - box.height * k) / 2 - box.y * k };
+  } else {
+    const pad = 24 / min;
+    const at = keep ?? box;
+    const x = Math.max(box.x, at.x + at.width + pad - w / min);
+    const y = Math.max(box.y, at.y + at.height + S.canvas.labelHeight + pad - h / min);
+    view = { k: min, x: left - x * min, y: top - y * min };
+  }
+  placed = true;
   canvas.classList.toggle('moving', glide);
   apply();
   if (glide) setTimeout(() => canvas.classList.remove('moving'), 460);
 }
 const whole = () => ({ x: 0, y: 0, width: laid.canvas.width, height: laid.canvas.height });
+// The page nearest the middle of the view; and the view moved, at its
+// scale, to have it there again (the map laid out anew).
+function middlePage() {
+  const m = map.getBoundingClientRect();
+  const cx = (m.width / 2 - view.x) / view.k, cy = (m.height / 2 - view.y) / view.k;
+  let best = null, nearest = Infinity;
+  for (const id of Object.keys(nodes)) {
+    const b = boxOf(id);
+    const d = Math.hypot(b.x + b.width / 2 - cx, b.y + b.height / 2 - cy);
+    if (d < nearest) { nearest = d; best = id; }
+  }
+  return best;
+}
+function toMiddle(id) {
+  const m = map.getBoundingClientRect();
+  const b = boxOf(id);
+  view.x = m.width / 2 - (b.x + b.width / 2) * view.k;
+  view.y = m.height / 2 - (b.y + b.height / 2) * view.k;
+  apply();
+}
+// Where the map opens: whole, where it reads so; else where the app starts,
+// its first page with its section, as large as reads. Nothing else shows
+// it whole but its button: whole, a large app's pages are too small to make
+// out.
+function showStart(glide) {
+  const m = map.getBoundingClientRect();
+  const all = whole();
+  if (Math.min(m.width / all.width, m.height / all.height) >= readable) { show(all, glide); return; }
+  const b = boxOf(S.pages[0].id);
+  const island = laid.sections.find((s) => b.x >= s.x && b.y >= s.y && b.x + b.width <= s.x + s.width && b.y + b.height <= s.y + s.height);
+  show(island ?? around([S.pages[0].id]), glide, { min: readable, keep: b });
+}
 // Whether the panels sit beside what the map shows, or across it (a phone):
 // as the CSS lays them out.
 const wide = () => !matchMedia('(max-width: 640px)').matches;
@@ -770,7 +852,11 @@ function zoom(f, cx, cy) {
 }
 $('#zin').onclick = () => zoom(1.25);
 $('#zout').onclick = () => zoom(0.8);
-$('#fit').onclick = () => go('map');
+// The whole map: what is chosen lets go.
+$('#fit').onclick = () => {
+  if (focused || routed || picked) go('map');
+  show(whole(), true);
+};
 
 // Brings out the pages [near], the arrows [edgeOn] and the deep links
 // [entryOn] say, the page [sel] chosen; the rest faint. Nothing near: all
@@ -819,8 +905,8 @@ function showState(id, i) {
   if (!s) return;
   shownState[id] = i;
   const n = nodes[id];
-  const d = drawn(s);
-  n.querySelector('.img').innerHTML = d.image ? `<img src="${esc(d.image)}" alt="${esc(p.label)}">` : '';
+  n.querySelector('.img').innerHTML = nodeImage(s, p);
+  loadImages();
   n.querySelector('.label small').textContent = i ? s.name : '';
   n.classList.toggle('other-state', i > 0);
 }
@@ -882,7 +968,8 @@ function focus(id, glide, { state } = {}) {
   picked = null;
   $('#route').classList.remove('on');
   const card = $('#card');
-  if (!focused) { highlight(new Set(), () => false, () => false, null); card.classList.remove('on'); show(whole(), glide); return; }
+  // Nothing chosen: the map stays where it is.
+  if (!focused) { highlight(new Set(), () => false, () => false, null); card.classList.remove('on'); return; }
   if (state != null) {
     // Another state of the page: the pages its arrows arrived at, back first.
     firstStates();
@@ -1261,8 +1348,7 @@ function renderTree() {
   }
 }
 renderTree();
-// Larger or smaller: the whole tree to begin with, as the map's whole, not
-// too small to read.
+// Larger or smaller.
 let tk = 1, treeFitted = false;
 function zoomTree(k, cx, cy) {
   const r = treeView.getBoundingClientRect();
@@ -1275,10 +1361,20 @@ function zoomTree(k, cx, cy) {
   treeView.scrollLeft = at.x * tk - cx;
   treeView.scrollTop = at.y * tk - cy;
 }
-const fitTree = () => zoomTree(Math.max(0.4, Math.min(1, treeView.clientWidth / tree.width, treeView.clientHeight / tree.height)), 0, 0);
+// As the map opens: whole where it reads so, else as large as reads, from
+// its top, the app's start (the first tree's root) in the middle.
+const fitTree = () => {
+  zoomTree(Math.max(readable, Math.min(1, treeView.clientWidth / tree.width, treeView.clientHeight / tree.height)), 0, 0);
+  const root = tree.pages.find((t) => !t.parent);
+  treeView.scrollTo(root ? (root.x + root.width / 2) * tk - treeView.clientWidth / 2 : 0, 0);
+};
 $('#tzin').onclick = () => zoomTree(tk * 1.25);
 $('#tzout').onclick = () => zoomTree(tk * 0.8);
-$('#tfit').onclick = () => { fitTree(); treeView.scrollTo(0, 0); };
+// Its button: the whole tree, however small.
+$('#tfit').onclick = () => {
+  zoomTree(Math.min(1, treeView.clientWidth / tree.width, treeView.clientHeight / tree.height), 0, 0);
+  treeView.scrollTo(0, 0);
+};
 // A pinch, or the wheel with Ctrl or Cmd, zooms; the wheel alone scrolls.
 treeView.addEventListener('wheel', (e) => {
   if (!e.ctrlKey && !e.metaKey) return;
@@ -1400,6 +1496,8 @@ function route() {
       const chosen = Object.keys(valuation).length ? valuation : undefined;
       if (ids.length > 2) showRoute(ids[0], ids[2], !first, ids[1], chosen); else showRoute(ids[0], ids[1], !first, undefined, chosen);
     } else focus(ids[0] ?? null, !first, { state: ids[1] });
+    if (!placed) showStart(false);
+    loadImages();
   });
   if (name === 'tree') requestAnimationFrame(() => {
     if (!treeFitted && treeView.clientWidth) { fitTree(); treeFitted = true; }
@@ -1450,6 +1548,8 @@ function setCode(on) {
 // out at its screens' sizes. Kept in the address (?variant=) to pass around,
 // and for the viewer.
 function setVariant(i) {
+  // With nothing chosen, the page in the middle of the map stays there.
+  const middle = current === 'map' && !focused && !routed && !picked ? middlePage() : null;
   variant = i;
   try { localStorage.setItem('contact_sheet.variant', variantName()); } catch {}
   const url = new URL(location.href);
@@ -1468,8 +1568,11 @@ function setVariant(i) {
     backgrounds();
     if (routed) showRoute(...routed.slice(0, 2), false, ...routed.slice(2));
     else if (picked) pick(picked, false);
-    else focus(focused, false, { state: focused ? chosen(focused) ?? undefined : undefined });
+    else if (focused) focus(focused, false, { state: chosen(focused) ?? undefined });
+    else if (middle) toMiddle(middle);
   });
+  // Not shown, the map opens where the app starts again.
+  else placed = false;
   if (current === 'tree' && location.hash.startsWith('#tree/')) showTree(decodeURIComponent(location.hash.slice('#tree/'.length)), false);
   if ($('#detail').classList.contains('on') && location.hash.startsWith('#page/')) openPage(decodeURIComponent(location.hash.slice('#page/'.length)));
 }
