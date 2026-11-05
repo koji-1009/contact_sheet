@@ -305,7 +305,7 @@ What the pages are tagged with, set alike for every page: where each page's anal
 | Field | | What |
 | --- | --- | --- |
 | `name` | required | What the pages and the HTML call it (`Analytics`) |
-| `url` | | Where a page's value is, `{value}` in it the value, URL-encoded (`https://analytics.example.com/screens/{value}`); none: a page's value is text, or a link of its own |
+| `url` | | Where a page's value is, `{value}` in it the value, what a URL cannot hold escaped (a space, a letter not ASCII) and its `/`, `?` and `#` kept, so a value may be a path (`https://analytics.example.com/screens/{value}`; the app on the web, `https://app.example.com{value}`, a page's value `/products/p1`); none: a page's value is text, or a link of its own |
 
 ### `variants`
 

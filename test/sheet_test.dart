@@ -66,6 +66,7 @@ tags:
   - {name: Analytics, url: 'https://analytics.example.com/screens/{value}'}
   - {name: Spec}
   - {name: Owner}
+  - {name: Web, url: 'https://app.example.com{value}'}
 pages:
   - id: home
     label: Home
@@ -73,6 +74,7 @@ pages:
       Analytics: [home view, home_scroll]
       Spec: {label: Home spec, url: 'https://example.com/spec'}
       Owner: Shop team
+      Web: /products/p1?from=home
     states: [{name: s, preview: lib/home.dart#home}]
   - id: cart
     label: Cart
@@ -94,6 +96,12 @@ pages:
         ),
         ('Spec', 'Home spec', 'https://example.com/spec'),
         ('Owner', 'Shop team', null),
+        // A path, as the app on the web takes it.
+        (
+          'Web',
+          '/products/p1?from=home',
+          'https://app.example.com/products/p1?from=home',
+        ),
       ],
     );
     // A link of its own, whatever the tag's url.

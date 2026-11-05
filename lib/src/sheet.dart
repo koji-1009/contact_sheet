@@ -234,9 +234,11 @@ class SheetTag {
 
   final String name;
 
-  /// Where a page's value is, `{value}` in it the value (URL-encoded):
-  /// `https://analytics.example.com/screens/{value}`. None: each page says
-  /// where, or its value is text.
+  /// Where a page's value is, `{value}` in it the value, what a URL cannot
+  /// hold escaped (a space, a letter not ASCII) and its `/`, `?` and `#`
+  /// kept, so a value may be a path: `https://analytics.example.com/screens/
+  /// {value}`, `https://app.example.com{value}` with `/products/p1`. None:
+  /// each page says where, or its value is text.
   final String? url;
 }
 
@@ -839,7 +841,7 @@ class _Parser {
       String() || num() => SheetPageTag(
         tag.name,
         '$value',
-        url: tag.url?.replaceAll('{value}', Uri.encodeComponent('$value')),
+        url: tag.url?.replaceAll('{value}', Uri.encodeFull('$value')),
       ),
       YamlMap() => () {
         final link = _map(value, at, const {'label', 'url'});
