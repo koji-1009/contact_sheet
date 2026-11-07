@@ -210,17 +210,24 @@ void main() {
     expect(marksOf(design), contains('>Design<'));
     expect(marksOf(design), isNot(contains('Spec')));
     expect(marksOf(design), isNot(contains('ⓘ')));
-    // Nothing said: the sentences and the memo, no tag.
-    final first = _open(shopHtml, '#map/home', drawn: drawn).dom;
-    expect(cardOf(first), contains('class="memo"'));
-    expect(cardOf(first), contains('class="says"'));
-    expect(cardOf(first), isNot(contains('https://')));
-    expect(marksOf(first), contains('ⓘ'));
-    expect(marksOf(first), isNot(contains('Design')));
-    // ?with= alone: none of them.
-    final none = _open(shopHtml, '?with=#map/home', drawn: drawn).dom;
+    // Nothing named: nothing shown, no button pressed.
+    final none = _open(shopHtml, '#map/home', drawn: drawn).dom;
     expect(cardOf(none), isEmpty);
     expect(marksOf(none), isEmpty);
+    expect(
+      none,
+      isNot(matches(RegExp(r'data-note="[^"]*" aria-pressed="true"'))),
+    );
+    expect(
+      none,
+      matches(RegExp(r'<div id="map-view"[^>]*class="[^"]*no-back')),
+    );
+    // Named, its button pressed.
+    expect(
+      design,
+      matches(RegExp(r'data-note="tag:Design" aria-pressed="true"')),
+    );
+    expect(design, matches(RegExp(r'data-note="memo" aria-pressed="false"')));
   }, skip: _skip);
 
   test(

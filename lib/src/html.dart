@@ -857,28 +857,17 @@ $('#levels').addEventListener('click', (e) => {
 setLevel(level, { remember: false });
 // What the map shows that can be hidden, by key: the arrows back (`back`),
 // and with the pages, the transitions as sentences (`says`), the memo
-// (`memo`) and each tag (`tag:<name>`). As the address says (?with=<key>,
-// once for each; ?with= alone, none of them), to pass around; else as the
-// viewer last chose; else the arrows back, the sentences and the memo, no
-// tag.
-const withNotes = (() => {
-  const params = new URLSearchParams(location.search);
-  if (params.has('with')) return new Set(params.getAll('with').filter(Boolean));
-  try {
-    const saved = localStorage.getItem(kept('with'));
-    if (saved !== null) return new Set(JSON.parse(saved));
-  } catch {}
-  return new Set(['back', 'says', 'memo']);
-})();
+// (`memo`) and each tag (`tag:<name>`). Shown when the address names it
+// (?with=<key>, once for each), and only then: what the buttons show is
+// what the address says.
+const withNotes = new Set(new URLSearchParams(location.search).getAll('with').filter(Boolean));
 const noteOn = (key) => withNotes.has(key);
-// [key] shown or not, kept in the address and for the viewer.
+// [key] shown or not, in the address.
 function keepWith(key, on) {
   if (on) withNotes.add(key); else withNotes.delete(key);
-  try { localStorage.setItem(kept('with'), JSON.stringify([...withNotes])); } catch {}
   const url = new URL(location.href);
   url.searchParams.delete('with');
   for (const k of withNotes) url.searchParams.append('with', k);
-  if (!withNotes.size) url.searchParams.set('with', '');
   history.replaceState(null, '', url);
 }
 // The arrows back, shown or hidden.
