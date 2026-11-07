@@ -235,8 +235,9 @@ code { font: 12px ui-monospace, Menlo, monospace; }
 .node:focus { outline: none; }
 .node:focus-visible .img { outline: 3px solid var(--accent); outline-offset: 2px; }
 .node.sel .img { border: 3px solid var(--accent); }
-/* Above the image, not on it: the image stays readable. In one row no wider than the page (the room the layout keeps above it; those past it in one +N), where it covers the fewest arrows meeting the page's top (placeMarks). */
+/* Above the image, in the room the layout keeps there: the image stays readable. In one row no wider than the page (those past it in one +N), clear of the arrows meeting its top and of the labels (renderMark); where nothing there is clear, on the image's top edge, its status bar. */
 .node .marks { position: absolute; bottom: calc(100% + 4px); left: 0; display: flex; gap: 4px; }
+.node .marks.on-image { bottom: auto; top: 4px; }
 .node .marks:empty { display: none; }
 .mark { background: var(--accent); color: #fff; border-radius: 999px; padding: 0 6px; font-size: 11px; line-height: 18px; white-space: nowrap; text-decoration: none; }
 a.mark::after { content: ' ↗'; }
@@ -710,12 +711,15 @@ function layMap() {
   topSpans = spansAtTops();
 }
 // Where the arrows and deep links meeting each page's top run through the
-// room of its marks (marksHeight above it): [left, right] from the page's
-// left, its arrowhead's width either side. An end with the point its line
-// leaves towards: an arrow's control point, a short line's other end.
+// room of its marks (marksHeight above it), and where the labels over the
+// map lie in it: [left, right] from the page's left, an arrowhead's width
+// either side of a line. An end with the point its line leaves towards: an
+// arrow's control point, a short line's other end.
 const marksHeight = 22;
 let topSpans = {};
 function spansAtTops() {
+  const labels = [...$('#over').querySelectorAll('g > rect')].map((r) =>
+    ['x', 'y', 'width', 'height'].map((a) => +r.getAttribute(a)));
   const nums = (el) => (el.getAttribute('d') ?? '').match(/-?\d+(\.\d+)?/g)?.map(Number) ?? [];
   const ends = [];
   for (const path of edgePaths) {
@@ -736,6 +740,10 @@ function spansAtTops() {
       const up = y - ty;
       const far = up <= 0 ? x : up < marksHeight ? tx : x + (tx - x) * marksHeight / up;
       (spans[id] ??= []).push([Math.min(x, far) - 5 - b.x, Math.max(x, far) + 5 - b.x]);
+    }
+    for (const [x, y, w, h] of labels) {
+      if (y >= b.y || y + h <= b.y - marksHeight || x >= b.x + b.width || x + w <= b.x) continue;
+      (spans[id] ??= []).push([x - b.x, x + w - b.x]);
     }
   }
   return spans;
@@ -876,9 +884,10 @@ const markWidth = (text) => {
 };
 // A page's marks above it: its memo, and each tag the state shown has, a
 // link where it is one value that is. In one row no wider than the page,
-// those past it in one +N (the card says them all); along the page's top
-// where it covers the fewest arrows meeting it ([topSpans]), at its right
-// where none.
+// those past it in one +N (the card says them all); above the page where
+// it covers no arrow meeting it nor label ([topSpans]), at its right where
+// it can; where nothing is clear, on the image's top edge (the status
+// bar's), at its right: never under an arrow or a label.
 function renderMark(p) {
   const marks = [];
   if (p.memo && noteOn('memo')) marks.push({ text: 'ⓘ', title: p.memo, html: `<span class="mark" title="${esc(p.memo)}">ⓘ</span>` });
@@ -914,7 +923,9 @@ function renderMark(p) {
     const c = covers(l), best = covers(left);
     if (c < best || (c === best && l > left)) left = l;
   }
-  box.style.left = Math.min(left, room) + 'px';
+  const onImage = covers(left) > 0;
+  box.classList.toggle('on-image', onImage);
+  box.style.left = (onImage ? Math.max(0, room - 4) : left) + 'px';
 }
 function renderMarks() {
   for (const p of S.pages) renderMark(p);

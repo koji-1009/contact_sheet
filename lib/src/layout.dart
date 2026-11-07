@@ -422,7 +422,8 @@ class MapLayout {
   static const double islandPadding = 16;
 
   /// Room above each page's image for the HTML's marks (a memo, tags),
-  /// drawn there and not on the image.
+  /// drawn there and not on the image, but where arrows or labels take all
+  /// of it.
   static const double marksHeight = 22;
 
   /// The image of each page (without its label below), by page id.

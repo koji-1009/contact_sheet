@@ -474,7 +474,7 @@ And in every view:
 - **A page's details**, and each image opening large.
 - **Search**: pages by their names, memo, states, tags (their names and values) and what is done on them (a button's words find its page). The table narrows as it is typed.
 - **How much the map shows**, chosen under it: the pages alone, with the arrows, or with what each arrow says (the default); and the arrows back, shown or hidden (tapping "Back" in the legend). A page chosen, or a route, shows its own arrows whatever is chosen, and beside the map says them as sentences.
-- **What is shown with the pages** ("With"), on the map above each page and beside a page chosen: its transitions as sentences, its memo, and each tag, each shown (the default) or hidden. Above a page, they are one row no wider than it, those past it one `+<n>`.
+- **What is shown with the pages** ("With"), on the map above each page and beside a page chosen: its transitions as sentences, its memo, and each tag, each shown (the default) or hidden. Above a page, they are one row no wider than it, those past it one `+<n>`, clear of the arrows and labels there; where those take all the room above, on the top edge of its image.
 - **Variants**, chosen in the header ("Shown as"): every image follows, and the map and the tree are laid out again, each page's box its screen at the scale the first variant's is drawn at.
 - **Where it is from**: which app it was drawn from (its version and branch; its commit, for developers), when it was exported, and, with a basis, how many changes to the app's code the sheet names for no page.
 - **For developers**, ticked: what only developers read (the code's names, files, fakes, `go` and `replace`).
