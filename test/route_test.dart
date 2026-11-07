@@ -219,6 +219,32 @@ edges:
     ]);
   });
 
+  test('a state chosen keeps its own values over those chosen', () {
+    final sheet = Sheet.parse('''
+conditions:
+  - {name: Welcome, values: [Not seen, Seen]}
+  - {name: Language, values: [English, Japanese]}
+pages:
+  - {id: welcome, label: Welcome, states: [{name: s, preview: w.dart#w}]}
+  - {id: home, label: Home, states: [{name: s, preview: h.dart#h}]}
+  - id: language
+    label: Language
+    states:
+      - {name: English, preview: l.dart#l, if: {Language: English}}
+      - {name: Japanese, preview: l.dart#l@1, if: {Language: Japanese}}
+edges:
+  - {from: welcome, to: home, trigger: text:Start, set: {Welcome: Seen}, kind: go}
+  - {from: home, to: language, trigger: label:Language}
+''', _m);
+    // Japanese is not the English state's: the start is where the app's
+    // launch reaches the English state, the welcome seen.
+    final route = sheet.router.route('language', 'English', 'home', {
+      'Language': 'Japanese',
+    });
+    expect(route.valuation, {'Welcome': 'Seen', 'Language': 'English'});
+    expect(route.start.map((f) => f.page), ['home', 'language']);
+  });
+
   test('a pop brings no older value back: the page under shows as now', () {
     final sheet = Sheet.parse('''
 conditions:

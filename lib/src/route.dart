@@ -1737,7 +1737,11 @@ class Router {
     Map<String, String> chosen,
   ) {
     final named = state == null ? null : _frame(from, state);
-    final want = _values(chosen);
+    // The state's own values win over those chosen.
+    final want = [
+      for (final v in _values(chosen))
+        if (named == null || !_requires[named].any((r) => r.$1 == v.$1)) v,
+    ];
     final launch = [_launch];
     final (steps, deep, short, searched) = _search(launch, (n) {
       final f = _canon[_frameOf(n)];
