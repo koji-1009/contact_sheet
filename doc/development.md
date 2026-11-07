@@ -25,7 +25,7 @@ dart analyze
 dart test
 ```
 
-And `flutter analyze` in each example app, and in its `contact_sheet/` where it is a package (shop_app, tabs_app).
+And `flutter analyze` in each example app, and in its `contact_sheet/` where it is a package (shop_app, tabs_app, trips_app).
 
 ## Generated files
 
@@ -46,6 +46,7 @@ To draw them:
 dart run contact_sheet export example/shop_app
 dart run contact_sheet export example/notes_app
 dart run contact_sheet export example/tabs_app
+dart run contact_sheet export example/trips_app
 ```
 
 Each map is then in `example/<app>/contact_sheet/map/`.

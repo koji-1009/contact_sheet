@@ -29,6 +29,10 @@ jobs:
         working-directory: example/tabs_app
       - run: flutter pub get
         working-directory: example/tabs_app/contact_sheet
+      - run: flutter pub get
+        working-directory: example/trips_app
+      - run: flutter pub get
+        working-directory: example/trips_app/contact_sheet
       - run: dart analyze
 
   format:

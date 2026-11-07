@@ -1023,4 +1023,58 @@ pages:
     expect(shutter.asked, hasLength(2));
     expect(shots.listSync(), isEmpty);
   });
+
+  test('a state whose preview is not written yet is drawn without an image, '
+      'told at once; the map is in the sheet\'s locale', () async {
+    repo.sheetFile.writeAsStringSync('''
+locale: ja
+pages:
+  - id: home
+    label: Home
+    states:
+      - {name: Guest, preview: lib/preview/home.dart#home}
+      - {name: Member}
+  - {id: cart, label: Cart, states: [{name: Full}]}
+edges:
+  - {from: home, to: cart, trigger: text:Cart}
+''');
+    final shutter = _Shutter(shots.path);
+    final lines = <String>[];
+    final (dir: out, :missing) = await SheetExport(
+      repo,
+      runner: Tools(),
+      shoot: shutter.shot,
+      m: Messages.of('en'),
+      log: lines.add,
+    ).run();
+    expect(missing, 2);
+    // Only the preview written is shot, in the app alone.
+    expect(
+      shutter.asked.single.$2,
+      const PreviewFiles(['lib/preview/home.dart']),
+    );
+    expect(
+      lines,
+      contains(
+        'No preview written yet, drawn without an image: 2 states, '
+        'Home (Member), Cart (Full)',
+      ),
+    );
+    final data = jsonDecode(
+      File(p.join(out, 'sheet.json')).readAsStringSync(),
+    ) as Map<String, Object?>;
+    expect(data['locale'], 'ja');
+    final pages = (data['pages']! as List<Object?>)
+        .cast<Map<String, Object?>>();
+    final member = (pages.first['states']! as List<Object?>)[1];
+    expect(member, containsPair('preview', null));
+    expect(member, containsPair('project', null));
+    expect(member, containsPair('shot', null));
+    expect(member, containsPair('image', null));
+    expect(member, containsPair('error', null));
+    expect(
+      File(p.join(out, 'index.html')).readAsStringSync(),
+      contains('プレビュー未作成'),
+    );
+  });
 }

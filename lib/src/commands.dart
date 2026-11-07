@@ -19,12 +19,11 @@ import 'package:stack_trace/stack_trace.dart';
 
 /// Runs `sheet` with [args]: its exit code (sysexits). [out] gets
 /// what it gives (and the usage, when asked for), [err] what went wrong, in
-/// English; the map is in [words] (the machine's language) unless
-/// `--locale` says otherwise. [runner] runs flutter and git, [shoot] is
-/// shutter's.
+/// English; the map is in the sheet's `locale` (English without one)
+/// unless `--locale` says otherwise. [runner] runs flutter and git,
+/// [shoot] is shutter's.
 Future<int> runCli(
   List<String> args, {
-  required Messages words,
   required void Function(String line) out,
   required void Function(String line) err,
   ProcessRunner runner = const SystemProcessRunner(),
@@ -33,7 +32,6 @@ Future<int> runCli(
   const m = MessagesEn();
   final cli = ContactSheetRunner(
     m: m,
-    words: words,
     out: out,
     err: err,
     processes: runner,
@@ -59,7 +57,6 @@ Future<int> runCli(
 class ContactSheetRunner extends CommandRunner<int> {
   ContactSheetRunner({
     required this.m,
-    required this.words,
     required this.out,
     required this.err,
     required this.processes,
@@ -84,9 +81,6 @@ class ContactSheetRunner extends CommandRunner<int> {
 
   /// What the command tells.
   final Messages m;
-
-  /// The map's words when `--locale` does not choose them.
-  final Messages words;
   final void Function(String line) out;
   final void Function(String line) err;
   final ProcessRunner processes;
@@ -201,7 +195,7 @@ class _ExportCommand extends _AppCommand {
       ..addOption(
         'locale',
         valueHelp: 'language',
-        allowed: const ['en', 'ja'],
+        allowed: Messages.locales,
         help: m.helpLocale,
       )
       ..addFlag('strict', negatable: false, help: m.helpStrict)
@@ -234,7 +228,7 @@ class _ExportCommand extends _AppCommand {
       runner: cli.processes,
       shoot: cli.shoot,
       m: m,
-      words: locale == null ? cli.words : Messages.of(locale),
+      locale: locale,
       svg: args.flag('svg'),
       pixelRatio: pixelRatio,
       log: cli.out,
@@ -262,9 +256,15 @@ class _LintCommand extends _AppCommand {
 
   @override
   Future<int> runOn(SheetRepo repo) async {
-    final findings = lintSheet(SheetExport(repo, m: m).readSheet(), m);
-    if (findings.isEmpty) cli.out(m.lintNone);
-    findings.forEach(cli.out);
+    final sheet = SheetExport(repo, m: m).readSheet();
+    final lines = lintLines(sheet, m);
+    final checked = checkedHints(sheet, m);
+    lines.forEach(cli.out);
+    if (lines.isEmpty) {
+      cli.out(checked > 0 ? m.lintOnlyChecked(checked) : m.lintNone);
+    } else if (checked > 0) {
+      cli.out(m.lintChecked(checked));
+    }
     return ExitCode.success.code;
   }
 }

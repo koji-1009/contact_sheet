@@ -97,13 +97,18 @@ class RouteState {
 
 /// A page, and its states in order: the first is how it starts.
 class RoutePage {
-  const RoutePage(this.id, this.states, {this.tabs = const []});
+  const RoutePage(this.id, this.states, {this.tabs = const [], this.parent});
 
   final String id;
   final List<RouteState> states;
 
   /// The tabs it is shown in, by their first pages; none, over the bar.
   final List<String> tabs;
+
+  /// The page its route is nested under: with nothing under it (after a go,
+  /// a deep link, the launch), its back goes there, as go_router builds the
+  /// pages of a location's path under it.
+  final String? parent;
 }
 
 /// A tab bar whose tabs each keep their own history.
@@ -226,12 +231,17 @@ class Route {
     this.valuation = const {},
     this.active,
     this.inTab = 0,
+    this.pastBound = 0,
     this.tabs = const [],
     this.bounded = false,
     this.searched = true,
   });
 
   final List<RouteFrame> start;
+
+  /// Of [start]'s frames over the tab shown's first [inTab], how many are
+  /// in its history past [Router.tabDepth] (the rest are over the bar).
+  final int pastBound;
 
   /// Whether the search, and that of the start's history, went to the end
   /// ([Router.searchLimit]): if not, the app may have a route, or a shorter
@@ -252,6 +262,7 @@ class Route {
     'valuation': valuation,
     'active': active,
     'inTab': inTab,
+    'pastBound': pastBound,
     'tabs': [
       for (final t in tabs)
         {
@@ -417,14 +428,19 @@ class Router {
   factory Router.fromJson(Map<String, Object?> json) => Router(
     [
       for (final p in _maps(json['pages']))
-        RoutePage(p['id']! as String, [
-          for (final s in _maps(p['states']))
-            RouteState(
-              s['name']! as String,
-              conditions: _strings(s['if']),
-              data: s['data'] == true,
-            ),
-        ], tabs: ((p['tab'] as List<Object?>?) ?? const []).cast<String>()),
+        RoutePage(
+          p['id']! as String,
+          [
+            for (final s in _maps(p['states']))
+              RouteState(
+                s['name']! as String,
+                conditions: _strings(s['if']),
+                data: s['data'] == true,
+              ),
+          ],
+          tabs: ((p['tab'] as List<Object?>?) ?? const []).cast<String>(),
+          parent: p['parent'] as String?,
+        ),
     ],
     [
       for (final e in _maps(json['edges']))
@@ -766,6 +782,32 @@ class Router {
     return _unsaid(page, g);
   }
 
+  /// The page each page's route is nested under, where it has one.
+  late final Map<String, String> _parents = {
+    for (final p in pages) p.id: ?p.parent,
+  };
+
+  /// The nodes, of canonical frames, the back of [node] arrives at with
+  /// nothing under it: its page's parent, in the state of the name it left
+  /// if the conditions allow it, else as nothing says; none without a
+  /// parent, or where something written is done by its back.
+  List<int> _toParent(int node) {
+    final parent = _parents[_frames[_frameOf(node)].page];
+    if (parent == null || !_pops(node).contains(null)) return const [];
+    final g = _gOf(node);
+    final kept = _frame(parent, _frames[_frameOf(node)].state);
+    if (kept != null && _holds(_requires[kept], g)) return [_node(kept, g)];
+    return _unsaid(parent, g);
+  }
+
+  /// Whether tapping the tab [t] shown again, its history [stack], goes
+  /// back to its first page: the bar says so, the conditions let the tab be
+  /// switched to, and the history is not that page alone.
+  bool _retaps(int t, List<int> stack, int g) =>
+      tabBars[_tabBar[t]].retapFirst &&
+      _guarded(_tabGuards[t], g) &&
+      (stack.length >= 2 || _frames[stack.single].page != _tabRoots[t]);
+
   /// Where the app launches: its first page, in the first state its first
   /// values allow, in its tab if it is in one.
   int get _launch {
@@ -1022,6 +1064,12 @@ class Router {
             if (t != null) add(id, tab(t, [_frameOf(h)], _gOf(h)));
           }
         }
+        // Nothing under it: its back to its parent.
+        for (final h in _toParent(id)) {
+          add(id, h);
+          final t = _goTab(_frames[_frameOf(h)].page, null, null);
+          if (t != null) add(id, tab(t, [_frameOf(h)], _gOf(h)));
+        }
         // A page of a tab, past the bound in it: tapping it again, and a
         // switch, from here and back to here.
         final tabs = _deepTabs[f];
@@ -1101,9 +1149,17 @@ class Router {
           }
         }
       }
-      if (tabBars[a.bar].retapFirst &&
-          history.length >= 2 &&
-          _guarded(_tabGuards[a.tab], a.g)) {
+      if (history.length == 1) {
+        for (final h in _toParent(n)) {
+          final f = _frameOf(h);
+          final t = _inTab(_frames[f].page, a.tab)
+              ? a.tab
+              : _goTab(_frames[f].page, null, null);
+          to.add(h);
+          if (t != null) to.add(tab(t, [f], _gOf(h)));
+        }
+      }
+      if (_retaps(a.tab, history, a.g)) {
         for (final x in _unsaid(_tabRoots[a.tab], a.g)) {
           to.add(tab(a.tab, [_frameOf(x)], a.g));
         }
@@ -1353,12 +1409,17 @@ class Router {
           }
         }
       } else if (k == 0) {
-        // Nothing under it: a written pop is the sheet's word; no back.
+        // Nothing under it: a written pop is the sheet's word; the back goes
+        // to its parent, where it has one.
         for (final j in _pops(f)) {
           if (j == null || edges[j].under) continue;
           for (final h in _arrive(j, f)) {
             relax(d + 1, h, 0, ctx, at, _Step(_Op.pop, j, h));
           }
+        }
+        for (final h in _toParent(f)) {
+          final to = _startAt(h, -1);
+          relax(d + 1, to, 0, -1, at, _Step(_Op.reset, null, to, _Do.back));
         }
       }
     }
@@ -1456,6 +1517,18 @@ class Router {
         }
       }
     }
+    // A page alone in the tab's history (after a go): its back goes to its
+    // parent, where it has one.
+    if (stack.length == 1) {
+      for (final h in _toParent(f)) {
+        if (_inTab(_frames[_frameOf(h)].page, s.active)) {
+          become(_withStack(s, [_frameOf(h)], _gOf(h)), null, _Do.back);
+        } else {
+          final to = _startAt(h, -1);
+          relax(d + 1, to, 0, -1, at, _Step(_Op.reset, null, to, _Do.back));
+        }
+      }
+    }
     for (final t in _barTabs[s.bar]) {
       if (t == s.active || !_guarded(_tabGuards[t], g)) continue;
       final other = s.stacks[_tabPos[t]];
@@ -1480,9 +1553,7 @@ class Router {
         }
       }
     }
-    if (tabBars[s.bar].retapFirst &&
-        stack.length >= 2 &&
-        _guarded(_tabGuards[s.active], g)) {
+    if (_retaps(s.active, stack, g)) {
       for (final x in _unsaid(_tabRoots[s.active], g)) {
         become(_withStack(s, [_frameOf(x)], g), null, _Do.retap);
       }
@@ -1730,6 +1801,12 @@ class Router {
     final values = _named(_gOf(stack.last));
     final active = shell == null ? null : _tabRoots[shell.active];
     final inTab = shell?.stacks[_tabPos[shell.active]].length ?? 0;
+    final pastBound = shell == null
+        ? 0
+        : stack
+              .skip(1)
+              .takeWhile((n) => _frameTab[_frameOf(n)] == shell.active)
+              .length;
     final tabs = [
       if (shell != null)
         for (final t in _barTabs[shell.bar])
@@ -1751,6 +1828,7 @@ class Router {
         valuation: values,
         active: active,
         inTab: inTab,
+        pastBound: pastBound,
         tabs: tabs,
         bounded: bounded,
         searched: searched,
@@ -1763,6 +1841,7 @@ class Router {
       valuation: values,
       active: active,
       inTab: inTab,
+      pastBound: pastBound,
       tabs: tabs,
       bounded: bounded,
       searched: searched,

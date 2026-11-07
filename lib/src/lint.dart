@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:convert';
 
 import 'package:contact_sheet/src/messages.g.dart';
 import 'package:contact_sheet/src/sheet.dart';
@@ -21,8 +22,51 @@ import 'package:contact_sheet/src/sheet.dart';
 ///   launch's; an arrow whose `if` no history meets where it happens, or
 ///   that names in `when` a state its `if` leaves out;
 /// - a tag no page has, or one most pages have that some do not.
-List<String> lintSheet(Sheet sheet, Messages m) {
-  final findings = <String>[];
+///
+/// The hints the sheet's `checked` names are looked at and kept as they
+/// are: left out. A key `checked` names that is no hint now is told.
+List<String> lintSheet(Sheet sheet, Messages m) => [
+  for (final hint in lintHints(sheet, m)) hint.message,
+];
+
+/// A hint of [lintSheet]'s: what it says, and the key the sheet's
+/// `checked` names it by once it is looked at; empty for one that cannot
+/// be checked.
+class LintHint {
+  const LintHint(this.key, this.message);
+
+  final String key;
+  final String message;
+}
+
+/// [lintSheet]'s hints, with their keys: those the sheet's `checked` names
+/// left out, and one for each key it names that is no hint now.
+List<LintHint> lintHints(Sheet sheet, Messages m) {
+  final all = _hints(sheet, m);
+  final keys = {for (final hint in all) hint.key};
+  return [
+    for (final hint in all)
+      if (!sheet.checked.contains(hint.key)) hint,
+    for (final key in sheet.checked)
+      if (!keys.contains(key)) LintHint('', m.lintCheckedGone(jsonEncode(key))),
+  ];
+}
+
+/// [lintHints] as the command tells them: each, and under it the key to
+/// add to `checked` once it is looked at, quoted as YAML takes it.
+List<String> lintLines(Sheet sheet, Messages m) => [
+  for (final hint in lintHints(sheet, m)) ...[
+    hint.message,
+    if (hint.key.isNotEmpty) m.lintKey(jsonEncode(hint.key)),
+  ],
+];
+
+/// How many of [sheet]'s hints its `checked` leaves out.
+int checkedHints(Sheet sheet, Messages m) =>
+    _hints(sheet, m).where((h) => sheet.checked.contains(h.key)).length;
+
+List<LintHint> _hints(Sheet sheet, Messages m) {
+  final findings = <LintHint>[];
   if (sheet.pages.isEmpty) return findings;
   final reached = <String>{
     sheet.pages.first.id,
@@ -49,7 +93,12 @@ List<String> lintSheet(Sheet sheet, Messages m) {
   }
   for (final page in sheet.pages) {
     if (!reached.contains(page.id)) {
-      findings.add(m.lintUnreachable(page.label, page.id));
+      findings.add(
+        LintHint(
+          'unreachable ${page.id}',
+          m.lintUnreachable(page.label, page.id),
+        ),
+      );
     }
   }
   for (final page in sheet.pages) {
@@ -66,7 +115,12 @@ List<String> lintSheet(Sheet sheet, Messages m) {
     final named = {for (final e in out) ...e.when};
     for (final state in page.states) {
       if (!named.contains(state.name)) {
-        findings.add(m.lintUnusedState(state.name, page.label));
+        findings.add(
+          LintHint(
+            'nothing-leaves ${page.id}/${state.name}',
+            m.lintUnusedState(state.name, page.label),
+          ),
+        );
       }
     }
   }
@@ -88,7 +142,12 @@ List<String> lintSheet(Sheet sheet, Messages m) {
         );
     for (final state in page.states.skip(1)) {
       if (!state.data && !arrives(state.name)) {
-        findings.add(m.lintUnarrivedState(state.name, page.label));
+        findings.add(
+          LintHint(
+            'nothing-arrives ${page.id}/${state.name}',
+            m.lintUnarrivedState(state.name, page.label),
+          ),
+        );
       }
     }
   }
@@ -100,7 +159,9 @@ List<String> lintSheet(Sheet sheet, Messages m) {
   for (final e in sheet.edges) {
     final first = seen.putIfAbsent(e.key, () => e.item);
     if (first != e.item && told.add((first, e.item))) {
-      findings.add(m.lintDuplicateEdge(first, e.item));
+      findings.add(
+        LintHint('twice ${e.key}', m.lintDuplicateEdge(first, e.item)),
+      );
       continue;
     }
     if (e.when.isEmpty) continue;
@@ -118,13 +179,17 @@ List<String> lintSheet(Sheet sheet, Messages m) {
     if (other.item != e.item &&
         other.key != e.key &&
         told.add((other.item, e.item))) {
-      findings.add(m.lintSplitEdge(other.item, e.item));
+      findings.add(
+        LintHint('split ${e.key}', m.lintSplitEdge(other.item, e.item)),
+      );
     }
   }
   final entries = <String, int>{};
   for (final (i, e) in sheet.entries.indexed) {
     final first = entries.putIfAbsent(e.key, () => i);
-    if (first != i) findings.add(m.lintDuplicateEntry(first, i));
+    if (first != i) {
+      findings.add(LintHint('twice ${e.key}', m.lintDuplicateEntry(first, i)));
+    }
   }
   return [
     ...findings,
@@ -136,29 +201,43 @@ List<String> lintSheet(Sheet sheet, Messages m) {
 
 /// The hints of the tags: one no page has; one most pages have (three
 /// quarters or more), the pages without it named.
-List<String> _lintTags(Sheet sheet, Messages m) {
-  final findings = <String>[];
+List<LintHint> _lintTags(Sheet sheet, Messages m) {
+  final findings = <LintHint>[];
   final all = sheet.pages.length;
   for (final tag in sheet.tags) {
     final without = [
       for (final page in sheet.pages)
-        if (!page.tags.any((t) => t.tag == tag.name)) page.label,
+        if (!page.tags.any((t) => t.tag == tag.name)) page,
     ];
     final has = all - without.length;
     if (has == 0) {
-      findings.add(m.lintTagUnused(tag.name));
+      findings.add(
+        LintHint('tag-unused ${tag.name}', m.lintTagUnused(tag.name)),
+      );
     } else if (without.isNotEmpty && has * 4 >= all * 3) {
-      findings.add(m.lintTagMissing(tag.name, has, all, without.join(', ')));
+      findings.add(
+        LintHint(
+          'tag-missing ${tag.name}: ${without.map((p) => p.id).join(', ')}',
+          m.lintTagMissing(
+            tag.name,
+            has,
+            all,
+            without.map((p) => p.label).join(', '),
+          ),
+        ),
+      );
     }
   }
   return findings;
 }
 
 /// The hints of the tab bars whose tabs keep their histories.
-List<String> _lintTabs(Sheet sheet, Messages m) {
-  final findings = <String>[];
+List<LintHint> _lintTabs(Sheet sheet, Messages m) {
+  final findings = <LintHint>[];
   for (final (i, bar) in sheet.tabBars.indexed) {
-    if (bar.tabs.length < 2) findings.add(m.lintOneTab(i));
+    if (bar.tabs.length < 2) {
+      findings.add(LintHint('one-tab ${bar.tabs.first.page}', m.lintOneTab(i)));
+    }
   }
   // The tabs a page is shown in, by their first pages.
   List<String> tabsOf(String page) => [
@@ -173,28 +252,46 @@ List<String> _lintTabs(Sheet sheet, Messages m) {
     final fromTab = sheet.tabOf(e.from);
     final toTab = sheet.tabOf(e.to);
     final page = sheet.pageOf(e.to)!.label;
+    // The bar's switch written as an edge: by the tab's own words, or by
+    // nothing; a button on the page that goes to another tab is the page's.
     if (fromTab != null &&
         toTab != null &&
-        sheet.barOf(fromTab) == sheet.barOf(toTab)) {
-      findings.add(m.lintTabEdge(e.item));
+        e.from != e.to &&
+        sheet.barOf(fromTab) == sheet.barOf(toTab) &&
+        (e.trigger == null || '${e.trigger}' == '${toTab.trigger}')) {
+      findings.add(LintHint('between-tabs ${e.key}', m.lintTabEdge(e.item)));
     } else if (to.isNotEmpty && toTab == null) {
       final push =
           e.kind == NavigationKind.push || e.kind == NavigationKind.redirect;
       if (push && from.isNotEmpty && !from.any(to.contains)) {
-        findings.add(m.lintNotInTab(e.item, page));
+        findings.add(
+          LintHint('not-in-tab ${e.key}', m.lintNotInTab(e.item, page)),
+        );
       } else if ((push || e.kind == NavigationKind.replace) && from.isEmpty) {
-        findings.add(m.lintTabFromOutside(e.item, page));
+        findings.add(
+          LintHint('over-bar ${e.key}', m.lintTabFromOutside(e.item, page)),
+        );
       } else if (e.kind == NavigationKind.go &&
           to.length > 1 &&
           e.tab == null) {
-        findings.add(m.lintWhichTab(e.item, page, to.first));
+        findings.add(
+          LintHint(
+            'which-tab ${e.key}',
+            m.lintWhichTab(e.item, page, to.first),
+          ),
+        );
       }
     }
   }
   for (final (i, e) in sheet.entries.indexed) {
     final to = tabsOf(e.to);
     if (sheet.tabOf(e.to) == null && to.length > 1 && e.tab == null) {
-      findings.add(m.lintEntryWhichTab(i, sheet.pageOf(e.to)!.label, to.first));
+      findings.add(
+        LintHint(
+          'which-tab ${e.key}',
+          m.lintEntryWhichTab(i, sheet.pageOf(e.to)!.label, to.first),
+        ),
+      );
     }
   }
   return findings;
@@ -202,8 +299,8 @@ List<String> _lintTabs(Sheet sheet, Messages m) {
 
 /// The hints of the conditions; [reached], the pages an arrow leads to
 /// from the first or a deep link opens (those not, already told).
-List<String> _lintConditions(Sheet sheet, Messages m, Set<String> reached) {
-  final findings = <String>[];
+List<LintHint> _lintConditions(Sheet sheet, Messages m, Set<String> reached) {
+  final findings = <LintHint>[];
   String said(Map<String, String> values) =>
       [for (final MapEntry(:key, :value) in values.entries) '$key: $value']
           .join(', ');
@@ -244,9 +341,19 @@ List<String> _lintConditions(Sheet sheet, Messages m, Set<String> reached) {
   for (final c in sheet.conditions) {
     for (final (i, value) in c.values.indexed) {
       if (!named.contains((c.name, value))) {
-        findings.add(m.lintValueUnused(value, c.name));
+        findings.add(
+          LintHint(
+            'value-unnamed ${c.name}=$value',
+            m.lintValueUnused(value, c.name),
+          ),
+        );
       } else if (i > 0 && !given.contains((c.name, value))) {
-        findings.add(m.lintValueNeverSet(value, c.name));
+        findings.add(
+          LintHint(
+            'value-not-given ${c.name}=$value',
+            m.lintValueNeverSet(value, c.name),
+          ),
+        );
       }
     }
   }
@@ -260,7 +367,9 @@ List<String> _lintConditions(Sheet sheet, Messages m, Set<String> reached) {
       );
   final first = sheet.pages.first;
   if (!shows(first, {for (final c in sheet.conditions) c.name: c.values[0]})) {
-    findings.add(m.lintNoLaunchState(first.label));
+    findings.add(
+      LintHint('no-launch-state ${first.id}', m.lintNoLaunchState(first.label)),
+    );
   }
   for (final page in sheet.pages) {
     final of = [
@@ -278,7 +387,14 @@ List<String> _lintConditions(Sheet sheet, Messages m, Set<String> reached) {
     }
     for (final g in valuations) {
       if (!shows(page, g)) {
-        findings.add(m.lintNoStateUnder(page.label, said(g)));
+        findings.add(
+          LintHint(
+            'no-state ${page.id} ${guardKey({
+              for (final MapEntry(:key, :value) in g.entries) key: [value],
+            })}',
+            m.lintNoStateUnder(page.label, said(g)),
+          ),
+        );
       }
     }
     final looks = <String, SheetState>{};
@@ -290,7 +406,12 @@ List<String> _lintConditions(Sheet sheet, Messages m, Set<String> reached) {
       });
       final other = looks.putIfAbsent(key, () => state);
       if (other != state) {
-        findings.add(m.lintTwoStatesUnder(other.name, state.name, page.label));
+        findings.add(
+          LintHint(
+            'same-values ${page.id}/${other.name}/${state.name}',
+            m.lintTwoStatesUnder(other.name, state.name, page.label),
+          ),
+        );
       }
     }
   }
@@ -302,6 +423,8 @@ List<String> _lintConditions(Sheet sheet, Messages m, Set<String> reached) {
   // An item from a page happens if one of its edges from there does (a pop
   // back to the page under it is one edge to each page it can be over).
   final happens = <(int, String), bool>{};
+  // The key of the first of those edges: which the hint is.
+  final keys = <(int, String), String>{};
   for (final (i, e) in sheet.edges.indexed) {
     if (e.guard.isEmpty) continue;
     final from = sheet.pageOf(e.from)!;
@@ -309,17 +432,28 @@ List<String> _lintConditions(Sheet sheet, Messages m, Set<String> reached) {
       if (e.when.contains(state.name) &&
           !state.allowedBy(e.guard) &&
           told.add('${e.item}\u0000${state.name}')) {
-        findings.add(m.lintIfExcludesWhen(e.item, state.name));
+        findings.add(
+          LintHint(
+            'if-leaves-out ${e.key} ${state.name}',
+            m.lintIfExcludesWhen(e.item, state.name),
+          ),
+        );
       }
     }
     if (reached.contains(e.from)) {
       happens[(e.item, e.from)] =
           (happens[(e.item, e.from)] ?? false) || happening.contains(i);
+      keys.putIfAbsent((e.item, e.from), () => e.key);
     }
   }
   for (final MapEntry(key: (item, from), value: does) in happens.entries) {
     if (!does) {
-      findings.add(m.lintGuardUnsatisfied(item, sheet.pageOf(from)!.label));
+      findings.add(
+        LintHint(
+          'if-never-met ${keys[(item, from)]}',
+          m.lintGuardUnsatisfied(item, sheet.pageOf(from)!.label),
+        ),
+      );
     }
   }
   return findings;

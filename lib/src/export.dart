@@ -49,13 +49,12 @@ class SheetExport {
     this.runner = const SystemProcessRunner(),
     this.shoot = shot,
     required this.m,
-    Messages? words,
+    this.locale,
     this.svg = false,
     this.pixelRatio = defaultPixelRatio,
     this.log = _silent,
     void Function(String line)? warn,
-  }) : words = words ?? m,
-       warn = warn ?? log;
+  }) : warn = warn ?? log;
 
   final SheetRepo repo;
   final ProcessRunner runner;
@@ -77,8 +76,9 @@ class SheetExport {
   /// What the export tells, in the command's language.
   final Messages m;
 
-  /// The map's words: its labels and `index.html`'s.
-  final Messages words;
+  /// The language of the map's words, its labels and `index.html`'s, when
+  /// told: else the sheet's `locale`, else English.
+  final String? locale;
 
   /// Gets what is done.
   final void Function(String line) log;
@@ -130,9 +130,7 @@ class SheetExport {
         throw ExportException(m.exportUnknownPage(id), ExitCode.usage.code);
       }
     }
-    for (final finding in lintSheet(sheet, m)) {
-      log(finding);
-    }
+    lintLines(sheet, m).forEach(log);
     final out = folder == null ? repo.mapDir : dirIn(folder);
     final runs = ExportRuns(repo);
     final kept = Directory.systemTemp.createTempSync('contact_sheet_');
@@ -151,7 +149,7 @@ class SheetExport {
         sheet,
         shots: shots,
         failed: failed,
-        m: words,
+        m: Messages.of(locale ?? sheet.locale ?? 'en'),
         drift: await drift,
         release: (version: repo.appVersion, commit: commit, branch: branch),
       );
@@ -286,7 +284,8 @@ class SheetExport {
         for (final page in sheet.pages)
           if (only.isEmpty || only.contains(page.id))
             for (final state in page.states)
-              if (state.inSheetPackage == inSheetPackage) state.projectFile,
+              if (state.hasPreview && state.inSheetPackage == inSheetPackage)
+                state.projectFile!,
       }.toList()..sort()) {
         // What shutter would stop the whole run for, told of the file.
         if (!file.startsWith('lib/')) {
@@ -366,8 +365,15 @@ class SheetExport {
   /// variant.
   int _tellMissing(SheetMap map, Set<String> only) {
     var missing = 0;
+    // Those whose preview is not written yet: told at once.
+    final unwritten = <String>[];
     for (final page in map.sheet.pages) {
       for (final state in page.states) {
+        if (!state.hasPreview) {
+          unwritten.add('${page.label} (${state.name})');
+          missing++;
+          continue;
+        }
         var lacks = false;
         for (final variant in map.sheet.variants) {
           final shot = map.shotOf(state, variant);
@@ -384,7 +390,9 @@ class SheetExport {
               m.exportNoShot(
                 page.label,
                 name,
-                preview == null ? state.preview : '${state.preview} ($preview)',
+                preview == null
+                    ? state.preview!
+                    : '${state.preview} ($preview)',
               ),
             );
           } else if (shot.status == ShotStatus.error) {
@@ -399,6 +407,9 @@ class SheetExport {
         }
         if (lacks) missing++;
       }
+    }
+    if (unwritten.isNotEmpty) {
+      warn(m.exportNoPreview(unwritten.length, unwritten.join(', ')));
     }
     return missing;
   }
@@ -417,7 +428,7 @@ class SheetExport {
     Map<String, String> failed, {
     required bool prune,
   }) async {
-    final map = SheetMap(sheet, shots: shots, failed: failed, m: words);
+    final map = SheetMap(sheet, shots: shots, failed: failed, m: m);
     final drawn = Set<ShotResult>.identity();
     for (final page in sheet.pages) {
       for (final state in page.states) {
@@ -510,7 +521,7 @@ class SheetExport {
       '${const JsonEncoder.withIndent('  ').convert(data)}\n',
     );
     File(p.join(out, 'index.html'))
-        .writeAsStringSync(exportHtml(data, htmlStrings(words), map));
+        .writeAsStringSync(exportHtml(data, htmlStrings(map.m), map));
     for (final (name, plain) in [('map.svg', true), ('map-dev.svg', false)]) {
       final file = File(p.join(out, name));
       if (svg) {

@@ -1,0 +1,1064 @@
+# The transition structure of trips_app, written by an AI agent (Fable) that
+# was given only what `sheet agent` and `sheet manual` print, and read the
+# app's code; then its backs of the nested routes written as `parent`.
+# Nothing in trips_app is marked for it. trips_app has no previews of its
+# own: every state is the sheet package's (contact_sheet/lib/preview/),
+# started through the app's router.
+
+dependencies:
+  - name: AuthRepository
+    target: authRepositoryProvider
+    source: lib/data/auth_repository.dart
+  - name: SettingsRepository
+    target: settingsRepositoryProvider
+    source: lib/data/settings_repository.dart
+  - name: HotelRepository
+    target: hotelRepositoryProvider
+    source: lib/data/hotel_repository.dart
+  - name: TripRepository
+    target: tripRepositoryProvider
+    source: lib/data/trip_repository.dart
+  - name: WalletRepository
+    target: walletRepositoryProvider
+    source: lib/data/wallet_repository.dart
+  - name: WishlistRepository
+    target: wishlistRepositoryProvider
+    source: lib/data/wallet_repository.dart
+  - name: InboxRepository
+    target: inboxRepositoryProvider
+    source: lib/data/inbox_repository.dart
+  - name: UrlLauncher
+    target: UrlLauncherPlatform.instance
+    source: lib/features/account/help_page.dart
+
+conditions:
+  - name: Welcome
+    values: [Not seen, Seen]
+    source: lib/data/settings_repository.dart
+  - name: Login
+    values: [Guest, Signed in]
+    source: lib/data/auth_repository.dart
+  - name: Trips
+    values: [None, Booked]
+    source: lib/data/trip_repository.dart
+  - name: Cards
+    values: [None, Saved]
+    source: lib/data/wallet_repository.dart
+  - name: Wishlist
+    values: [None, Saved]
+    source: lib/data/wallet_repository.dart
+  - name: Language
+    values: [English, 日本語, Français]
+    source: lib/data/settings_repository.dart
+
+tabs:
+  - pages:
+      - {page: explore, trigger: text:Explore}
+      - {page: trips, trigger: text:Trips}
+      - {page: inbox, trigger: text:Inbox}
+      - {page: account, trigger: text:Account}
+    retap: first
+    source: lib/features/shell.dart
+
+pages:
+  # Welcome
+  - id: welcome
+    label: Welcome
+    section: Welcome
+    widget: WelcomePage
+    source: lib/features/onboarding/welcome_page.dart
+    path: /welcome
+    dependencies: [SettingsRepository]
+    memo: |
+      Shown in place of everything else until it is seen: on the first launch, and again after "Show the welcome again" in Settings.
+    states:
+      - name: Welcome
+        preview: contact_sheet/lib/preview/welcome.dart#welcome
+        uses: {SettingsRepository: fresh}
+
+  # Sign in
+  - id: sign_in
+    label: Sign in
+    section: Sign in
+    widget: SignInPage
+    source: lib/features/auth/sign_in_page.dart
+    path: /sign-in
+    dependencies: [AuthRepository]
+    memo: |
+      Where Continue goes depends on where the user was sent from (the page that asked to sign in, carried in the link as "from"), else Explore. "Sign in to go on." is shown when a page asked.
+    states:
+      - name: Standard
+        preview: contact_sheet/lib/preview/sign_in.dart#signIn
+        uses: {AuthRepository: guest}
+      - name: From trips
+        preview: contact_sheet/lib/preview/sign_in.dart#signInFromTrips
+        uses: {AuthRepository: guest}
+      - name: From inbox
+        preview: contact_sheet/lib/preview/sign_in.dart#signInFromInbox
+        uses: {AuthRepository: guest}
+      - name: From a stay
+        preview: contact_sheet/lib/preview/sign_in.dart#signInFromStay
+        uses: {AuthRepository: guest}
+      - name: For booking
+        preview: contact_sheet/lib/preview/sign_in.dart#signInForBooking
+        uses: {AuthRepository: guest}
+  - id: sign_up
+    label: Create an account
+    section: Sign in
+    widget: SignUpPage
+    source: lib/features/auth/sign_up_page.dart
+    path: /sign-up
+    dependencies: [AuthRepository]
+    memo: |
+      Opened from the sign-in, it carries the same "from": creating the account goes where signing in would have.
+    states:
+      - name: Standard
+        preview: contact_sheet/lib/preview/sign_up.dart#signUp
+        uses: {AuthRepository: guest}
+      - name: From trips
+        preview: contact_sheet/lib/preview/sign_up.dart#signUpFromTrips
+        uses: {AuthRepository: guest}
+      - name: From inbox
+        preview: contact_sheet/lib/preview/sign_up.dart#signUpFromInbox
+        uses: {AuthRepository: guest}
+      - name: From a stay
+        preview: contact_sheet/lib/preview/sign_up.dart#signUpFromStay
+        uses: {AuthRepository: guest}
+      - name: For booking
+        preview: contact_sheet/lib/preview/sign_up.dart#signUpForBooking
+        uses: {AuthRepository: guest}
+  - id: forgot_password
+    label: Reset your password
+    section: Sign in
+    widget: ForgotPasswordPage
+    source: lib/features/auth/forgot_password_page.dart
+    path: /forgot-password
+    states:
+      - name: Reset
+        preview: contact_sheet/lib/preview/forgot_password.dart#forgotPassword
+  - id: reset_sent
+    label: Check your email
+    section: Sign in
+    widget: ResetSentPage
+    source: lib/features/auth/reset_sent_page.dart
+    path: /reset-sent
+    memo: |
+      Takes the place of the reset page, so its back goes to the sign-in.
+    states:
+      - name: Sent
+        preview: contact_sheet/lib/preview/reset_sent.dart#resetSent
+
+  # Explore
+  - id: explore
+    label: Explore
+    section: Explore
+    widget: ExplorePage
+    source: lib/features/explore/explore_page.dart
+    path: /explore
+    dependencies: [HotelRepository]
+    memo: |
+      The Explore tab's first page, and where the app starts once the welcome is seen.
+    states:
+      - name: Explore
+        preview: contact_sheet/lib/preview/explore.dart#explore
+        uses: {HotelRepository: guest}
+  - id: search
+    label: Search
+    section: Explore
+    widget: SearchPage
+    source: lib/features/explore/search_page.dart
+    path: /explore/search
+    tab: explore
+    parent: explore
+    memo: |
+      Submitting the query from the keyboard searches too.
+    states:
+      - name: Search
+        preview: contact_sheet/lib/preview/search.dart#search
+  - id: search_results
+    label: Search results
+    section: Explore
+    widget: SearchResultsPage
+    source: lib/features/explore/search_results_page.dart
+    path: /explore/search/results
+    tab: explore
+    parent: search
+    dependencies: [HotelRepository]
+    states:
+      - name: Found
+        preview: contact_sheet/lib/preview/search_results.dart#searchResults
+        uses: {HotelRepository: guest}
+      - name: No match
+        preview: contact_sheet/lib/preview/search_results.dart#searchResultsNone
+        uses: {HotelRepository: guest}
+        data: true
+  - id: filters
+    label: Filters
+    section: Explore
+    widget: FiltersPage
+    source: lib/features/explore/filters_page.dart
+    path: /explore/search/results/filters
+    parent: search_results
+    memo: |
+      Over the whole screen. Reset clears the filters in place. The filters are not applied to the results yet: "Show stays" only goes back.
+    states:
+      - name: Filters
+        preview: contact_sheet/lib/preview/filters.dart#filters
+  - id: map
+    label: Map
+    section: Explore
+    widget: MapPage
+    source: lib/features/explore/map_page.dart
+    path: /explore/map
+    tab: explore
+    parent: explore
+    dependencies: [HotelRepository]
+    memo: |
+      The popular stays on a map; the card at the bottom is the first of them.
+    states:
+      - name: Map
+        preview: contact_sheet/lib/preview/map.dart#map
+        uses: {HotelRepository: guest}
+  - id: destination
+    label: Destination
+    section: Explore
+    widget: DestinationPage
+    source: lib/features/explore/destination_page.dart
+    path: /explore/destinations/:id
+    tab: explore
+    parent: explore
+    dependencies: [HotelRepository]
+    states:
+      - name: Destination
+        preview: contact_sheet/lib/preview/destination.dart#destination
+        uses: {HotelRepository: guest}
+  - id: hotel
+    label: Hotel
+    section: Explore
+    widget: HotelPage
+    source: lib/features/explore/hotel_page.dart
+    path: /explore/hotels/:id
+    tab: explore
+    parent: explore
+    dependencies: [HotelRepository, AuthRepository, WishlistRepository]
+    memo: |
+      The heart saves the stay to the wishlist and takes it out again; a guest is asked to sign in first, and comes back here.
+    states:
+      - name: Not saved
+        if: {Wishlist: None}
+        preview: contact_sheet/lib/preview/hotel.dart#hotelNotSaved
+        uses: {WishlistRepository: guest}
+      - name: Saved
+        if: {Wishlist: Saved}
+        preview: contact_sheet/lib/preview/hotel.dart#hotelSaved
+        uses: {WishlistRepository: saved}
+  - id: photos
+    label: Photos
+    section: Explore
+    widget: PhotosPage
+    source: lib/features/explore/photos_page.dart
+    path: /photos/:id
+    memo: |
+      Over the whole screen; swiped through. Close goes back to the hotel.
+    states:
+      - name: Photos
+        preview: contact_sheet/lib/preview/photos.dart#photos
+  - id: reviews
+    label: Reviews
+    section: Explore
+    widget: ReviewsPage
+    source: lib/features/explore/reviews_page.dart
+    path: /explore/hotels/:id/reviews
+    tab: explore
+    parent: hotel
+    dependencies: [HotelRepository]
+    states:
+      - name: Reviews
+        preview: contact_sheet/lib/preview/reviews.dart#reviews
+        uses: {HotelRepository: guest}
+  - id: rooms
+    label: Choose a room
+    section: Explore
+    widget: RoomsPage
+    source: lib/features/explore/rooms_page.dart
+    path: /explore/hotels/:id/rooms
+    tab: explore
+    parent: hotel
+    dependencies: [HotelRepository]
+    memo: |
+      Selecting a room starts the booking. A guest is sent to sign in first by the router, and comes back to the booking signed in.
+    states:
+      - name: Rooms
+        preview: contact_sheet/lib/preview/rooms.dart#roomsPage
+        uses: {HotelRepository: guest}
+
+  # Booking
+  - id: guests
+    label: Who is staying?
+    section: Booking
+    widget: GuestsPage
+    source: lib/features/booking/guests_page.dart
+    path: /book/guests
+    memo: |
+      Booking, first step: over the whole screen, signed in only.
+    states:
+      - name: Guests
+        preview: contact_sheet/lib/preview/guests.dart#guestsPage
+  - id: payment
+    label: Payment
+    section: Booking
+    widget: PaymentPage
+    source: lib/features/booking/payment_page.dart
+    path: /book/payment
+    dependencies: [WalletRepository]
+    memo: |
+      Booking, second step. Continue is disabled until a card is kept; the first card is the one paid with.
+    states:
+      - name: No card
+        if: {Cards: None}
+        preview: contact_sheet/lib/preview/payment.dart#paymentNoCard
+        uses: {WalletRepository: signedIn}
+      - name: Card saved
+        if: {Cards: Saved}
+        preview: contact_sheet/lib/preview/payment.dart#paymentWithCard
+        uses: {WalletRepository: withCard}
+  - id: review
+    label: Review and pay
+    section: Booking
+    widget: ReviewPage
+    source: lib/features/booking/review_page.dart
+    path: /book/review
+    dependencies: [HotelRepository, TripRepository]
+    memo: |
+      Booking, last step. Paying books the trip and starts the history again.
+    states:
+      - name: Review
+        preview: contact_sheet/lib/preview/review.dart#review
+        uses: {HotelRepository: withCard, TripRepository: withCard}
+  - id: done
+    label: You are booked
+    section: Booking
+    widget: DonePage
+    source: lib/features/booking/done_page.dart
+    path: /book/done/:id
+    memo: |
+      Nothing is under this page: there is no back from it.
+    states:
+      - name: Done
+        preview: contact_sheet/lib/preview/done.dart#done
+
+  # Trips
+  - id: trips
+    label: Trips
+    section: Trips
+    widget: TripsPage
+    source: lib/features/trips/trips_page.dart
+    path: /trips
+    dependencies: [AuthRepository, TripRepository]
+    memo: |
+      The Trips tab's first page: a guest is asked to sign in.
+    states:
+      - name: Guest
+        if: {Login: Guest}
+        preview: contact_sheet/lib/preview/trips.dart#tripsGuest
+        uses: {AuthRepository: guest, TripRepository: guest}
+      - name: No trips
+        if: {Login: Signed in, Trips: None}
+        preview: contact_sheet/lib/preview/trips.dart#tripsEmpty
+        uses: {AuthRepository: signedIn, TripRepository: signedIn}
+      - name: Booked
+        if: {Login: Signed in, Trips: Booked}
+        preview: contact_sheet/lib/preview/trips.dart#tripsBooked
+        uses: {AuthRepository: booked, TripRepository: booked}
+  - id: trip
+    label: Trip
+    section: Trips
+    widget: TripPage
+    source: lib/features/trips/trip_page.dart
+    path: /trips/:id
+    tab: trips
+    parent: trips
+    dependencies: [TripRepository]
+    memo: |
+      Reached from the trips list, from the booking done, and from a notification, each a go: its back goes to Trips. A trip that is gone says it was cancelled.
+    states:
+      - name: Trip
+        preview: contact_sheet/lib/preview/trip.dart#tripPage
+        uses: {TripRepository: booked}
+      - name: Cancelled
+        preview: contact_sheet/lib/preview/trip.dart#tripCancelled
+        uses: {TripRepository: signedIn}
+        data: true
+  - id: itinerary
+    label: Itinerary
+    section: Trips
+    widget: ItineraryPage
+    source: lib/features/trips/itinerary_page.dart
+    path: /trips/:id/itinerary
+    tab: trips
+    parent: trip
+    states:
+      - name: Itinerary
+        preview: contact_sheet/lib/preview/itinerary.dart#itinerary
+  - id: voucher
+    label: Voucher
+    section: Trips
+    widget: VoucherPage
+    source: lib/features/trips/voucher_page.dart
+    path: /trips/:id/voucher
+    parent: trip
+    memo: |
+      Over the whole screen. Close goes back to the trip.
+    states:
+      - name: Voucher
+        preview: contact_sheet/lib/preview/voucher.dart#voucher
+  - id: cancel
+    label: Cancel booking
+    section: Trips
+    widget: CancelPage
+    source: lib/features/trips/cancel_page.dart
+    path: /trips/:id/cancel
+    parent: trip
+    dependencies: [TripRepository]
+    memo: |
+      Over the whole screen. "Keep it" and Close go back to the trip.
+    states:
+      - name: Cancel
+        preview: contact_sheet/lib/preview/cancel.dart#cancel
+        uses: {TripRepository: booked}
+
+  # Inbox
+  - id: inbox
+    label: Inbox
+    section: Inbox
+    widget: InboxPage
+    source: lib/features/inbox/inbox_page.dart
+    path: /inbox
+    dependencies: [AuthRepository, InboxRepository]
+    memo: |
+      The Inbox tab's first page: a guest is asked to sign in.
+    states:
+      - name: Guest
+        if: {Login: Guest}
+        preview: contact_sheet/lib/preview/inbox.dart#inboxGuest
+        uses: {AuthRepository: guest, InboxRepository: guest}
+      - name: Signed in
+        if: {Login: Signed in}
+        preview: contact_sheet/lib/preview/inbox.dart#inboxSignedIn
+        uses: {AuthRepository: signedIn, InboxRepository: signedIn}
+  - id: conversation
+    label: Conversation
+    section: Inbox
+    widget: ConversationPage
+    source: lib/features/inbox/conversation_page.dart
+    path: /inbox/conversations/:id
+    tab: inbox
+    parent: inbox
+    dependencies: [InboxRepository]
+    memo: |
+      Sending a message stays on the page.
+    states:
+      - name: Conversation
+        preview: contact_sheet/lib/preview/conversation.dart#conversation
+        uses: {InboxRepository: signedIn}
+  - id: notifications
+    label: Notifications
+    section: Inbox
+    widget: NotificationsPage
+    source: lib/features/inbox/notifications_page.dart
+    path: /notifications
+    dependencies: [InboxRepository]
+    memo: |
+      Over the whole screen, from the Explore and Inbox tabs. Each notification opens its trip, in the Trips tab.
+    states:
+      - name: Notifications
+        preview: contact_sheet/lib/preview/notifications.dart#notifications
+        uses: {InboxRepository: guest}
+
+  # Account
+  - id: account
+    label: Account
+    section: Account
+    widget: AccountPage
+    source: lib/features/account/account_page.dart
+    path: /account
+    dependencies: [AuthRepository]
+    memo: |
+      The Account tab's first page. Signing out happens here, in place.
+    states:
+      - name: Guest
+        if: {Login: Guest}
+        preview: contact_sheet/lib/preview/account.dart#accountGuest
+        uses: {AuthRepository: guest}
+      - name: Signed in
+        if: {Login: Signed in}
+        preview: contact_sheet/lib/preview/account.dart#accountSignedIn
+        uses: {AuthRepository: signedIn}
+  - id: profile
+    label: Profile
+    section: Account
+    widget: ProfilePage
+    source: lib/features/account/profile_page.dart
+    path: /account/profile
+    tab: account
+    parent: account
+    dependencies: [AuthRepository]
+    states:
+      - name: Profile
+        preview: contact_sheet/lib/preview/profile.dart#profile
+        uses: {AuthRepository: signedIn}
+  - id: payment_methods
+    label: Payment methods
+    section: Account
+    widget: PaymentMethodsPage
+    source: lib/features/account/payment_methods_page.dart
+    path: /account/payment-methods
+    tab: account
+    parent: account
+    dependencies: [WalletRepository]
+    states:
+      - name: No card
+        if: {Cards: None}
+        preview: contact_sheet/lib/preview/payment_methods.dart#paymentMethodsNoCard
+        uses: {WalletRepository: signedIn}
+      - name: Card saved
+        if: {Cards: Saved}
+        preview: contact_sheet/lib/preview/payment_methods.dart#paymentMethodsWithCard
+        uses: {WalletRepository: withCard}
+  - id: add_card
+    label: Add a card
+    section: Account
+    widget: AddCardPage
+    source: lib/features/account/add_card_page.dart
+    path: /cards/add
+    dependencies: [WalletRepository]
+    memo: |
+      Over the whole screen, from the payment of a booking and from the payment methods; saved, back to whichever opened it.
+    states:
+      - name: Add a card
+        preview: contact_sheet/lib/preview/add_card.dart#addCard
+        uses: {WalletRepository: signedIn}
+  - id: wishlist
+    label: Saved stays
+    section: Account
+    widget: WishlistPage
+    source: lib/features/account/wishlist_page.dart
+    path: /account/wishlist
+    tab: account
+    parent: account
+    dependencies: [WishlistRepository, HotelRepository]
+    states:
+      - name: Empty
+        if: {Wishlist: None}
+        preview: contact_sheet/lib/preview/wishlist.dart#wishlistEmpty
+        uses: {WishlistRepository: signedIn, HotelRepository: signedIn}
+      - name: Saved
+        if: {Wishlist: Saved}
+        preview: contact_sheet/lib/preview/wishlist.dart#wishlistSaved
+        uses: {WishlistRepository: saved, HotelRepository: saved}
+  - id: settings
+    label: Settings
+    section: Account
+    widget: SettingsPage
+    source: lib/features/account/settings_page.dart
+    path: /account/settings
+    tab: account
+    parent: account
+    dependencies: [SettingsRepository]
+    memo: |
+      "Show the welcome again" marks the welcome as not seen: the router then shows it in place of everything.
+    states:
+      - name: English
+        if: {Language: English}
+        preview: contact_sheet/lib/preview/settings.dart#settingsEnglish
+        uses: {SettingsRepository: guest}
+      - name: 日本語
+        if: {Language: 日本語}
+        preview: contact_sheet/lib/preview/settings.dart#settingsJapanese
+        uses: {SettingsRepository: japanese}
+      - name: Français
+        if: {Language: Français}
+        preview: contact_sheet/lib/preview/settings.dart#settingsFrench
+        uses: {SettingsRepository: french}
+  - id: language
+    label: Language
+    section: Account
+    widget: LanguagePage
+    source: lib/features/account/language_page.dart
+    path: /account/settings/language
+    tab: account
+    parent: settings
+    dependencies: [SettingsRepository]
+    memo: |
+      The language chosen is kept on the device and shown in the settings; nothing else in the app is translated yet.
+    states:
+      - name: English
+        if: {Language: English}
+        preview: contact_sheet/lib/preview/language.dart#languageEnglish
+        uses: {SettingsRepository: guest}
+      - name: 日本語
+        if: {Language: 日本語}
+        preview: contact_sheet/lib/preview/language.dart#languageJapanese
+        uses: {SettingsRepository: japanese}
+      - name: Français
+        if: {Language: Français}
+        preview: contact_sheet/lib/preview/language.dart#languageFrench
+        uses: {SettingsRepository: french}
+  - id: help
+    label: Help
+    section: Account
+    widget: HelpPage
+    source: lib/features/account/help_page.dart
+    path: /account/help
+    tab: account
+    parent: account
+    dependencies: [UrlLauncher]
+    memo: |
+      "Open the help center" opens the browser; "Email support" opens the mail app, and is shown only on a device that can send an email. Both come back here.
+    states:
+      - name: Help
+        preview: contact_sheet/lib/preview/help.dart#help
+        uses: {UrlLauncher: no email}
+      - name: With email
+        preview: contact_sheet/lib/preview/help.dart#helpWithEmail
+        uses: {UrlLauncher: can email}
+        data: true
+  - id: about
+    label: About
+    section: Account
+    widget: AboutPage
+    source: lib/features/account/about_page.dart
+    path: /account/about
+    tab: account
+    parent: account
+    states:
+      - name: About
+        preview: contact_sheet/lib/preview/about.dart#about
+  - id: licenses
+    label: Licenses
+    section: Account
+    widget: LicensePage
+    source: lib/features/account/about_page.dart
+    tab: account
+    memo: |
+      Flutter's own licenses page, pushed in the Account tab.
+    states:
+      - name: Licenses
+        preview: contact_sheet/lib/preview/licenses.dart#licenses
+
+edges:
+  # Welcome
+  - from: welcome
+    to: explore
+    trigger: text:Get started
+    set: {Welcome: Seen}
+    kind: go
+    source: lib/features/onboarding/welcome_page.dart
+  - from: welcome
+    to: sign_in
+    trigger: text:I have an account
+    set: {Welcome: Seen}
+    then: Standard
+    source: lib/features/onboarding/welcome_page.dart
+
+  # Sign in
+  - from: sign_in
+    to: forgot_password
+    trigger: text:Forgot password?
+    source: lib/features/auth/sign_in_page.dart
+  - from: sign_in
+    to: sign_up
+    trigger: text:Create an account
+    source: lib/features/auth/sign_in_page.dart
+  - from: sign_in
+    to: explore
+    trigger: text:Continue
+    when: Standard
+    set: {Login: Signed in}
+    kind: go
+    source: lib/features/auth/sign_in_page.dart
+  - from: sign_in
+    to: trips
+    trigger: text:Continue
+    when: From trips
+    set: {Login: Signed in}
+    kind: go
+    source: lib/features/auth/sign_in_page.dart
+  - from: sign_in
+    to: inbox
+    trigger: text:Continue
+    when: From inbox
+    set: {Login: Signed in}
+    kind: go
+    source: lib/features/auth/sign_in_page.dart
+  - from: sign_in
+    to: hotel
+    trigger: text:Continue
+    when: From a stay
+    set: {Login: Signed in}
+    kind: go
+    source: lib/features/auth/sign_in_page.dart
+  - from: sign_in
+    to: guests
+    trigger: text:Continue
+    when: For booking
+    set: {Login: Signed in}
+    kind: go
+    source: lib/features/auth/sign_in_page.dart
+  - from: sign_up
+    to: explore
+    trigger: text:Create account
+    when: Standard
+    set: {Login: Signed in}
+    kind: go
+    source: lib/features/auth/sign_up_page.dart
+  - from: sign_up
+    to: trips
+    trigger: text:Create account
+    when: From trips
+    set: {Login: Signed in}
+    kind: go
+    source: lib/features/auth/sign_up_page.dart
+  - from: sign_up
+    to: inbox
+    trigger: text:Create account
+    when: From inbox
+    set: {Login: Signed in}
+    kind: go
+    source: lib/features/auth/sign_up_page.dart
+  - from: sign_up
+    to: hotel
+    trigger: text:Create account
+    when: From a stay
+    set: {Login: Signed in}
+    kind: go
+    source: lib/features/auth/sign_up_page.dart
+  - from: sign_up
+    to: guests
+    trigger: text:Create account
+    when: For booking
+    set: {Login: Signed in}
+    kind: go
+    source: lib/features/auth/sign_up_page.dart
+  - from: forgot_password
+    to: reset_sent
+    trigger: text:Send link
+    kind: replace
+    source: lib/features/auth/forgot_password_page.dart
+  - from: reset_sent
+    trigger: text:Back to sign in
+    kind: pop
+    source: lib/features/auth/reset_sent_page.dart
+
+  # Explore
+  - from: [explore, inbox]
+    to: notifications
+    trigger: label:Notifications
+    source: lib/features/explore/explore_page.dart
+  - from: explore
+    to: search
+    trigger: text:Where to?
+    kind: go
+    source: lib/features/explore/explore_page.dart
+  - from: explore
+    to: destination
+    trigger: other:Tap a destination
+    kind: go
+    source: lib/features/explore/explore_page.dart
+  - from: explore
+    to: hotel
+    trigger: other:Tap a popular stay
+    kind: go
+    source: lib/features/explore/explore_page.dart
+  - from: search
+    to: search_results
+    trigger: text:Search
+    kind: go
+    source: lib/features/explore/search_page.dart
+  - from: search
+    to: search_results
+    trigger: other:Tap a recent search
+    kind: go
+    source: lib/features/explore/search_page.dart
+  - from: search_results
+    to: map
+    trigger: label:Map
+    kind: go
+    source: lib/features/explore/search_results_page.dart
+  - from: search_results
+    to: filters
+    trigger: label:Filters
+    source: lib/features/explore/search_results_page.dart
+  - from: search_results
+    to: hotel
+    trigger: other:Tap a stay
+    when: Found
+    kind: go
+    source: lib/features/explore/search_results_page.dart
+  - from: filters
+    trigger: text:Show stays
+    kind: pop
+    source: lib/features/explore/filters_page.dart
+  - from: map
+    to: hotel
+    trigger: other:Tap the stay's card
+    source: lib/features/explore/map_page.dart
+  - from: destination
+    to: hotel
+    trigger: other:Tap a stay
+    source: lib/features/explore/destination_page.dart
+  - from: hotel
+    to: photos
+    trigger: other:Tap the photo
+    source: lib/features/explore/hotel_page.dart
+  - from: hotel
+    to: reviews
+    trigger: other:Read the reviews
+    source: lib/features/explore/hotel_page.dart
+  - from: hotel
+    to: rooms
+    trigger: text:Choose a room
+    source: lib/features/explore/hotel_page.dart
+  - from: hotel
+    to: sign_in
+    trigger: label:Save
+    when: Not saved
+    if: {Login: Guest}
+    then: From a stay
+    source: lib/features/explore/hotel_page.dart
+  - from: hotel
+    to: sign_in
+    trigger: label:Saved
+    when: Saved
+    if: {Login: Guest}
+    then: From a stay
+    source: lib/features/explore/hotel_page.dart
+  - from: hotel
+    to: hotel
+    trigger: label:Save
+    when: Not saved
+    if: {Login: Signed in}
+    set: {Wishlist: Saved}
+    kind: replace
+    source: lib/features/explore/hotel_page.dart
+  - from: hotel
+    to: hotel
+    trigger: label:Saved
+    when: Saved
+    if: {Login: Signed in}
+    set: {Wishlist: None}
+    kind: replace
+    source: lib/features/explore/hotel_page.dart
+  - from: rooms
+    to: guests
+    trigger: text:Select
+    if: {Login: Signed in}
+    source: lib/features/explore/rooms_page.dart
+  - from: rooms
+    to: sign_in
+    trigger: text:Select
+    if: {Login: Guest}
+    then: For booking
+    kind: redirect
+    source: lib/router.dart
+
+  # Booking
+  - from: guests
+    to: payment
+    trigger: text:Continue
+    source: lib/features/booking/guests_page.dart
+  - from: [payment, payment_methods]
+    to: add_card
+    trigger: text:Add a card
+    source: lib/features/booking/payment_page.dart
+  - from: payment
+    to: review
+    trigger: text:Continue
+    when: Card saved
+    source: lib/features/booking/payment_page.dart
+  - from: review
+    to: done
+    trigger: other:Pay
+    set: {Trips: Booked}
+    kind: go
+    source: lib/features/booking/review_page.dart
+  - from: done
+    to: trip
+    trigger: text:View trip
+    kind: go
+    source: lib/features/booking/done_page.dart
+  - from: done
+    to: explore
+    trigger: text:Keep exploring
+    kind: go
+    source: lib/features/booking/done_page.dart
+  - from: add_card
+    trigger: text:Save card
+    set: {Cards: Saved}
+    kind: pop
+    source: lib/features/account/add_card_page.dart
+
+  # Trips
+  - from: trips
+    to: sign_in
+    trigger: text:Sign in
+    when: Guest
+    then: From trips
+    source: lib/features/trips/trips_page.dart
+  - from: trips
+    to: explore
+    trigger: text:Find a stay
+    when: No trips
+    kind: go
+    source: lib/features/trips/trips_page.dart
+  - from: trips
+    to: trip
+    trigger: other:Tap a trip
+    when: Booked
+    kind: go
+    source: lib/features/trips/trips_page.dart
+  - from: trip
+    to: itinerary
+    trigger: text:Itinerary
+    when: Trip
+    kind: go
+    source: lib/features/trips/trip_page.dart
+  - from: trip
+    to: voucher
+    trigger: text:Voucher
+    when: Trip
+    source: lib/features/trips/trip_page.dart
+  - from: trip
+    to: conversation
+    trigger: text:Message the hotel
+    when: Trip
+    kind: go
+    source: lib/features/trips/trip_page.dart
+  - from: trip
+    to: cancel
+    trigger: text:Cancel booking
+    when: Trip
+    source: lib/features/trips/trip_page.dart
+  - from: cancel
+    to: trips
+    trigger: text:Cancel booking
+    set: {Trips: None}
+    kind: go
+    source: lib/features/trips/cancel_page.dart
+
+  # Inbox
+  - from: inbox
+    to: sign_in
+    trigger: text:Sign in
+    when: Guest
+    then: From inbox
+    source: lib/features/inbox/inbox_page.dart
+  - from: inbox
+    to: conversation
+    trigger: other:Tap a conversation
+    when: Signed in
+    kind: go
+    source: lib/features/inbox/inbox_page.dart
+  - from: notifications
+    to: trip
+    trigger: other:Tap a notification
+    kind: go
+    source: lib/features/inbox/notifications_page.dart
+
+  # Account
+  - from: account
+    to: sign_in
+    trigger: text:Sign in
+    when: Guest
+    then: Standard
+    source: lib/features/account/account_page.dart
+  - from: account
+    to: sign_up
+    trigger: text:Create an account
+    when: Guest
+    then: Standard
+    source: lib/features/account/account_page.dart
+  - from: account
+    to: profile
+    trigger: other:Tap your name
+    when: Signed in
+    kind: go
+    source: lib/features/account/account_page.dart
+  - from: account
+    to: payment_methods
+    trigger: text:Payment methods
+    when: Signed in
+    kind: go
+    source: lib/features/account/account_page.dart
+  - from: account
+    to: wishlist
+    trigger: text:Saved stays
+    when: Signed in
+    kind: go
+    source: lib/features/account/account_page.dart
+  - from: account
+    to: settings
+    trigger: text:Settings
+    kind: go
+    source: lib/features/account/account_page.dart
+  - from: account
+    to: help
+    trigger: text:Help
+    kind: go
+    source: lib/features/account/account_page.dart
+  - from: account
+    to: about
+    trigger: text:About
+    kind: go
+    source: lib/features/account/account_page.dart
+  - from: account
+    to: account
+    trigger: text:Sign out
+    when: Signed in
+    set: {Login: Guest}
+    kind: replace
+    source: lib/features/account/account_page.dart
+  - from: profile
+    to: account
+    trigger: text:Save
+    kind: pop
+    source: lib/features/account/profile_page.dart
+  - from: wishlist
+    to: hotel
+    trigger: other:Tap a stay
+    when: Saved
+    kind: go
+    source: lib/features/account/wishlist_page.dart
+  - from: settings
+    to: language
+    trigger: text:Language
+    kind: go
+    source: lib/features/account/settings_page.dart
+  - from: settings
+    to: welcome
+    trigger: text:Show the welcome again
+    set: {Welcome: Not seen}
+    kind: go
+    source: lib/features/account/settings_page.dart
+  - from: language
+    to: settings
+    trigger: text:English
+    set: {Language: English}
+    kind: pop
+    source: lib/features/account/language_page.dart
+  - from: language
+    to: settings
+    trigger: text:日本語
+    set: {Language: 日本語}
+    kind: pop
+    source: lib/features/account/language_page.dart
+  - from: language
+    to: settings
+    trigger: text:Français
+    set: {Language: Français}
+    kind: pop
+    source: lib/features/account/language_page.dart
+  - from: about
+    to: licenses
+    trigger: text:Licenses
+    source: lib/features/account/about_page.dart

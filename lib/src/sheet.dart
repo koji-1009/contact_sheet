@@ -19,11 +19,21 @@ class Sheet {
     this.dependencies = const [],
     this.variants = const [SheetVariant(name: '')],
     this.tags = const [],
+    this.locale,
+    this.checked = const {},
   });
 
   /// Reads [yaml], the text of `sheet.yaml`. Throws a [SheetException],
   /// in [m]'s words, saying where it is wrong.
   factory Sheet.parse(String yaml, Messages m) => _Parser(m).sheet(yaml);
+
+  /// The language the map is in (`en`, `ja`), unless the export is told
+  /// another; null: English.
+  final String? locale;
+
+  /// The keys of lint's hints that were looked at and are kept as they are:
+  /// lint and the export do not tell them again.
+  final Set<String> checked;
 
   final List<SheetPage> pages;
 
@@ -90,7 +100,7 @@ class Sheet {
   late final Router router = Router(
     [
       for (final p in pages)
-        RoutePage(p.id, tabs: p.tabs, [
+        RoutePage(p.id, tabs: p.tabs, parent: p.parent, [
           for (final s in p.states)
             RouteState(s.name, conditions: s.conditions, data: s.data),
         ]),
@@ -184,7 +194,13 @@ class SheetPage {
     this.tags = const [],
     this.dependencies = const [],
     this.tabs = const [],
+    this.parent,
   });
+
+  /// The page its route is nested under (go_router's `/explore` for
+  /// `/explore/hotels/:id`): with nothing under it (after a go, a deep link),
+  /// its back goes there, as the router builds the path's pages under it.
+  final String? parent;
 
   /// The tabs it is shown in (its `tab`), by their first pages: pushed from
   /// a page of one of them, it goes on that tab's history; none, over the
@@ -299,8 +315,8 @@ enum VariantPlatform { ios, android }
 class SheetState {
   SheetState({
     required this.name,
-    required this.file,
-    required this.symbol,
+    this.file,
+    this.symbol,
     this.index = 0,
     this.runtime = 0,
     this.uses = const {},
@@ -331,10 +347,15 @@ class SheetState {
   /// The preview's file, relative to the app, its function, and the
   /// annotation's place among those on it: the app's own preview
   /// (`lib/features/home_preview.dart`), or the sheet package's
-  /// (`contact_sheet/lib/preview/home.dart`).
-  final String file;
-  final String symbol;
+  /// (`contact_sheet/lib/preview/home.dart`). Null for a state whose
+  /// preview is not written yet: drawn without an image.
+  final String? file;
+  final String? symbol;
   final int index;
+
+  /// Whether it names a preview: one not written yet is drawn without an
+  /// image.
+  bool get hasPreview => file != null;
 
   /// Of the `Preview`s the annotation gives (a `MultiPreview` gives several),
   /// which: shutter's runtime part of the shot id.
@@ -344,25 +365,26 @@ class SheetState {
   final Map<String, String> uses;
 
   /// How the sheet names the preview: `lib/preview/home.dart#home@1`, or
-  /// `#home@0.2` for the third `Preview` of a `MultiPreview`.
-  String get preview =>
-      '$file#$symbol${runtime != 0
-          ? '@$index.$runtime'
-          : index != 0
-          ? '@$index'
-          : ''}';
+  /// `#home@0.2` for the third `Preview` of a `MultiPreview`; null for none.
+  String? get preview => file == null
+      ? null
+      : '$file#$symbol${runtime != 0
+            ? '@$index.$runtime'
+            : index != 0
+            ? '@$index'
+            : ''}';
 
   /// The sheet package's directory, in the app.
   static const sheetPackage = 'contact_sheet';
 
   /// Whether the preview is the sheet package's, shot there, rather than
   /// the app's, shot in the app.
-  bool get inSheetPackage => file.startsWith('$sheetPackage/');
+  bool get inSheetPackage => file?.startsWith('$sheetPackage/') ?? false;
 
   /// The preview's file in the project it is shot in: what shutter names
-  /// its shot by.
-  String get projectFile =>
-      inSheetPackage ? file.substring(sheetPackage.length + 1) : file;
+  /// its shot by; null for none.
+  String? get projectFile =>
+      inSheetPackage ? file!.substring(sheetPackage.length + 1) : file;
 }
 
 /// How a transition moves, as the app's code does it.
@@ -567,7 +589,14 @@ class _Parser {
     try {
       yaml = loadYaml(text);
     } on YamlException catch (e) {
-      throw SheetException(m.sheetNotYaml(e.message));
+      throw SheetException(switch (e.span) {
+        final span? => m.sheetNotYamlAt(
+          span.start.line + 1,
+          span.start.column + 1,
+          e.message,
+        ),
+        null => m.sheetNotYaml(e.message),
+      });
     }
     final root = _map(yaml ?? YamlMap(), 'sheet.yaml', const {
       'conditions',
@@ -578,7 +607,17 @@ class _Parser {
       'dependencies',
       'variants',
       'tags',
+      'locale',
+      'checked',
     });
+    final locale = _optional(root, 'locale', 'sheet.yaml');
+    if (locale != null && !Messages.locales.contains(locale)) {
+      _fail(
+        'sheet.yaml.locale',
+        m.sheetBadLocale(locale, Messages.locales.join(', ')),
+      );
+    }
+    final checked = _strings(root, 'checked', 'sheet.yaml');
     final tags = [
       for (final (i, t) in _list(root, 'tags', 'sheet.yaml').indexed)
         _tag(t, 'tags[$i]'),
@@ -639,6 +678,16 @@ class _Parser {
     }
     SheetPage page(String id, String where) =>
         byId[id] ?? _fail(where, m.sheetUnknownPage(id));
+
+    // Each parent a page, and none the page's own, through its parents.
+    for (final (i, p) in pages.indexed) {
+      final seen = {p.id};
+      for (var parent = p.parent; parent != null;) {
+        page(parent, 'pages[$i].parent');
+        if (!seen.add(parent)) _fail('pages[$i].parent', m.sheetParentLoop);
+        parent = byId[parent]!.parent;
+      }
+    }
 
     bool has(SheetPage page, String state) =>
         page.states.any((s) => s.name == state);
@@ -816,6 +865,8 @@ class _Parser {
       dependencies: dependencies,
       variants: variants.isEmpty ? const [SheetVariant(name: '')] : variants,
       tags: tags,
+      locale: locale,
+      checked: checked.toSet(),
     );
   }
 
@@ -951,6 +1002,7 @@ class _Parser {
       'tags',
       'states',
       'tab',
+      'parent',
     });
     final states = [
       for (final (i, s) in _list(map, 'states', where).indexed)
@@ -985,6 +1037,7 @@ class _Parser {
       tabs: map['tab'] is YamlList
           ? _strings(map, 'tab', where)
           : [?_optional(map, 'tab', where)],
+      parent: _optional(map, 'parent', where),
     );
   }
 
@@ -1004,14 +1057,18 @@ class _Parser {
       'data',
       'if',
     });
-    final preview = _required(map, 'preview', where);
-    final match = _preview.firstMatch(preview);
-    if (match == null) _fail('$where.preview', m.sheetBadPreview(preview));
+    // None yet: the state is drawn without an image.
+    final preview = _optional(map, 'preview', where);
+    final match = preview == null ? null : _preview.firstMatch(preview);
+    if (preview != null && match == null) {
+      _fail('$where.preview', m.sheetBadPreview(preview));
+    }
     // Written as shutter names it, which its shot's id is of: `/` apart,
     // nothing to resolve.
-    final file = match[1]!;
-    if (file.contains(r'\') ||
-        file.split('/').any((s) => s.isEmpty || s == '.' || s == '..')) {
+    final file = match?[1];
+    if (file != null &&
+        (file.contains(r'\') ||
+            file.split('/').any((s) => s.isEmpty || s == '.' || s == '..'))) {
       _fail('$where.preview', m.sheetPreviewPath(file));
     }
     final uses = map['uses'];
@@ -1023,9 +1080,9 @@ class _Parser {
     return SheetState(
       name: _required(map, 'name', where),
       file: file,
-      symbol: match[2]!,
-      index: int.parse(match[3] ?? '0'),
-      runtime: int.parse(match[4] ?? '0'),
+      symbol: match?[2],
+      index: int.parse(match?[3] ?? '0'),
+      runtime: int.parse(match?[4] ?? '0'),
       uses: {
         if (uses is YamlMap)
           for (final MapEntry(:key, :value) in uses.entries) '$key': '$value',

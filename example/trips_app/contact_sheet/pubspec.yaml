@@ -1,0 +1,30 @@
+name: trips_app_sheet
+description: The previews Contact Sheet's map of trips_app needs that the app does not have.
+publish_to: none
+
+environment:
+  sdk: "^3.13.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # The app, imported as is.
+  trips_app:
+    path: ..
+  # The app's own dependencies that the fakes and previews use directly.
+  flutter_riverpod: ^3.0.0
+  go_router: ^16.0.0
+  material_ui: ^1.9.0
+  shared_preferences: ^2.5.3
+  # The help page asks url_launcher whether the device can send an email:
+  # a plugin, faked at its platform interface.
+  url_launcher_platform_interface: ^2.3.2
+  plugin_platform_interface: ^2.1.8
+
+dev_dependencies:
+  # shutter shoots the previews in flutter test.
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

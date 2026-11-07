@@ -192,10 +192,24 @@ class SheetMap {
     labelSize,
   );
   late final Map<SheetEdge, Box> edgeLabels = layout.placeEdgeLabels(
-    edgeLabel,
+    drawnLabel,
     labelSize,
     avoid: entryLabels.values,
   );
+
+  /// The page a jump goes to ([MapLayout.jumps]), which its label names;
+  /// null for an arrow drawn whole.
+  String? jumpTo(SheetEdge edge) =>
+      layout.jumps.contains(edge) ? sheet.pageOf(edge.to)!.label : null;
+
+  /// What [edge]'s label says on the map: [edgeLabel], and for a jump, the
+  /// page it goes to.
+  String? drawnLabel(SheetEdge edge) {
+    final to = jumpTo(edge);
+    final label = edgeLabel(edge);
+    if (to == null) return label;
+    return label == null ? '→ $to' : '$label → $to';
+  }
 
   /// Where each bundle's label is, off the others.
   late final Map<EdgeBundle, Box> bundleLabels = layout.placeBundleLabels(
@@ -223,21 +237,26 @@ class SheetMap {
   String bundleLabel(EdgeBundle bundle) =>
       [?edgeLabel(bundle.edges.first), bundleCount(bundle)].join(' ');
 
-  /// How many arrows [bundle] is: `×3`, or, from every page, said so.
-  String bundleCount(EdgeBundle bundle) =>
-      bundle.edges.first.anywhere ? m.fromAnywhere : '×${bundle.edges.length}';
+  /// How many arrows [bundle] is: `×3`; from every page, said so; one jump
+  /// alone, the page it comes from.
+  String bundleCount(EdgeBundle bundle) => switch (bundle.edges) {
+    [final e, ...] when e.anywhere => m.fromAnywhere,
+    [final e] => '← ${sheet.pageOf(e.from)!.label}',
+    final edges => '×${edges.length}',
+  };
 
   /// The shot of [state] in [variant] (the first by default): the one it
   /// names, as the variant's platform draws it; or, for a variant naming a
   /// `Preview`, the one of that name its annotation gives.
   ShotResult? shotOf(SheetState state, [SheetVariant? variant]) {
+    if (!state.hasPreview) return null;
     final v = variant ?? sheet.variants.first;
     final preview = v.preview;
     if (failed[state.file] case final error?) {
       return ShotResult(
         id: shotIdOf(state),
         status: ShotStatus.error,
-        name: preview ?? state.symbol,
+        name: preview ?? state.symbol!,
         error: error,
       );
     }
@@ -366,7 +385,7 @@ class SheetMap {
       for (final page in sheet.pages) ...filesOf(sheet, page),
       for (final page in sheet.pages)
         for (final state in page.states)
-          if (!state.inSheetPackage) state.file,
+          if (!state.inSheetPackage) ?state.file,
     };
     return [
       for (final file in changed)
@@ -481,6 +500,7 @@ class SheetMap {
             ],
             'sheetChanged': changedFor(page),
             'tab': page.tabs,
+            'parent': page.parent,
             ...box(layout.nodes[page.id]!),
             'states': [for (final state in page.states) _state(state)],
           },
@@ -527,6 +547,7 @@ class SheetMap {
             },
             if (layout.bundleWith(edge) case final b?)
               'bundle': layout.bundles.indexOf(b),
+            'jump': layout.jumps.contains(edge),
           },
       ],
       // The arrows from other sections into one page that say the same,
@@ -620,7 +641,11 @@ class SheetMap {
     final (width, height) = sizeOf(state, variant);
     final image = imageNameOf(state, variant);
     return {
-      'shot': shot?.id ?? (variant.preview == null ? shotIdOf(state) : null),
+      'shot':
+          shot?.id ??
+          (variant.preview == null && state.hasPreview
+              ? shotIdOf(state)
+              : null),
       'width': width,
       'height': height,
       'image': image == null ? null : 'images/$image',
@@ -631,7 +656,9 @@ class SheetMap {
   Map<String, Object?> _state(SheetState state) => {
     'name': state.name,
     'preview': state.preview,
-    'project': projectOf(inSheetPackage: state.inSheetPackage),
+    'project': state.hasPreview
+        ? projectOf(inSheetPackage: state.inSheetPackage)
+        : null,
     'uses': state.uses,
     'data': state.data,
     'if': state.conditions,

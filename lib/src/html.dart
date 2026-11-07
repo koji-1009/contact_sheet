@@ -28,6 +28,7 @@ Map<String, String> htmlStrings(Messages m) => {
   'statesOf': m.htmlStatesOf('{page}', '{count}'),
   'statesOfOne': m.htmlStatesOfOne('{page}'),
   'noImage': m.htmlNoImage,
+  'noPreview': m.htmlNoPreview,
   'none': m.htmlNone,
   'colFrom': m.htmlColFrom,
   'colTo': m.htmlColTo,
@@ -216,6 +217,7 @@ code { font: 12px ui-monospace, Menlo, monospace; }
 .node { position: absolute; cursor: pointer; transition: opacity .3s; }
 .node .img { width: 100%; border: 1px solid var(--line); background: var(--surface); overflow: hidden; }
 .node img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.node .no-preview { display: flex; height: 100%; align-items: center; justify-content: center; padding: 8px; text-align: center; font-size: 11px; color: var(--muted); }
 .node .label { height: var(--label-height); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; line-height: 1.2; white-space: nowrap; }
 /* Another state than its first: named under the page's name. */
 .node .label small { font-size: 10px; color: var(--accent); }
@@ -227,6 +229,8 @@ code { font: 12px ui-monospace, Menlo, monospace; }
 #canvas.far .island-chip { display: block; }
 #canvas.far .island-name { visibility: hidden; }
 .node:hover .img { border: 2px solid var(--accent); }
+.node:focus { outline: none; }
+.node:focus-visible .img { outline: 3px solid var(--accent); outline-offset: 2px; }
 .node.sel .img { border: 3px solid var(--accent); }
 /* Above the image, not on it: the image stays readable. On the right, in one row (the room the layout keeps above the page), to the left past the page where they are many: the section's name is above the row. */
 .node .marks { position: absolute; bottom: calc(100% + 4px); right: 0; display: flex; gap: 4px; }
@@ -465,8 +469,10 @@ const findEdge = (e, dev) => [label(e.from), label(e.to), said(e, dev), ...e.whe
 // What is searched in, as the developers' information is shown or not.
 const forDev = () => !document.body.classList.contains('plain');
 const findIn = (el) => forDev() ? el.dataset.findDev : el.dataset.find;
-// A viewer's choice, kept in their browser when it can be.
-const load = (key, fallback) => { try { const v = localStorage.getItem(key); return v === null ? fallback : v === '1'; } catch { return fallback; } };
+// A viewer's choice, kept in their browser when it can be, for this app's
+// map alone: maps opened from disk all share one store.
+const kept = (name) => `contact_sheet.${S.app}.${name}`;
+const load =(key, fallback) => { try { const v = localStorage.getItem(key); return v === null ? fallback : v === '1'; } catch { return fallback; } };
 const save = (key, on) => { try { localStorage.setItem(key, on ? '1' : '0'); } catch {} };
 // An arrow's words: what only the code names, for developers; what anyone
 // reads; how the code keeps its pages, for developers.
@@ -540,7 +546,7 @@ const codeMeta = (p) => [p.path, p.widget, p.route, p.source].filter(Boolean).ma
 const variants = S.variants;
 let variant = (() => {
   let saved = null;
-  try { saved = localStorage.getItem('contact_sheet.variant'); } catch {}
+  try { saved = localStorage.getItem(kept('variant')); } catch {}
   const i = variants.findIndex((v) => v.name === (new URLSearchParams(location.search).get('variant') ?? saved));
   return i < 0 ? 0 : i;
 })();
@@ -554,7 +560,7 @@ const stateHtml = (s) => {
   const d = drawn(s);
   return `<div class="state" style="--k:${d.width / s.width}">${d.image
     ? `<img src="${esc(d.image)}" alt="${esc(s.name)}" loading="lazy" style="aspect-ratio:${d.width}/${d.height}" data-zoom="${esc(s.name)}">`
-    : `<div class="none${d.error ? ' error' : ''}" style="aspect-ratio:${d.width}/${d.height}" title="${esc(d.error ?? '')}">${esc(d.error ?? (d.shot == null && variant ? T('notInVariant', { variant: variantName() }) : T('noImage')))}</div>`}
+    : `<div class="none${d.error ? ' error' : ''}" style="aspect-ratio:${d.width}/${d.height}" title="${esc(d.error ?? '')}">${esc(d.error ?? (s.preview == null ? T('noPreview') : d.shot == null && variant ? T('notInVariant', { variant: variantName() }) : T('noImage')))}</div>`}
   <div class="name">${esc(s.name)}</div></div>`;
 };
 
@@ -619,9 +625,22 @@ const nodes = {};
 let islandChips = [];
 // A page's image on the map, loaded only once the map shows it
 // ([loadImages]); its name is under it.
+// A page on the map or the tree, chosen from the keyboard too: Tab to it,
+// Enter or Space as a click.
+const pressable = (n, label) => {
+  n.tabIndex = 0;
+  n.setAttribute('role', 'button');
+  n.setAttribute('aria-label', label);
+  n.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    n.click();
+  });
+};
 const nodeImage = (s) => {
   const d = drawn(s);
-  return d.image ? `<img data-src="${esc(d.image)}" alt="">` : '';
+  return d.image ? `<img data-src="${esc(d.image)}" alt="">`
+    : s.preview == null ? `<span class="no-preview">${esc(T('noPreview'))}</span>` : '';
 };
 // The map drawn as [laid] lays it out: its arrows, its pages' boxes and its
 // sections' names.
@@ -664,6 +683,7 @@ for (const p of S.pages) {
   });
   // Twice: the state it shows, large.
   n.addEventListener('dblclick', () => enlarge(p.id));
+  pressable(n, p.label);
   canvas.insertBefore(n, $('#over'));
   nodes[p.id] = n;
 }
@@ -726,7 +746,7 @@ const fitBar = () => map.style.setProperty('--bar-h', $('#bar').offsetHeight + '
 // the address (?show=) to pass around, and for the viewer.
 let level = (() => {
   let saved = null;
-  try { saved = localStorage.getItem('contact_sheet.show'); } catch {}
+  try { saved = localStorage.getItem(kept('show')); } catch {}
   const asked = new URLSearchParams(location.search).get('show') ?? saved;
   return levels.includes(asked) ? asked : 'actions';
 })();
@@ -736,7 +756,7 @@ function setLevel(l, { remember = true } = {}) {
   for (const b of $('#levels').querySelectorAll('[data-level]')) b.setAttribute('aria-pressed', b.dataset.level === l);
   requestAnimationFrame(fitBar);
   if (!remember) return;
-  try { localStorage.setItem('contact_sheet.show', l); } catch {}
+  try { localStorage.setItem(kept('show'), l); } catch {}
   const url = new URL(location.href);
   if (l === 'actions') url.searchParams.delete('show'); else url.searchParams.set('show', l);
   history.replaceState(null, '', url);
@@ -752,19 +772,19 @@ function setBack(on, { remember = true } = {}) {
   map.classList.toggle('no-back', !on);
   $('#backToggle')?.setAttribute('aria-pressed', on);
   if (!remember) return;
-  save('contact_sheet.back', on);
+  save(kept('back'), on);
   const url = new URL(location.href);
   if (on) url.searchParams.delete('back'); else url.searchParams.set('back', 'hide');
   history.replaceState(null, '', url);
 }
-setBack(new URLSearchParams(location.search).get('back') === 'hide' ? false : load('contact_sheet.back', true), { remember: false });
+setBack(new URLSearchParams(location.search).get('back') === 'hide' ? false : load(kept('back'), true), { remember: false });
 $('#backToggle')?.addEventListener('click', () => setBack(map.classList.contains('no-back')));
 // What is shown with the pages, hidden as the viewer chose: kept in the
 // address (?hide=<key>, once for each) to pass around, and for the viewer.
 const hidden = (() => {
   const asked = new URLSearchParams(location.search).getAll('hide');
   if (asked.length) return new Set(asked);
-  try { return new Set(JSON.parse(localStorage.getItem('contact_sheet.hide') ?? '[]')); } catch { return new Set(); }
+  try { return new Set(JSON.parse(localStorage.getItem(kept('hide')) ?? '[]')); } catch { return new Set(); }
 })();
 const noteOn = (key) => !hidden.has(key);
 // Each page's marks above it: its memo, and each tag it has, a link where
@@ -789,7 +809,7 @@ const cardNotes = (p) => (noteOn('memo') ? memoHtml(p) : '')
   + tagsHtml(p, (tag) => noteOn('tag:' + tag)) + (noteOn('says') ? sentences(p) : '');
 function setNote(key, on) {
   if (on) hidden.delete(key); else hidden.add(key);
-  try { localStorage.setItem('contact_sheet.hide', JSON.stringify([...hidden])); } catch {}
+  try { localStorage.setItem(kept('hide'), JSON.stringify([...hidden])); } catch {}
   const url = new URL(location.href);
   url.searchParams.delete('hide');
   for (const k of hidden) url.searchParams.append('hide', k);
@@ -1412,10 +1432,11 @@ function renderTree() {
     const n = document.createElement('div');
     n.className = 'node';
     n.style.left = t.x + 'px'; n.style.top = t.y + 'px'; n.style.width = t.width + 'px';
-    n.innerHTML = `<div class="img" style="height:${t.height}px">${s.image ? `<img src="${esc(s.image)}" alt="${esc(p.label)}" loading="lazy">` : ''}</div><div class="label"><span>${esc(p.label)}</span><small></small></div>`;
+    n.innerHTML = `<div class="img" style="height:${t.height}px">${s.image ? `<img src="${esc(s.image)}" alt="${esc(p.label)}" loading="lazy">` : nodeImage(p.states[0])}</div><div class="label"><span>${esc(p.label)}</span><small></small></div>`;
     n.title = T(p.states.length === 1 ? 'statesOfOne' : 'statesOf', { page: p.label, count: p.states.length });
     // Its details, over the tree.
     n.addEventListener('click', () => go('page', t.page));
+    pressable(n, p.label);
     treeCanvas.appendChild(n);
     treeNodes[t.page] = n;
   }
@@ -1613,7 +1634,7 @@ $('#search').addEventListener('change', () => {
 const code = $('#code');
 function setCode(on) {
   document.body.classList.toggle('plain', !on);
-  save('contact_sheet.code', on);
+  save(kept('code'), on);
   // What the search finds follows what is shown.
   filter();
 }
@@ -1624,7 +1645,7 @@ function setVariant(i) {
   // With nothing chosen, the page in the middle of the map stays there.
   const middle = current === 'map' && !focused && !routed && !picked ? middlePage() : null;
   variant = i;
-  try { localStorage.setItem('contact_sheet.variant', variantName()); } catch {}
+  try { localStorage.setItem(kept('variant'), variantName()); } catch {}
   const url = new URL(location.href);
   if (i) url.searchParams.set('variant', variantName()); else url.searchParams.delete('variant');
   history.replaceState(null, '', url);
@@ -1656,7 +1677,7 @@ if (variants.length > 1) {
   pick.onchange = () => setVariant(+pick.value);
   $('#variant-pick').hidden = false;
 }
-code.checked = load('contact_sheet.code', false);
+code.checked = load(kept('code'), false);
 setCode(code.checked);
 code.onchange = () => { setCode(code.checked); requestAnimationFrame(backgrounds); };
 route();

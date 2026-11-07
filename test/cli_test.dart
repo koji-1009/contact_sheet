@@ -33,15 +33,8 @@ void main() {
     return ShotRun(id: 'run', dir: p.join(dir, 'run'), shots: const []);
   }
 
-  // [words]: the machine's language.
-  Future<int> cli(List<String> args, {String words = 'en'}) => runCli(
-    args,
-    words: Messages.of(words),
-    out: out.add,
-    err: err.add,
-    runner: Tools(),
-    shoot: nothing,
-  );
+  Future<int> cli(List<String> args) =>
+      runCli(args, out: out.add, err: err.add, runner: Tools(), shoot: nothing);
 
   test('the usage when asked for, on out; a wrong use said on err, with the '
       'usage, as a usage error', () async {
@@ -167,9 +160,9 @@ void main() {
   );
 
   test('export --strict fails when a state has no image; the map is in the '
-      'machine\'s language or --locale\'s, what the command tells in '
-      'English', () async {
-    File('${app.path}/contact_sheet/sheet.yaml')
+      'sheet\'s locale or --locale\'s, else English, what the command tells '
+      'in English', () async {
+    final sheet = File('${app.path}/contact_sheet/sheet.yaml')
       ..createSync(recursive: true)
       ..writeAsStringSync(
         'pages: [{id: home, label: Home, '
@@ -188,14 +181,54 @@ void main() {
     expect(await cli(['export', '--locale', 'ja', app.path]), 0);
     expect(lang(), 'ja');
     expect(out.last, startsWith('Exported: '));
-    // On a Japanese machine, the map in Japanese; the command in English.
-    expect(await cli(['export', app.path], words: 'ja'), 0);
+    // Without --locale, English again, whatever the machine's language.
+    expect(await cli(['export', app.path]), 0);
+    expect(lang(), 'en');
+    // The sheet's locale; the command in English.
+    sheet.writeAsStringSync('locale: ja\n${sheet.readAsStringSync()}');
+    expect(await cli(['export', app.path]), 0);
     expect(lang(), 'ja');
     expect(out.last, startsWith('Exported: '));
-    expect(await cli(['export', '--locale', 'en', app.path], words: 'ja'), 0);
+    expect(await cli(['export', '--locale', 'en', app.path]), 0);
     expect(lang(), 'en');
-    expect(await cli(['export', '--strict', app.path], words: 'ja'), 65);
+    expect(await cli(['export', '--strict', app.path]), 65);
     expect(err.last, '1 state has no image');
+    // One the map is not drawn in: where it is said.
+    sheet.writeAsStringSync(
+      sheet.readAsStringSync().replaceFirst('locale: ja', 'locale: fr'),
+    );
+    expect(await cli(['export', app.path]), 65);
+    expect(
+      err.last,
+      'contact_sheet/sheet.yaml, sheet.yaml.locale: fr is not a language the '
+      'map is drawn in: en, ja',
+    );
+  });
+
+  test('lint tells each hint with the key that checks it; the hints checked '
+      'are not told, a key checked that is no hint is', () async {
+    final sheet = File('${app.path}/contact_sheet/sheet.yaml')
+      ..createSync(recursive: true)
+      ..writeAsStringSync('''
+pages:
+  - {id: home, label: Home, states: [{name: s, preview: lib/home.dart#home}]}
+  - {id: lost, label: Lost, states: [{name: s, preview: lib/lost.dart#lost}]}
+''');
+    expect(await cli(['lint', app.path]), 0);
+    expect(out, [
+      ('Lost (lost): no arrow leads to it from the first page, and no deep '
+          'link opens it'),
+      '  looked at, and kept as it is: add "unreachable lost" to checked',
+    ]);
+    out.clear();
+    sheet.writeAsStringSync(
+      '${sheet.readAsStringSync()}checked: ["unreachable lost", gone]\n',
+    );
+    expect(await cli(['lint', app.path]), 0);
+    expect(out, [
+      'checked names "gone", which is no hint now: take it out of checked',
+      'Hints in checked, not told: 1',
+    ]);
   });
 
   test('export --pixel-ratio draws the previews at it; one that is no ratio '
@@ -232,6 +265,7 @@ void main() {
     expect(out, [
       ('B (b): no arrow leads to it from the first page, and no deep link '
           'opens it'),
+      '  looked at, and kept as it is: add "unreachable b" to checked',
     ]);
   });
 

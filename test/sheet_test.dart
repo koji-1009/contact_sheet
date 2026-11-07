@@ -208,7 +208,9 @@ pages:
     );
     expect(
       () => _parse('pages: [oops'),
-      _fails(startsWith('contact_sheet/sheet.yaml is not YAML')),
+      _fails(
+        startsWith('contact_sheet/sheet.yaml, line 1, column 13: not YAML'),
+      ),
     );
     // A file as shutter names it, which its shot's id is of.
     for (final file in ['./lib/a.dart', r'lib\a.dart', 'lib/../lib/a.dart']) {
@@ -609,11 +611,13 @@ pages:
 $bar$pages
   - {id: e, label: E, tab: b, states: [{name: s, preview: e.dart#e}]}
 edges:
-  - {from: a, to: b, trigger: text:B, kind: replace}
+  - {from: a, to: b, trigger: label:B, kind: replace}
   - {from: a, to: e, trigger: text:E}
   - {from: d, to: c, trigger: text:C}
   - {from: a, to: d, trigger: text:D}
   - {from: d, to: c, trigger: text:Go, kind: go}
+  - {from: a, to: a, trigger: text:Again, kind: replace}
+  - {from: a, to: b, trigger: text:Open B, kind: go}
 entries:
   - {to: c, via: /c}
 '''),

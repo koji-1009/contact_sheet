@@ -38,6 +38,9 @@ class Box {
 
   Box shift(Point by) => Box(left + by.x, top + by.y, width, height);
 
+  bool contains(Point p) =>
+      p.x > left && p.x < right && p.y > top && p.y < bottom;
+
   /// The area [this] and [other] share.
   double overlap(Box other) {
     final w = math.min(right, other.right) - math.max(left, other.left);
@@ -103,8 +106,9 @@ class MapLayout {
     this.width,
     this.height,
     this._sheet,
-    this.bundles,
-  );
+    this.bundles, [
+    this.jumps = const {},
+  ]);
 
   /// [sizeOf] is each page's image on the map (without its label); [gap] the
   /// room between columns, where the arrows' labels go. [labelOf] is what an
@@ -303,9 +307,57 @@ class MapLayout {
         if (edges.length >= bundleFrom) bundles.add((to: to, edges: edges));
       }
     }
+    // An arrow between sections that would run across another island is a
+    // jump: a short arrow out of its page, saying where it goes, and one
+    // into the page it goes to, bundled with those that say the same.
+    final drawn = MapLayout._(nodes, sections, width, height, sheet, bundles);
+    final islandOf = {
+      for (final p in sheet.pages)
+        p.id: sections.firstWhere((s) => s.name == p.section).box,
+    };
+    final jumps = Set<SheetEdge>.identity();
+    final jumpsInto = <(String, String?, bool), List<SheetEdge>>{};
+    for (final e in sheet.edges) {
+      if (e.anywhere || sectionOf[e.from] == sectionOf[e.to]) continue;
+      final curve = drawn.curveOf(e);
+      if (curve == null) continue;
+      final ends = {islandOf[e.from], islandOf[e.to]};
+      final (a, b, c, d) = curve;
+      final line = [for (var i = 1; i < 32; i++) bezier(a, b, c, d, i / 32)];
+      // Through where an island's pages are: over its name, above them, an
+      // arrow still reads.
+      const above = islandPadding + sectionLabelHeight + marksHeight;
+      final across = sections.any(
+        (s) =>
+            !ends.contains(s.box) &&
+            line.any(
+              Box(
+                s.box.left,
+                s.box.top + above,
+                s.box.width,
+                s.box.height - above,
+              ).contains,
+            ),
+      );
+      if (!across) continue;
+      jumps.add(e);
+      (jumpsInto[(e.to, labelOf?.call(e), e.kind == NavigationKind.pop)] ??= [])
+          .add(e);
+    }
+    for (final MapEntry(key: (to, _, _), value: edges) in jumpsInto.entries) {
+      bundles.add((to: to, edges: edges));
+    }
     // Room for the arrows that go back over the top or round the side, and
     // for the short arrows' labels above the pages.
-    final placed = MapLayout._(nodes, sections, width, height, sheet, bundles);
+    final placed = MapLayout._(
+      nodes,
+      sections,
+      width,
+      height,
+      sheet,
+      bundles,
+      jumps,
+    );
     var top = 0.0;
     var right = width;
     var bottom = height;
@@ -338,8 +390,16 @@ class MapLayout {
       bottom - top,
       sheet,
       bundles,
+      jumps,
     );
   }
+
+  /// The arrows between sections drawn as jumps: a short arrow out of their
+  /// page ([curveOf]), and in a bundle into the page they go to.
+  final Set<SheetEdge> jumps;
+
+  /// The length of a jump's short arrow out of its page.
+  static const double jumpLength = 28;
 
   /// How many arrows from other sections into one page, saying the same,
   /// are drawn as one (those from every page always are).
@@ -451,6 +511,24 @@ class MapLayout {
         };
       }
     }
+    // A jump's short arrow: out of its page's right side, at its top, above
+    // the arrows forward (from a fifth of the way down); several from one
+    // page one under the other.
+    final jumpsFrom = <String, List<SheetEdge>>{};
+    for (final edge in _sheet.edges) {
+      if (jumps.contains(edge)) (jumpsFrom[edge.from] ??= []).add(edge);
+    }
+    final stubs = <SheetEdge, Curve>{};
+    for (final MapEntry(key: id, value: out) in jumpsFrom.entries) {
+      final box = nodes[id]!;
+      final step = math.min(14.0, (box.height * 0.2 - 10) / out.length);
+      for (final (k, edge) in out.indexed) {
+        final s = Point(box.right, box.top + 6 + k * step);
+        const third = Point(jumpLength / 3, 0);
+        final e = s + const Point(jumpLength, 0);
+        stubs[edge] = (s, s + third, e - third, e);
+      }
+    }
     return {
       for (final MapEntry(key: edge, value: route) in routes.entries)
         edge: _curveBetween(
@@ -459,6 +537,7 @@ class MapLayout {
           points[(edge, true)]!,
           points[(edge, false)]!,
         ),
+      ...stubs,
     };
   }();
 

@@ -69,6 +69,11 @@ Future<void> main() async {
     ..writeln('        _ => const MessagesEn(),')
     ..writeln('      };')
     ..writeln()
+    ..writeln('  /// The languages there are words in.')
+    ..writeln(
+      '  static const locales = [${locales.map((l) => "'$l'").join(', ')}];',
+    )
+    ..writeln()
     ..writeln('  /// The language of these words: `en`, `ja`.')
     ..writeln('  String get localeName;')
     ..writeln();

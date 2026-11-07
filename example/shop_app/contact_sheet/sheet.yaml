@@ -181,3 +181,9 @@ edges:
 # takes from the platform (the app's routes).
 entries:
   - {to: product_detail, via: /products/:id, source: lib/router.dart}
+
+# lint's hints looked at and kept as they are: with the cart empty, Check out
+# and Pay are disabled, so nothing but the back leaves those states.
+checked:
+  - "nothing-leaves cart/Empty"
+  - "nothing-leaves checkout/Empty"

@@ -65,6 +65,7 @@ a.page-link:hover .page { stroke: var(--accent); stroke-width: 2; }
 .edge-label { font-size: 11px; fill: var(--muted); }
 .edge-label .l-does { fill: var(--text); }
 .edge-label .l-kind { font-style: italic; }
+.edge-label .l-to { fill: var(--accent); }
 .entry .edge-label { fill: var(--e-entry); }
 .edge-bg { fill: var(--surface); }
 .tabbar rect { fill: var(--line); }
@@ -198,15 +199,18 @@ String mapOver(SheetMap map, {bool plain = false}) {
   for (final (i, edge) in map.sheet.edges.indexed) {
     final box = map.edgeLabels[edge];
     if (box == null) continue;
-    final text = _labelText(map, edge, plain: plain);
+    var text = _labelText(map, edge, plain: plain);
+    var words = map.labelOf(edge).plain;
+    // A jump says where it goes.
+    if (map.jumpTo(edge) case final to?) {
+      text =
+          '${text ?? ''}<tspan class="l-to">${text == null ? '' : ' '}'
+          '→ ${_esc(to)}</tspan>';
+      words = words == null ? '→ $to' : '$words → $to';
+    }
     if (text == null) continue;
     final pop = edge.kind == NavigationKind.pop;
-    label(
-      'lbl${pop ? ' pop' : ''}',
-      i,
-      fit(box, map.labelOf(edge).plain),
-      text,
-    );
+    label('lbl${pop ? ' pop' : ''}', i, fit(box, words), text);
   }
   for (final (i, entry) in map.sheet.entries.indexed) {
     label('entry', i, map.entryLabels[entry]!, _esc(entry.via));

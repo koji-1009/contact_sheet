@@ -1,0 +1,25 @@
+name: trips_app
+description: A travel booking app used as a target app of Contact Sheet's examples. Tabs that keep their own histories (go_router's StatefulShellRoute), riverpod, shared_preferences and url_launcher.
+version: 2.4.0+31
+publish_to: none
+
+environment:
+  sdk: ^3.13.0
+  flutter: ">=3.47.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^3.0.0
+  go_router: ^16.0.0
+  material_ui: ^1.9.0
+  shared_preferences: ^2.5.3
+  url_launcher: ^6.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

@@ -84,6 +84,62 @@ void main() {
     ]);
   });
 
+  test('with nothing under it, a page\'s back goes to its parent: in its '
+      'tab, as a go to a nested route builds the path\'s pages', () {
+    final sheet = Sheet.parse('''
+tabs:
+  - pages:
+      - {page: explore, trigger: text:Explore}
+      - {page: trips, trigger: text:Trips}
+pages:
+  - {id: explore, label: Explore, states: [{name: s, preview: a.dart#a}]}
+  - {id: trips, label: Trips, states: [{name: s, preview: b.dart#b}]}
+  - {id: hotel, label: Hotel, tab: explore, parent: explore, states: [{name: s, preview: c.dart#c}]}
+  - {id: reviews, label: Reviews, tab: explore, parent: hotel, states: [{name: s, preview: d.dart#d}]}
+  - {id: help, label: Help, parent: trips, states: [{name: s, preview: e.dart#e}]}
+edges:
+  - {from: trips, to: reviews, trigger: text:Reviews, kind: go}
+  - {from: explore, to: help, trigger: text:Help, kind: go}
+  - {from: hotel, to: reviews, trigger: text:Reviews}
+''', _m);
+    // Gone to from the Trips tab: alone in Explore's history, its back goes
+    // to the hotel, then to Explore.
+    final route = sheet.router.route('reviews', null, 'explore');
+    expect(route.start.map((f) => f.page), ['reviews']);
+    expect(_said(sheet, route).skip(1), [
+      'back => hotel:s',
+      'back => explore:s',
+    ]);
+    // Gone to out of the bar, alone: its parent is opened in its tab.
+    final help = sheet.router.route('help', null, 'trips');
+    expect(_said(sheet, help), ['help:s', 'back => trips:s']);
+    expect(help.steps!.single.tab, 'trips');
+    // Pushed, its back goes to the page under it.
+    expect(_said(sheet, sheet.router.route('hotel', null, 'explore')).skip(1), [
+      'back => explore:s',
+    ]);
+  });
+
+  test('tapping the tab shown again goes to its first page from any other '
+      'page, alone in its history too', () {
+    final sheet = Sheet.parse('''
+tabs:
+  - retap: first
+    pages:
+      - {page: explore, trigger: text:Explore}
+      - {page: trips, trigger: text:Trips}
+pages:
+  - {id: explore, label: Explore, states: [{name: s, preview: a.dart#a}]}
+  - {id: trips, label: Trips, states: [{name: s, preview: b.dart#b}]}
+  - {id: hotel, label: Hotel, tab: explore, states: [{name: s, preview: c.dart#c}]}
+edges:
+  - {from: trips, to: hotel, trigger: text:Hotel, kind: go}
+''', _m);
+    final route = sheet.router.route('hotel', null, 'explore');
+    expect(route.start.map((f) => f.page), ['hotel']);
+    expect(_said(sheet, route).skip(1), ['retap => explore:s']);
+  });
+
   test('a written back that goes elsewhere replaces the back', () {
     final sheet = Sheet.parse('''
 pages:
@@ -756,7 +812,11 @@ Sheet _random(Random r, {bool tabs = false}) {
     final tab = inTabs[i].isEmpty
         ? ''
         : ', tab: [${inTabs[i].map((t) => 'p$t').join(', ')}]';
-    return '  - {id: p$i, label: P$i$tab, states: [{name: x, preview: a$i.dart#a$x}, '
+    // Nested under a page before it, sometimes.
+    final parent = i > 0 && r.nextInt(3) == 0
+        ? ', parent: p${r.nextInt(i)}'
+        : '';
+    return '  - {id: p$i, label: P$i$tab$parent, states: [{name: x, preview: a$i.dart#a$x}, '
         '{name: y, preview: a$i.dart#a@1$data$y}]}';
   }
 
@@ -876,6 +936,18 @@ Map<String, int> _searched(
     return unsaid(below.page, g);
   }
 
+  // With nothing under [top], its back: to its page's parent, in the state
+  // of the name it left, else as unsaid.
+  List<RouteFrame> toParent(RouteFrame top, Map<String, String> g) {
+    final parent = pages[top.page]!.parent;
+    if (parent == null) return const [];
+    final kept = state(parent, top.state);
+    if (kept != null && fits(kept, g)) {
+      return [(page: parent, state: top.state)];
+    }
+    return unsaid(parent, g);
+  }
+
   // The tab bars: each tab's bar, the tabs of a bar, the values a tab is
   // switched to while, whether a bar's tab tapped again goes to its first.
   final barOf = <String, int>{};
@@ -908,17 +980,14 @@ Map<String, int> _searched(
   ].join('\u0001');
 
   // The start, as the route gives it: a shell holding the tab shown's first
-  // [Route.inTab] frames (and, unbounded, those past the bound in it), and
-  // the frames over it, in the tab shown's history past the bound while
-  // they are shown in it.
+  // [Route.inTab] frames (and, unbounded, those past the bound in it, its
+  // [Route.pastBound]), and the frames over it.
   _Config start;
   if (route.active case final active?) {
-    final above = <({RouteFrame frame, String? tab})>[];
-    var tag = route.inTab >= router.tabDepth ? active : null;
-    for (final f in route.start.skip(route.inTab)) {
-      tag = tag != null && inTab(f.page, tag) ? tag : null;
-      above.add((frame: f, tab: tag));
-    }
+    final above = <({RouteFrame frame, String? tab})>[
+      for (final (i, f) in route.start.skip(route.inTab).indexed)
+        (frame: f, tab: i < route.pastBound ? active : null),
+    ];
     final deep = [
       for (final a in above.takeWhile((a) => a.tab != null)) a.frame,
     ];
@@ -1120,6 +1189,31 @@ Map<String, int> _searched(
             add(landed(f, after));
           }
         }
+      } else if (!out.any((e) => e.back)) {
+        // Nothing under it: its back to its parent, in the tab where the
+        // parent is in it, else as a go from nowhere puts it.
+        for (final f in toParent(top, g)) {
+          if (onShell && inTab(f.page, shell!.active)) {
+            add(withStack([f], g));
+            continue;
+          }
+          final t = tabFor(f.page, null, null);
+          add(
+            t == null
+                ? (shell: null, above: [(frame: f, tab: null)], g: g)
+                : (
+                    shell: (
+                      active: t,
+                      stacks: {
+                        for (final u in barTabs[barOf[t]!]) u: <RouteFrame>[],
+                        t: [f],
+                      },
+                    ),
+                    above: const [],
+                    g: g,
+                  ),
+          );
+        }
       }
       if (shell == null) continue;
       // Tapping the tab shown again, while it can be switched to.
@@ -1150,7 +1244,9 @@ Map<String, int> _searched(
             }
           }
         }
-        if (retap && stack!.length >= 2) {
+        // Not on the tab's first page alone.
+        if (retap &&
+            (stack!.length >= 2 || stack.single.page != shell.active)) {
           for (final f in unsaid(shell.active, g)) {
             add(withStack([f], g));
           }

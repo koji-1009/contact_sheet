@@ -15,6 +15,9 @@ abstract class Messages {
         _ => const MessagesEn(),
       };
 
+  /// The languages there are words in.
+  static const locales = ['en', 'ja'];
+
   /// The language of these words: `en`, `ja`.
   String get localeName;
 
@@ -63,6 +66,10 @@ abstract class Messages {
   String lintTabFromOutside(Object item, Object page);
   String lintWhichTab(Object item, Object page, Object tab);
   String lintEntryWhichTab(Object item, Object page, Object tab);
+  String lintKey(Object key);
+  String lintCheckedGone(Object key);
+  String lintChecked(Object count);
+  String lintOnlyChecked(Object count);
   String get helpByPage;
   String changedPage(Object page, Object id);
   String get changedNoPage;
@@ -85,6 +92,7 @@ abstract class Messages {
   String get exportShooting;
   String exportShotFailed(Object page, Object state, Object error);
   String exportNoShot(Object page, Object state, Object preview);
+  String exportNoPreview(Object count, Object states);
   String exportNotShot(Object page, Object state);
   String noFlutter(Object error);
   String exportNoFile(Object file);
@@ -92,6 +100,7 @@ abstract class Messages {
   String exportDone(Object dir);
   String pruneDone(Object count);
   String sheetNotYaml(Object error);
+  String sheetNotYamlAt(Object line, Object column, Object error);
   String sheetInvalid(Object where, Object problem);
   String get sheetNotMap;
   String get sheetNotList;
@@ -130,6 +139,8 @@ abstract class Messages {
   String sheetBadPreview(Object value);
   String sheetBadTrigger(Object value);
   String sheetBadKind(Object value);
+  String get sheetParentLoop;
+  String sheetBadLocale(Object value, Object locales);
   String get triggerBack;
   String get kindPush;
   String get kindGo;
@@ -169,6 +180,7 @@ abstract class Messages {
   String htmlStatesOf(Object page, Object count);
   String htmlStatesOfOne(Object page);
   String get htmlNoImage;
+  String get htmlNoPreview;
   String get htmlNone;
   String get htmlColFrom;
   String get htmlColTo;
@@ -275,7 +287,8 @@ class MessagesEn extends Messages {
       "Shoot only this page's previews (again for more pages); the other pages keep the images the map there has of them.";
 
   @override
-  String get helpLocale => "The map's language; the machine's by default.";
+  String get helpLocale =>
+      "The map's language; by default the sheet's locale, else English.";
 
   @override
   String get helpStrict => "Fail (exit code 65) when a state has no image.";
@@ -401,6 +414,21 @@ class MessagesEn extends Messages {
       "entries[${item}] opens ${page}, shown in several tabs, in the tab of ${tab}, the first: name the tab with tab";
 
   @override
+  String lintKey(Object key) =>
+      "  looked at, and kept as it is: add ${key} to checked";
+
+  @override
+  String lintCheckedGone(Object key) =>
+      "checked names ${key}, which is no hint now: take it out of checked";
+
+  @override
+  String lintChecked(Object count) => "Hints in checked, not told: ${count}";
+
+  @override
+  String lintOnlyChecked(Object count) =>
+      "Nothing found in the sheet but the hints in checked: ${count}";
+
+  @override
   String get helpByPage => "By the pages the sheet names each file for.";
 
   @override
@@ -477,6 +505,10 @@ class MessagesEn extends Messages {
       "${page} (${state}) has no shot: shutter found no preview ${preview}";
 
   @override
+  String exportNoPreview(Object count, Object states) =>
+      "No preview written yet, drawn without an image: ${count} states, ${states}";
+
+  @override
   String exportNotShot(Object page, Object state) =>
       "${page} (${state}) has no image: not shot, as --only leaves it out, and the map before has none";
 
@@ -501,6 +533,10 @@ class MessagesEn extends Messages {
   @override
   String sheetNotYaml(Object error) =>
       "contact_sheet/sheet.yaml is not YAML: ${error}";
+
+  @override
+  String sheetNotYamlAt(Object line, Object column, Object error) =>
+      "contact_sheet/sheet.yaml, line ${line}, column ${column}: not YAML: ${error}";
 
   @override
   String sheetInvalid(Object where, Object problem) =>
@@ -642,6 +678,13 @@ class MessagesEn extends Messages {
       "${value} is not a kind: push, go, replace, pop or redirect";
 
   @override
+  String get sheetParentLoop => "a page is its own parent, through its parents";
+
+  @override
+  String sheetBadLocale(Object value, Object locales) =>
+      "${value} is not a language the map is drawn in: ${locales}";
+
+  @override
   String get triggerBack => "Back";
 
   @override
@@ -758,6 +801,9 @@ class MessagesEn extends Messages {
 
   @override
   String get htmlNoImage => "No image";
+
+  @override
+  String get htmlNoPreview => "No preview yet";
 
   @override
   String get htmlNone => "None";
@@ -978,7 +1024,7 @@ class MessagesJa extends Messages {
       "この画面の Preview だけを撮る（画面ごとに繰り返し指定できる）。他の画面は、書き出し先の地図にある画像を使う";
 
   @override
-  String get helpLocale => "地図の言語（省略時はこの機械の言語）";
+  String get helpLocale => "地図の言語（省略時は sheet の locale、なければ英語）";
 
   @override
   String get helpStrict => "画像のない状態があれば失敗にする（終了コード 65）";
@@ -1099,6 +1145,20 @@ class MessagesJa extends Messages {
       "entries[${item}] は複数のタブに表示される ${page} を、最初の ${tab} のタブで開きます。tab でタブを指定してください";
 
   @override
+  String lintKey(Object key) => "  確認してこのままにするなら、checked に ${key} を加えてください";
+
+  @override
+  String lintCheckedGone(Object key) =>
+      "checked の ${key} は、もうヒントではありません。checked から外してください";
+
+  @override
+  String lintChecked(Object count) => "checked にあるヒント ${count} 件は伝えていません";
+
+  @override
+  String lintOnlyChecked(Object count) =>
+      "sheet に気になるところはありません（checked にあるヒント ${count} 件のほか）";
+
+  @override
   String get helpByPage => "sheet がファイルを結びつけている画面ごとに出す";
 
   @override
@@ -1172,6 +1232,10 @@ class MessagesJa extends Messages {
       "${page}（${state}）の撮影結果がありません: shutter が Preview ${preview} を見つけられませんでした";
 
   @override
+  String exportNoPreview(Object count, Object states) =>
+      "プレビューがまだ書かれておらず、画像なしで描く状態: ${count} 件、${states}";
+
+  @override
   String exportNotShot(Object page, Object state) =>
       "${page}（${state}）には画像がありません: --only で外れたので撮っておらず、前の地図にもありません";
 
@@ -1196,6 +1260,10 @@ class MessagesJa extends Messages {
   @override
   String sheetNotYaml(Object error) =>
       "contact_sheet/sheet.yaml を YAML として読めません: ${error}";
+
+  @override
+  String sheetNotYamlAt(Object line, Object column, Object error) =>
+      "contact_sheet/sheet.yaml の ${line} 行 ${column} 文字目を YAML として読めません: ${error}";
 
   @override
   String sheetInvalid(Object where, Object problem) =>
@@ -1326,6 +1394,13 @@ class MessagesJa extends Messages {
       "${value} は移動の種類ではありません: push・go・replace・pop・redirect のどれかです";
 
   @override
+  String get sheetParentLoop => "親をたどると、ページが自分自身の親になっています";
+
+  @override
+  String sheetBadLocale(Object value, Object locales) =>
+      "${value} は地図を描ける言語ではありません: ${locales}";
+
+  @override
   String get triggerBack => "戻る";
 
   @override
@@ -1441,6 +1516,9 @@ class MessagesJa extends Messages {
 
   @override
   String get htmlNoImage => "画像なし";
+
+  @override
+  String get htmlNoPreview => "プレビュー未作成";
 
   @override
   String get htmlNone => "ありません";

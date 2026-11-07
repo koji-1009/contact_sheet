@@ -1,5 +1,5 @@
 name: contact_sheet
-description: Every page of a Flutter app as one map, from its widget previews shot with shutter, written as HTML, SVG and JSON.
+description: Every page of a Flutter app as one map, from its widget previews shot with shutter, written as HTML and JSON, and SVG when asked.
 version: 0.1.0
 repository: https://github.com/koji-1009/contact_sheet
 issue_tracker: https://github.com/koji-1009/contact_sheet/issues

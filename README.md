@@ -78,14 +78,14 @@ An export deletes the runs of shutter's it made, so the team's own runs in the a
 Contact Sheet adds `contact_sheet/` to the app, and with `init --package`, a line to its `.gitignore`:
 
 - `sheet.yaml` and `basis.json`, and the sheet package where there is one: kept in git.
-- `map/`: the map (about 0.33 MB for the shop example's 11 states, its images WebP drawn at a pixel ratio of 1.5). Commit it, or ignore it and export it where it is shared (`export --out <folder>`), or have CI export it.
+- `map/`: the map (about 0.33 MB for the shop example's 11 states, its images WebP drawn at a pixel ratio of 1.5). Commit it, or ignore it and export it where it is shared (`export --out <folder>`), or have CI export it. Its images depend on the machine's fonts (Cupertino text is SF Pro on macOS, Roboto elsewhere): export it on one kind of machine, macOS to look as an iPhone does.
 - `.dart_tool/`: what an export keeps between runs, and the sheet package's shots: out of git. Flutter's `.gitignore` ignores `.dart_tool/` at any depth; where the app's `.gitignore` does not, `init --package` adds `contact_sheet/.dart_tool/` to it.
 
 ## More
 
 - [The manual](https://github.com/koji-1009/contact_sheet/blob/main/doc/manual.md): the sheet's fields, the map, `sheet.json`, the commands' options and exit codes.
 - [The playbook](https://github.com/koji-1009/contact_sheet/blob/main/doc/agent.md): what the AI agent follows.
-- [The examples](https://github.com/koji-1009/contact_sheet/tree/main/example): three apps and their sheets (go_router, Navigator 1.0, bottom tabs), each with its previews from a different place.
+- [The examples](https://github.com/koji-1009/contact_sheet/tree/main/example): four apps and their sheets (go_router, Navigator 1.0, bottom tabs, and a travel app of 37 pages with tabs that keep their own histories), their previews from different places.
 - [The changelog](https://github.com/koji-1009/contact_sheet/blob/main/CHANGELOG.md).
 - Problems and ideas: [the issues](https://github.com/koji-1009/contact_sheet/issues).
 - Working on Contact Sheet itself: [doc/development.md](https://github.com/koji-1009/contact_sheet/blob/main/doc/development.md).

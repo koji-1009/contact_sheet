@@ -62,6 +62,76 @@ edges:
     expect(svg, contains('<a class="page-link" href="index.html#map/home">'));
   });
 
+  test('an arrow between sections that would run across another island is a '
+      'jump: a short arrow out, saying where it goes, and one in', () {
+    // Five sections of three pages, the islands in rows: arrows from home
+    // into the far ones, and between the first and the last.
+    final pages = StringBuffer('pages:\n  - ${_page('home', 'Home')}\n');
+    final edges = StringBuffer('edges:\n');
+    for (final s in ['a', 'b', 'c', 'd', 'e']) {
+      for (var i = 1; i <= 3; i++) {
+        pages.writeln('  - ${_page('$s$i', s.toUpperCase())}');
+      }
+      edges
+        ..writeln('  - {from: home, to: ${s}1, trigger: text:$s}')
+        ..writeln('  - {from: ${s}1, to: ${s}2, trigger: text:${s}2}')
+        ..writeln('  - {from: ${s}2, to: ${s}3, trigger: text:${s}3}');
+    }
+    edges
+      ..writeln('  - {from: e3, to: a3, trigger: text:Far}')
+      ..writeln('  - {from: a1, to: e2, trigger: text:Across}');
+    final sheet = Sheet.parse('$pages$edges', m);
+    final map = SheetMap(sheet, shots: const {}, m: m);
+    final layout = map.layout;
+    final islandOf = {
+      for (final p in sheet.pages)
+        p.id: layout.sections.firstWhere((s) => s.name == p.section).box,
+    };
+    expect(layout.jumps, isNotEmpty);
+    for (final edge in sheet.edges) {
+      final (a, b, c, d) = layout.curveOf(edge)!;
+      if (layout.jumps.contains(edge)) {
+        // Short, out of its page; in a bundle into the page it goes to,
+        // which says where it comes from.
+        expect(a.distanceTo(d), MapLayout.jumpLength);
+        final bundle = layout.bundleWith(edge)!;
+        expect(bundle.to, edge.to);
+        if (bundle.edges.length == 1) {
+          expect(map.bundleLabel(bundle), endsWith('← ${edge.from}'));
+        }
+        expect(map.drawnLabel(edge), endsWith('→ ${edge.to}'));
+        continue;
+      }
+      // Drawn whole: through where no island's pages are but its own two's.
+      final ends = {islandOf[edge.from], islandOf[edge.to]};
+      const above =
+          MapLayout.islandPadding +
+          MapLayout.sectionLabelHeight +
+          MapLayout.marksHeight;
+      for (var i = 1; i < 32; i++) {
+        final p = MapLayout.bezier(a, b, c, d, i / 32);
+        for (final s in layout.sections) {
+          if (ends.contains(s.box)) continue;
+          final pages = Box(
+            s.box.left,
+            s.box.top + above,
+            s.box.width,
+            s.box.height - above,
+          );
+          expect(
+            pages.contains(p),
+            isFalse,
+            reason: '${edge.key} over ${s.name}',
+          );
+        }
+      }
+    }
+    final json = map.json(app: 'app');
+    final far = sheet.edges.indexWhere((e) => e.key == 'e3>a3 text:Far push');
+    expect(layout.jumps, contains(sheet.edges[far]));
+    expect((json['edges']! as List<Object?>)[far], containsPair('jump', true));
+  });
+
   test('arrows that go back are bundled apart from those that do not, and '
       'their bundle is dashed', () {
     final sheet = Sheet.parse('''
