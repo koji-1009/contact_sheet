@@ -169,10 +169,10 @@ void main() {
     timeout: const Timeout(Duration(minutes: 3)),
   );
 
-  test('the tags chosen in the address are shown; a state chosen shows its '
-      'own, its page\'s others', () {
+  test('what the address says is shown, and only that; a state chosen shows '
+      'its own tags, its page\'s others', () {
     bool drawn(String dom) => dom.contains('id="card-notes"');
-    const all = '?tag=Spec&tag=Design&tag=Web';
+    const all = '?with=tag:Spec&with=tag:Design&with=tag:Web';
     final (:dom, :errors) = _open(
       shopHtml,
       '$all#map/home/Signed%20in',
@@ -194,18 +194,33 @@ void main() {
     expect(card, contains('https://example.com/specs/home'));
     expect(card, contains('https://shop.example.com/'));
     // The first state shows the page's.
-    final first = _open(shopHtml, '$all#map/home', drawn: drawn).dom;
-    expect(cardOf(first), contains('https://example.com/designs/home"'));
-    // Only those chosen, on the card and above the page; none, where none
-    // is.
-    final design = _open(shopHtml, '?tag=Design#map/home', drawn: drawn).dom;
+    final page = _open(shopHtml, '$all#map/home', drawn: drawn).dom;
+    expect(cardOf(page), contains('https://example.com/designs/home"'));
+    // Only those named, on the card and above the page: no memo, no
+    // sentences, no other tag.
+    final design = _open(
+      shopHtml,
+      '?with=tag:Design#map/home',
+      drawn: drawn,
+    ).dom;
     expect(cardOf(design), contains('https://example.com/designs/home"'));
     expect(cardOf(design), isNot(contains('https://example.com/specs/home')));
+    expect(cardOf(design), isNot(contains('class="memo"')));
+    expect(cardOf(design), isNot(contains('class="says"')));
     expect(marksOf(design), contains('>Design<'));
     expect(marksOf(design), isNot(contains('Spec')));
-    final none = _open(shopHtml, '#map/home', drawn: drawn).dom;
-    expect(cardOf(none), isNot(contains('https://')));
-    expect(marksOf(none), isNot(contains('Design')));
+    expect(marksOf(design), isNot(contains('ⓘ')));
+    // Nothing said: the sentences and the memo, no tag.
+    final first = _open(shopHtml, '#map/home', drawn: drawn).dom;
+    expect(cardOf(first), contains('class="memo"'));
+    expect(cardOf(first), contains('class="says"'));
+    expect(cardOf(first), isNot(contains('https://')));
+    expect(marksOf(first), contains('ⓘ'));
+    expect(marksOf(first), isNot(contains('Design')));
+    // ?with= alone: none of them.
+    final none = _open(shopHtml, '?with=#map/home', drawn: drawn).dom;
+    expect(cardOf(none), isEmpty);
+    expect(marksOf(none), isEmpty);
   }, skip: _skip);
 
   test(
