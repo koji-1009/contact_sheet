@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:contact_sheet/contact_sheet.dart';
@@ -8,20 +9,45 @@ import 'package:test/test.dart';
 
 import 'support.dart';
 
+/// git as it is; flutter pub get failing, as pub tells it.
+class _PubGetFails extends Tools {
+  @override
+  Future<ProcessResult> run(
+    String executable,
+    List<String> arguments, {
+    String? workingDirectory,
+  }) async {
+    if (executable != 'flutter') {
+      return await super.run(
+        executable,
+        arguments,
+        workingDirectory: workingDirectory,
+      );
+    }
+    return ProcessResult(
+      0,
+      1,
+      'Resolving dependencies...\n',
+      'Because shop depends on missing any, version solving failed.\n',
+    );
+  }
+}
+
 void main() {
   late Directory app;
   late List<String> out;
   late List<String> err;
+  // shutter, drawing nothing; the pixel ratios it is asked to draw at.
+  final ratios = <double>[];
   setUp(() {
     app = Directory.systemTemp.createTempSync('cli_');
     File('${app.path}/pubspec.yaml').writeAsStringSync('name: shop\n');
     out = [];
     err = [];
+    ratios.clear();
   });
   tearDown(() => app.deleteSync(recursive: true));
 
-  // shutter, drawing nothing; the pixel ratios it is asked to draw at.
-  final ratios = <double>[];
   Future<ShotRun> nothing(
     String dir,
     ShotSubject subject, {
@@ -159,6 +185,53 @@ void main() {
     },
   );
 
+  test(
+    'basis records what was not committed by its content: changed tells '
+    'it once that changes; a basis git does not know, or none, is said',
+    () async {
+      await cli(['init', app.path]);
+      File('${app.path}/lib/home.dart')
+        ..createSync(recursive: true)
+        ..writeAsStringSync('// home\n');
+      git(app.path, ['init', '-q']);
+      git(app.path, ['add', '.']);
+      git(app.path, ['commit', '-q', '-m', 'first']);
+      // Written from the app as it was: a change not committed, and a file
+      // not in git yet.
+      File('${app.path}/lib/home.dart').writeAsStringSync('// draft\n');
+      File('${app.path}/lib/new.dart').writeAsStringSync('// new\n');
+      expect(await cli(['basis', app.path]), 0);
+      final basis = File('${app.path}/contact_sheet/basis.json');
+      expect((jsonDecode(basis.readAsStringSync()) as Map)['files'], {
+        'lib/home.dart': hasLength(40),
+        'lib/new.dart': hasLength(40),
+      });
+      expect(await cli(['changed', app.path]), 0);
+      expect(out.last, 'Nothing changed since the sheet was written');
+      // Committed as they were: nothing changed still.
+      git(app.path, ['add', 'lib']);
+      git(app.path, ['commit', '-q', '-m', 'second']);
+      expect(await cli(['changed', app.path]), 0);
+      expect(out.last, 'Nothing changed since the sheet was written');
+      File('${app.path}/lib/new.dart').writeAsStringSync('// newer\n');
+      out.clear();
+      expect(await cli(['changed', app.path]), 0);
+      expect(out, ['lib/new.dart']);
+
+      // A commit git does not have (a history rewritten).
+      basis.writeAsStringSync('{"commit": "${'0' * 40}", "files": {}}\n');
+      expect(await cli(['changed', app.path]), 65);
+      expect(
+        err.last,
+        'git does not have ${'0' * 40}: what changed since is not known',
+      );
+      // Not one (a merge conflict in it): no basis.
+      basis.writeAsStringSync('<<<<<<< HEAD\n');
+      expect(await cli(['changed', app.path]), 66);
+      expect(err.last, startsWith('No basis yet'));
+    },
+  );
+
   test('export --strict fails when a state has no image; the map is in the '
       'sheet\'s locale or --locale\'s, else English, what the command tells '
       'in English', () async {
@@ -254,19 +327,116 @@ pages:
     }
   });
 
-  test('lint tells what the sheet itself shows may be missing', () async {
+  test('lint says when it finds nothing, and when only what checked '
+      'names', () async {
+    final sheet = File('${app.path}/contact_sheet/sheet.yaml')
+      ..createSync(recursive: true)
+      ..writeAsStringSync(
+        'pages: [{id: a, label: A, states: [{name: s, preview: a.dart#a}]}]\n',
+      );
+    expect(await cli(['lint', app.path]), 0);
+    expect(out, ['Nothing found in the sheet']);
+    sheet.writeAsStringSync('''
+pages:
+  - {id: a, label: A, states: [{name: s, preview: a.dart#a}]}
+  - {id: b, label: B, states: [{name: s, preview: b.dart#b}]}
+checked: ["unreachable b"]
+''');
+    out.clear();
+    expect(await cli(['lint', app.path]), 0);
+    expect(out, ['Nothing found in the sheet but the hints in checked: 1']);
+  });
+
+  test('flutter pub get that fails is told with what it said; an error no '
+      'command expects is said, where it came from with --verbose', () async {
     File('${app.path}/contact_sheet/sheet.yaml')
       ..createSync(recursive: true)
       ..writeAsStringSync(
-        'pages: [{id: a, label: A, states: [{name: s, preview: a.dart#a}]}, '
-        '{id: b, label: B, states: [{name: s, preview: b.dart#b}]}]',
+        'pages: [{id: home, label: Home, '
+        'states: [{name: s, preview: lib/home.dart#home}]}]',
       );
-    expect(await cli(['lint', app.path]), 0);
-    expect(out, [
-      ('B (b): no arrow leads to it from the first page, and no deep link '
-          'opens it'),
-      '  looked at, and kept as it is: add "unreachable b" to checked',
+    File('${app.path}/lib/home.dart')
+      ..createSync(recursive: true)
+      ..writeAsStringSync('// previews\n');
+    final failing = await runCli(
+      ['export', app.path],
+      out: out.add,
+      err: err.add,
+      runner: _PubGetFails(),
+      shoot: nothing,
+    );
+    expect(failing, 69);
+    // All it said, then that it failed.
+    expect(err, [
+      'Resolving dependencies...',
+      'Because shop depends on missing any, version solving failed.',
+      'flutter pub get failed (exit code 1)',
     ]);
+
+    Future<ShotRun> broken(
+      String dir,
+      ShotSubject subject, {
+      ShotPlatform platform = ShotPlatform.ios,
+      double pixelRatio = 2,
+      void Function(ShotProgress event)? onProgress,
+    }) => throw StateError('a bug');
+    for (final verbose in [false, true]) {
+      err.clear();
+      final code = await runCli(
+        ['export', if (verbose) '--verbose', app.path],
+        out: out.add,
+        err: err.add,
+        runner: Tools(),
+        shoot: broken,
+      );
+      expect(code, 70);
+      expect(err.first, 'Unexpected error: Bad state: a bug');
+      // Where: this test, which shutter was.
+      expect(err, hasLength(verbose ? 2 : 1));
+      if (verbose) expect(err.last, contains('cli_test.dart'));
+    }
+  });
+
+  test('export runs flutter pub get only where the packages are older than '
+      'the pubspec', () async {
+    File('${app.path}/contact_sheet/sheet.yaml')
+      ..createSync(recursive: true)
+      ..writeAsStringSync(
+        'pages: [{id: home, label: Home, '
+        'states: [{name: s, preview: lib/home.dart#home}]}]',
+      );
+    File('${app.path}/lib/home.dart')
+      ..createSync(recursive: true)
+      ..writeAsStringSync('// previews\n');
+    final tools = Tools();
+    Future<int> export() => runCli(
+      ['export', app.path],
+      out: out.add,
+      err: err.add,
+      runner: tools,
+      shoot: nothing,
+    );
+    expect(await export(), 0);
+    expect(tools.commands, [
+      ['flutter', 'pub', 'get', '@${p.normalize(p.absolute(app.path))}'],
+    ]);
+    // Got, after the pubspec last changed: not again.
+    final config = File('${app.path}/.dart_tool/package_config.json')
+      ..createSync(recursive: true)
+      ..writeAsStringSync('{}');
+    final pubspec = File('${app.path}/pubspec.yaml');
+    pubspec.setLastModifiedSync(
+      config.lastModifiedSync().subtract(const Duration(minutes: 1)),
+    );
+    tools.commands.clear();
+    expect(await export(), 0);
+    expect(tools.commands, isEmpty);
+    // The pubspec changed since: again.
+    pubspec.setLastModifiedSync(
+      config.lastModifiedSync().add(const Duration(minutes: 1)),
+    );
+    expect(await export(), 0);
+    expect(tools.commands, hasLength(1));
   });
 
   test('prune deletes the runs Contact Sheet left: the sheet package\'s, and '

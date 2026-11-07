@@ -53,6 +53,7 @@ abstract class Messages {
   String lintDuplicateEntry(Object first, Object second);
   String lintTagUnused(Object tag);
   String lintTagMissing(Object tag, Object count, Object total, Object pages);
+  String lintPathParams(Object page, Object id, Object names, Object path);
   String lintValueUnused(Object value, Object condition);
   String lintValueNeverSet(Object value, Object condition);
   String lintNoLaunchState(Object page);
@@ -361,6 +362,10 @@ class MessagesEn extends Messages {
   @override
   String lintTagMissing(Object tag, Object count, Object total, Object pages) =>
       "the tag ${tag}: ${count} of the ${total} pages have it, not ${pages}";
+
+  @override
+  String lintPathParams(Object page, Object id, Object names, Object path) =>
+      "${page} (${id}): its path's ${names} has no value in params (the page's, or a state's), so a tag's url made with ${path} has no link there";
 
   @override
   String lintValueUnused(Object value, Object condition) =>
@@ -1092,6 +1097,10 @@ class MessagesJa extends Messages {
   @override
   String lintTagMissing(Object tag, Object count, Object total, Object pages) =>
       "タグ ${tag}: ${total} ページ中 ${count} ページにあり、${pages} にはありません";
+
+  @override
+  String lintPathParams(Object page, Object id, Object names, Object path) =>
+      "${page}（${id}）: path のパラメーター ${names} の値が params（ページか状態の）にありません。${path} で作るタグの url は、ここではリンクになりません";
 
   @override
   String lintValueUnused(Object value, Object condition) =>

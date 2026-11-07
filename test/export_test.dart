@@ -125,7 +125,10 @@ pages:
     tags: {Analytics: home}
     states:
       - {name: Guest, preview: lib/preview/home.dart#home, if: {Login: Guest}}
-      - {name: Member, preview: lib/preview/home.dart#home@1, if: {Login: Member}}
+      - name: Member
+        preview: lib/preview/home.dart#home@1
+        if: {Login: Member}
+        tags: {Analytics: home_member}
   - id: detail
     label: 詳細
     source: lib/detail.dart
@@ -259,6 +262,22 @@ void main() {
     expect(data['tags'], [
       {'name': 'Analytics', 'url': 'https://analytics.example.com/{value}'},
     ]);
+    // Each state's: its page's, but where it has its own.
+    final homeStates = (pages.first['states']! as List<Object?>)
+        .cast<Map<String, Object?>>();
+    expect(
+      [for (final s in homeStates) s['tags']],
+      [
+        pages.first['tags'],
+        [
+          {
+            'tag': 'Analytics',
+            'label': 'home_member',
+            'url': 'https://analytics.example.com/home_member',
+          },
+        ],
+      ],
+    );
     final states = (pages.last['states']! as List<Object?>)
         .cast<Map<String, Object?>>();
     expect(states.map((s) => s['image']), [

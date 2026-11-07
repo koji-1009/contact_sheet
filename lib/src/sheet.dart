@@ -189,6 +189,7 @@ class SheetPage {
     this.widget,
     this.source,
     this.path,
+    this.params = const {},
     this.route,
     this.memo,
     this.tags = const [],
@@ -225,6 +226,11 @@ class SheetPage {
   /// The route's path, parameters included: `/products/:id`.
   final String? path;
 
+  /// The values of [path]'s parameters, as its previews show it
+  /// (`{id: p1}`): what `{path}` in a tag's url is filled with. A state may
+  /// give others.
+  final Map<String, String> params;
+
   /// The typed route class (go_router_builder's `GoRouteData`, say).
   final String? route;
 
@@ -235,8 +241,9 @@ class SheetPage {
   /// What a reader of the map should know of the page.
   final String? memo;
 
-  /// What it is tagged with, in the order written: of the [Sheet.tags],
-  /// each value its own.
+  /// What it is tagged with, in the [Sheet.tags]' order, each value its own:
+  /// the values written, and a tag whose url is made of the [path] alone
+  /// where it has one. Each state has its own ([SheetState.tags]).
   final List<SheetPageTag> tags;
 
   /// The names of the [Sheet.dependencies] the page reads.
@@ -244,18 +251,57 @@ class SheetPage {
 }
 
 /// What pages are tagged with, alike for each (its analytics, its design,
-/// its spec): a name, and where a page's value of it is.
+/// its spec, its address on the web): a name, and where a page's value of it
+/// is. What the map links a page to, kept elsewhere; nothing Contact Sheet
+/// computes with.
 class SheetTag {
   SheetTag(this.name, {this.url});
 
   final String name;
 
-  /// Where a page's value is, `{value}` in it the value, what a URL cannot
-  /// hold escaped (a space, a letter not ASCII) and its `/`, `?` and `#`
-  /// kept, so a value may be a path: `https://analytics.example.com/screens/
-  /// {value}`, `https://app.example.com{value}` with `/products/p1`. None:
-  /// each page says where, or its value is text.
+  /// Where a page's value is: `{value}` in it the value, and `{path}` the
+  /// page's [SheetPage.path], its parameters filled by `params`; what a URL
+  /// cannot hold escaped (a space, a letter not ASCII), a value's `/`, `?`
+  /// and `#` kept (`https://analytics.example.com/screens/{value}`). Made of
+  /// `{path}` alone (`https://app.example.com{path}`), every page with a path
+  /// has it without a value written. None: each page says where, or its
+  /// value is text.
   final String? url;
+
+  /// Whether a page with a path has it without a value written.
+  bool get byPath =>
+      url != null && url!.contains('{path}') && !url!.contains('{value}');
+}
+
+/// The parameters' names in [path], as go_router writes them (`:id` in
+/// `/products/:id`), in order.
+List<String> pathParameters(String path) => [
+  for (final match in _parameter.allMatches(path)) match[1]!,
+];
+
+final _parameter = RegExp(r'(?<=/):([A-Za-z_][A-Za-z0-9_]*)');
+
+/// [path] with its parameters filled by [params]: escaped for a URL where
+/// [encoded] (a value's `/` too), as written otherwise. Null when one has no
+/// value.
+String? fillPath(
+  String path,
+  Map<String, String> params, {
+  bool encoded = false,
+}) {
+  final out = StringBuffer();
+  var at = 0;
+  String keep(String s) => encoded ? Uri.encodeFull(s) : s;
+  for (final match in _parameter.allMatches(path)) {
+    final value = params[match[1]];
+    if (value == null) return null;
+    out
+      ..write(keep(path.substring(at, match.start)))
+      ..write(encoded ? Uri.encodeComponent(value) : value);
+    at = match.end;
+  }
+  out.write(keep(path.substring(at)));
+  return '$out';
 }
 
 /// A value of a [SheetTag] on a page: what it says, and where it leads.
@@ -267,9 +313,10 @@ class SheetPageTag {
 
   final String label;
 
-  /// The tag's `url` with the value in it, or the page's own; none for a
-  /// value that is text. An `https:` (or `http:`, `mailto:`) URL: the HTML
-  /// links no other kind.
+  /// The tag's `url` with the value and the path in it, or the page's own;
+  /// none for a value that is text, or a path a parameter of which has no
+  /// value. An `https:` (or `http:`, `mailto:`) URL: the HTML links no other
+  /// kind.
   final String? url;
 }
 
@@ -322,7 +369,18 @@ class SheetState {
     this.uses = const {},
     this.data = false,
     this.conditions = const {},
+    this.params = const {},
+    this.tags = const [],
   });
+
+  /// The values of its page's path's parameters it gives, over the page's
+  /// (`{id: p2}`).
+  final Map<String, String> params;
+
+  /// What it is tagged with, in the [Sheet.tags]' order: its own values of
+  /// a tag in place of its page's, and its page's of the others; a tag made
+  /// of the path, with its own parameters.
+  final List<SheetPageTag> tags;
 
   /// Whether how the page starts in it is up to what it loads (empty,
   /// loading, an error), not to the arrow it comes by: an arrow that says
@@ -565,6 +623,58 @@ class _EdgeItem {
   final String? to;
   final NavigationKind kind;
   final SheetEdge Function(String from, String to) edge;
+}
+
+/// A value of a tag as written: its text, and its own url ([link]) where it
+/// is a link of its own.
+typedef _Written = ({String text, String? link});
+
+/// What a page's tags are made of: the sheet's tags, the page's values,
+/// its path and the values of its parameters.
+class _PageTags {
+  _PageTags(this.tags, this.written, this.path, this.params);
+
+  final Map<String, SheetTag> tags;
+  final Map<String, List<_Written>> written;
+  final String? path;
+  final Map<String, String> params;
+
+  /// The values [written] by tag, each in its tag's url with [params] in
+  /// the path, in the tags' order; a tag made of the path alone, without one
+  /// written, the path's.
+  List<SheetPageTag> resolve(
+    Map<String, List<_Written>> written,
+    Map<String, String> params,
+  ) {
+    final path = this.path;
+    String? fill(String? url, String? value) {
+      if (url == null) return null;
+      var out = url;
+      if (out.contains('{path}')) {
+        final filled = path == null
+            ? null
+            : fillPath(path, params, encoded: true);
+        if (filled == null) return null;
+        out = out.replaceAll('{path}', filled);
+      }
+      return value == null
+          ? out
+          : out.replaceAll('{value}', Uri.encodeFull(value));
+    }
+
+    return [
+      for (final tag in tags.values)
+        if (written[tag.name] case final values?)
+          for (final v in values)
+            SheetPageTag(tag.name, v.text, url: v.link ?? fill(tag.url, v.text))
+        else if (tag.byPath && path != null)
+          SheetPageTag(
+            tag.name,
+            fillPath(path, params) ?? path,
+            url: fill(tag.url, null),
+          ),
+    ];
+  }
 }
 
 /// What is wrong with `sheet.yaml`, and where.
@@ -878,45 +988,37 @@ class _Parser {
     );
   }
 
-  /// A page's `tags`: by a tag's name, a value, a link (`label` and `url`)
-  /// or a list of them; a value goes in the tag's `url`, where it has one.
-  List<SheetPageTag> _pageTags(
+  /// A page's or a state's `tags`, by a tag's name: a value, a link of its
+  /// own (`label` and `url`), or a list of them (empty: none).
+  Map<String, List<_Written>> _writtenTags(
     YamlMap map,
     String where,
     Map<String, SheetTag> tags,
   ) {
     final given = map['tags'];
-    if (given == null) return const [];
+    if (given == null) return const {};
     if (given is! YamlMap) _fail('$where.tags', m.sheetNotMap);
-    SheetPageTag one(SheetTag tag, Object? value, String at) => switch (value) {
-      String() || num() => SheetPageTag(
-        tag.name,
-        '$value',
-        url: tag.url?.replaceAll('{value}', Uri.encodeFull('$value')),
-      ),
+    _Written one(Object? value, String at) => switch (value) {
+      String() || num() => (text: '$value', link: null),
       YamlMap() => () {
         final link = _map(value, at, const {'label', 'url'});
-        return SheetPageTag(
-          tag.name,
-          _required(link, 'label', at),
-          url: _required(link, 'url', at),
+        return (
+          text: _required(link, 'label', at),
+          link: _required(link, 'url', at),
         );
       }(),
       _ => _fail(at, m.sheetBadTag),
     };
-    final all = <SheetPageTag>[];
-    for (final MapEntry(:key, :value) in given.entries) {
-      final at = '$where.tags.$key';
-      final tag = tags['$key'] ?? _fail(at, m.sheetUnknownTag('$key'));
-      if (value is YamlList) {
-        for (final (i, v) in value.indexed) {
-          all.add(one(tag, v, '$at[$i]'));
-        }
-      } else {
-        all.add(one(tag, value, at));
-      }
-    }
-    return all;
+    return {
+      for (final MapEntry(:key, :value) in given.entries)
+        (tags['$key'] ?? _fail('$where.tags.$key', m.sheetUnknownTag('$key')))
+            .name: value is YamlList
+            ? [
+                for (final (i, v) in value.indexed)
+                  one(v, '$where.tags.$key[$i]'),
+              ]
+            : [one(value, '$where.tags.$key')],
+    };
   }
 
   SheetCondition _condition(Object? yaml, String where) {
@@ -996,6 +1098,7 @@ class _Parser {
       'widget',
       'source',
       'path',
+      'params',
       'route',
       'dependencies',
       'memo',
@@ -1004,9 +1107,12 @@ class _Parser {
       'tab',
       'parent',
     });
+    final path = _optional(map, 'path', where);
+    final params = _values(map, 'params', where);
+    final page = _PageTags(tags, _writtenTags(map, where, tags), path, params);
     final states = [
       for (final (i, s) in _list(map, 'states', where).indexed)
-        _state(s, '$where.states[$i]'),
+        _state(s, '$where.states[$i]', page),
     ];
     if (states.isEmpty) _fail('$where.states', m.sheetNoStates);
     // A state is named by `when` and `then`: two of one name are one.
@@ -1028,10 +1134,11 @@ class _Parser {
       section: _optional(map, 'section', where) ?? '',
       widget: _optional(map, 'widget', where),
       source: _optional(map, 'source', where),
-      path: _optional(map, 'path', where),
+      path: path,
+      params: params,
       route: _optional(map, 'route', where),
       memo: _optional(map, 'memo', where),
-      tags: _pageTags(map, where, tags),
+      tags: page.resolve(page.written, params),
       dependencies: dependencies,
       states: states,
       tabs: map['tab'] is YamlList
@@ -1049,13 +1156,15 @@ class _Parser {
     r'(?:@(\d+)(?:\.(\d+))?)?$',
   );
 
-  SheetState _state(Object? yaml, String where) {
+  SheetState _state(Object? yaml, String where, _PageTags page) {
     final map = _map(yaml, where, const {
       'name',
       'preview',
       'uses',
       'data',
       'if',
+      'params',
+      'tags',
     });
     // None yet: the state is drawn without an image.
     final preview = _optional(map, 'preview', where);
@@ -1077,7 +1186,13 @@ class _Parser {
     }
     final data = map['data'] ?? false;
     if (data is! bool) _fail('$where.data', m.sheetNotBool);
+    final params = _values(map, 'params', where);
     return SheetState(
+      params: params,
+      tags: page.resolve(
+        {...page.written, ..._writtenTags(map, where, page.tags)},
+        {...page.params, ...params},
+      ),
       name: _required(map, 'name', where),
       file: file,
       symbol: match?[2],

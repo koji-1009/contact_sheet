@@ -46,6 +46,8 @@
   "@lintTagUnused": {"placeholders": {"tag": {}}},
   "lintTagMissing": "the tag {tag}: {count} of the {total} pages have it, not {pages}",
   "@lintTagMissing": {"placeholders": {"tag": {}, "count": {}, "total": {}, "pages": {}}},
+  "lintPathParams": "{page} ({id}): its path's {names} has no value in params (the page's, or a state's), so a tag's url made with {path} has no link there",
+  "@lintPathParams": {"placeholders": {"page": {}, "id": {}, "names": {}, "path": {}}},
   "lintValueUnused": "{value} of {condition}: no state, if or set names it",
   "@lintValueUnused": {"placeholders": {"value": {}, "condition": {}}},
   "lintValueNeverSet": "{value} of {condition}: it is not the first, and nothing gives it (a set, or a then of a state of it): the app is never in it",

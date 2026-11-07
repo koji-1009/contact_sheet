@@ -78,9 +78,11 @@ conditions:              # what the app keeps across pages, shown on them or not
   - name: Login
     values: [Guest, Logged in]          # the first is what the app launches with
     source: lib/data/auth_repository.dart
-tags:                    # what pages are tagged with, alike for each
+tags:                    # where each page is in the team's other tools, alike for each
   - name: Analytics
     url: https://analytics.example.com/screens/{value}   # a page's value goes in it
+  - name: Web
+    url: https://shop.example.com{path}  # made of each page's path: no value to write
   - name: Spec
 pages:
   - id: home
@@ -104,6 +106,7 @@ pages:
         if: {Login: Logged in}
         preview: lib/features/home_page_preview.dart#home@1      # its 2nd @Preview
         uses: {AuthRepository: logged in}
+        tags: {Analytics: home_member}   # its own value, in place of the page's
       - name: Loading
         preview: lib/features/home_page_preview.dart#home@2
         data: true                       # what the page loads decides it, not the arrow
@@ -116,6 +119,8 @@ pages:
         preview: contact_sheet/lib/preview/login.dart#loginFromHome
   - id: product_detail                   # each page the edges name, with a state at least
     label: Product
+    path: /products/:id
+    params: {id: p1}                     # the product its preview shows: fills {path}
     states: [{name: Standard, preview: contact_sheet/lib/preview/product.dart#product}]
   - id: cart
     label: Cart
@@ -179,6 +184,8 @@ Each field, and how `preview` names a `@Preview`: `sheet manual`, "The sheet".
 - What can happen on every page (a session that expires, a forced update) is one edge `from: '*'`, with `if` for when (not `when`): drawn once, from outside.
 - Screens outside the app (signing in through the browser, a payment sheet, sharing, the OS settings) are not pages: write the step as one edge from the button to where the app comes back, with what it gives (`set: {Login: Logged in}`), and another for each other outcome (cancelled). Nor are written: pops through several pages to one in between, the browser's back and forward; the pages a deep link builds under its page are its `parent`'s.
 - `entries`: the links the code handles on purpose (ones it publishes, a notification it opens), not every route a link could name; `then` where the link decides the state the page opens in (`/login?from=/checkout`); `if` where it opens the page only for some values of the conditions (the link the router sends a guest elsewhere with is another entry, to that page).
-- `memo`: what you found about the page that its image and arrows do not show. `tags` (top level): what pages are tagged with, alike for each (where their analytics are, their design, their specification), with the `url` a page's value goes in; a page's `tags`: its value of each it has, where what you read tells it (the screen name the code logs), or a link of its own. People write these by hand too: keep the tags and values you did not write as they are. `lint` tells a page without a tag most pages have.
+- Each thing has one place: what decides where the user can go is in the pages, states, edges and conditions; what the readers should know of a page, in its `memo`; where its code is, in `source` and `widget`; where it is in the team's other tools, in `tags`.
+- `memo`: what you found about the page that its image and arrows do not show.
+- `tags` (top level): where each page is in the team's other tools, alike for each (its analytics, its design, its specification, its address on the web), with the `url` a value goes in. Not a tag: anything the route needs (a condition, a state), a note (the memo), the code's place (`source`). A url made of `{path}` (the app on the web) needs no value written: every page with a `path` has it, its parameters filled by the page's `params` (the values its previews show); `lint` tells a path whose parameters have none. A page's `tags`: its value of each tag that takes one, where what you read tells it (the screen name the code logs), or a link of its own. A state whose value differs (the signed-in look's own design or screen name) gives it in its own `tags`, the rest staying its page's. People write tags by hand too: keep the tags and values you did not write as they are. `lint` tells a page without a tag most pages have.
 
 `basis.json` is written by `sheet basis`. Do not edit it.

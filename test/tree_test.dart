@@ -75,4 +75,26 @@ tabs:
     expect(pages[1], containsPair('tab', 'search'));
     expect(pages[2], containsPair('edge', 0));
   });
+
+  test('a page shown in a tab leads to its bar\'s tabs', () {
+    final sheet = Sheet.parse('''
+pages:
+  - ${_page('welcome')}
+  - ${_page('feed')}
+  - ${_page('search')}
+  - {id: post, label: post, tab: feed, states: [{name: s, preview: lib/post.dart#post}]}
+edges:
+  - {from: welcome, to: post, trigger: text:Start, kind: go}
+tabs:
+  - pages:
+      - {page: feed, trigger: text:Feed}
+      - {page: search, trigger: text:Search}
+''', m);
+    expect(SheetMap(sheet, shots: const {}, m: m).tree.parent, {
+      'welcome': null,
+      'feed': 'post',
+      'search': 'post',
+      'post': 'welcome',
+    });
+  });
 }

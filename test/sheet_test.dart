@@ -108,6 +108,78 @@ pages:
     expect(sheet.pages.last.tags.single.url, 'https://example.com/cart');
   });
 
+  test('a tag made of the path is every page\'s with one, its parameters '
+      'the params; a state has its own values', () {
+    final sheet = _parse('''
+tags:
+  - {name: Web, url: 'https://app.example.com{path}'}
+  - {name: Analytics, url: 'https://analytics.example.com/{value}'}
+  - {name: Design}
+pages:
+  - id: home
+    label: Home
+    path: /
+    tags: {Analytics: home}
+    states:
+      - {name: Guest, preview: lib/home.dart#home, tags: {Analytics: home_guest}}
+      - {name: Member, preview: lib/home.dart#home@1, tags: {Analytics: []}}
+  - id: product
+    label: Product
+    path: /products/:id/reviews/:review
+    params: {id: p 1}
+    tags: {Design: {label: Product, url: 'https://example.com/design'}}
+    states:
+      - {name: Saved, preview: lib/p.dart#p, params: {review: r/2}}
+      - {name: Unsaved, preview: lib/p.dart#p@1}
+  - {id: about, label: About, states: [{name: s, preview: lib/a.dart#a}]}
+''');
+    List<(String, String, String?)> said(List<SheetPageTag> tags) => [
+      for (final t in tags) (t.tag, t.label, t.url),
+    ];
+    final [home, product, about] = sheet.pages;
+    expect(said(home.tags), [
+      ('Web', '/', 'https://app.example.com/'),
+      ('Analytics', 'home', 'https://analytics.example.com/home'),
+    ]);
+    // A state's values in place of its page's; none, where it says so.
+    expect(said(home.states.first.tags), [
+      ('Web', '/', 'https://app.example.com/'),
+      ('Analytics', 'home_guest', 'https://analytics.example.com/home_guest'),
+    ]);
+    expect(said(home.states.last.tags), [
+      ('Web', '/', 'https://app.example.com/'),
+    ]);
+    // A parameter without a value: the path as declared, no link.
+    expect(said(product.tags).first, (
+      'Web',
+      '/products/:id/reviews/:review',
+      null,
+    ));
+    // A state's parameters over its page's, each escaped.
+    expect(said(product.states.first.tags), [
+      (
+        'Web',
+        '/products/p 1/reviews/r/2',
+        'https://app.example.com/products/p%201/reviews/r%2F2',
+      ),
+      ('Design', 'Product', 'https://example.com/design'),
+    ]);
+    expect(product.states.first.params, {'review': 'r/2'});
+    expect(about.tags, isEmpty);
+    expect(
+      lintHints(sheet, _m).map((h) => h.key),
+      contains('path-params product'),
+    );
+    expect(
+      lintSheet(sheet, _m),
+      contains(
+        'Product (product): its path\'s review has no value in params (the '
+        'page\'s, or a state\'s), so a tag\'s url made with {path} has no link '
+        'there',
+      ),
+    );
+  });
+
   test('a tag a page names is one of tags, named once', () {
     const page = 'states: [{name: s, preview: lib/a.dart#a}]';
     expect(
@@ -254,6 +326,65 @@ pages:
         'when: x}]}]',
       ),
       _fails(startsWith('contact_sheet/sheet.yaml, pages[0].states[0].when:')),
+    );
+    // Each field of the shape it takes, said where it is not.
+    const login = 'conditions: [{name: Login, values: [Guest, Member]}]\n';
+    for (final (yaml, where) in [
+      ('pages: {a: 1}', 'sheet.yaml.pages'),
+      ('checked: [[x]]', 'sheet.yaml.checked[0]'),
+      ('pages: [{id: a, label: [A], states: [{name: s}]}]', 'pages[0].label'),
+      (
+        'pages: [{id: a, label: A, states: [{name: s, uses: [x]}]}]',
+        'pages[0].states[0].uses',
+      ),
+      (
+        'pages: [{id: a, label: A, params: [x], states: [{name: s}]}]',
+        'pages[0].params',
+      ),
+      (
+        'pages: [{id: a, label: A, states: [{name: s, params: {id: [x]}}]}]',
+        'pages[0].states[0].params.id',
+      ),
+      ('pages: [$page]\nedges: [{from: a, to: a, if: x}]', 'edges[0].if'),
+      (
+        '${login}pages: [$page]\nedges: [{from: a, to: a, if: {Login: []}}]',
+        'edges[0].if.Login',
+      ),
+      (
+        '${login}pages: [$page]\nedges: [{from: a, to: a, if: {Login: {x: y}}}]',
+        'edges[0].if.Login',
+      ),
+      (
+        '${login}pages: [$page]\nedges: [{from: a, to: a, if: {Login: [[x]]}}]',
+        'edges[0].if.Login[0]',
+      ),
+      (
+        'pages: [$page]\nedges: [{from: a, to: a, then: {s: [x]}}]',
+        'edges[0].then.s',
+      ),
+      (
+        'pages: [$page]\nedges: [{from: a, to: a, then: {x: s}}]',
+        'edges[0].then',
+      ),
+      (
+        'pages: [$page]\ntabs: [{pages: [{page: a, trigger: tap}]}]',
+        'tabs[0].pages[0].trigger',
+      ),
+    ]) {
+      expect(
+        () => _parse(yaml),
+        _fails(startsWith('contact_sheet/sheet.yaml, $where: ')),
+        reason: yaml,
+      );
+    }
+    // A number or a truth where text goes is read as its text.
+    expect(
+      _parse(
+        'pages: [{id: a, label: 404, states: [{name: true, preview: a.dart#a}]}]',
+      ).pages.single,
+      isA<SheetPage>()
+          .having((p) => p.label, 'label', '404')
+          .having((p) => p.states.single.name, 'state', 'true'),
     );
   });
 
@@ -728,6 +859,54 @@ edges:
       ('edges[1] from Shop: no way through the app reaches it there while '
           'its if holds'),
     ]);
+  });
+
+  test('lint tells a bar of one tab', () {
+    final sheet = _parse('''
+pages:
+  - {id: feed, label: Feed, states: [{name: s, preview: f.dart#f}]}
+tabs:
+  - pages: [{page: feed, trigger: text:Feed}]
+''');
+    expect(
+      [for (final hint in lintHints(sheet, _m)) (hint.key, hint.message)],
+      [('one-tab feed', 'tabs[0]: a bar of one tab')],
+    );
+  });
+
+  test('a deep link\'s then gives its state\'s values: an if met only from '
+      'it is met', () {
+    const sheet = '''
+conditions:
+  - {name: Login, values: [Guest, Member]}
+pages:
+  - {id: home, label: Home, states: [{name: s, preview: h.dart#h}]}
+  - id: welcome
+    label: Welcome
+    states:
+      - {name: Guest, preview: w.dart#w, if: {Login: Guest}}
+      - {name: Member, preview: w.dart#w@1, if: {Login: Member}}
+  - {id: shop, label: Shop, states: [{name: s, preview: s.dart#s}]}
+edges:
+  - {from: home, to: welcome, trigger: text:Welcome}
+  - {from: welcome, to: shop, trigger: text:Shop, if: {Login: Member}}
+''';
+    List<String> keys(String yaml) => [
+      for (final hint in lintHints(_parse(yaml), _m)) hint.key,
+    ];
+    // Without the link, nothing gives Member, and the edge never happens.
+    expect(
+      keys(sheet),
+      containsAll([
+        'value-not-given Login=Member',
+        'if-never-met welcome>shop text:Shop {Login=Member} push',
+      ]),
+    );
+    final linked = keys(
+      '$sheet\nentries:\n  - {to: welcome, via: /welcome, then: Member}\n',
+    );
+    expect(linked, isNot(contains('value-not-given Login=Member')));
+    expect(linked.where((k) => k.startsWith('if-never-met')), isEmpty);
   });
 
   test('lint tells an item no way meets once from its page, though it be an '

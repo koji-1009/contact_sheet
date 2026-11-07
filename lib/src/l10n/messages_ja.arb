@@ -33,6 +33,7 @@
   "lintDuplicateEntry": "entries[{second}] は entries[{first}] と同じです",
   "lintTagUnused": "タグ {tag}: どのページにもありません",
   "lintTagMissing": "タグ {tag}: {total} ページ中 {count} ページにあり、{pages} にはありません",
+  "lintPathParams": "{page}（{id}）: path のパラメーター {names} の値が params（ページか状態の）にありません。{path} で作るタグの url は、ここではリンクになりません",
   "lintValueUnused": "{condition} の {value}: どの状態・if・set にも書かれていません",
   "lintValueNeverSet": "{condition} の {value}: 最初の値ではなく、この値にするもの（set か、この値の状態への then）もありません。アプリがこの値になることはありません",
   "lintNoLaunchState": "{page}: アプリはここから始まりますが、条件が最初の値のときの状態がありません",

@@ -21,7 +21,8 @@ import 'package:contact_sheet/src/sheet.dart';
 ///   their values, or two for the same; the first page with none for the
 ///   launch's; an arrow whose `if` no history meets where it happens, or
 ///   that names in `when` a state its `if` leaves out;
-/// - a tag no page has, or one most pages have that some do not.
+/// - a tag no page has, or one most pages have that some do not; a path a
+///   tag's url is made with whose parameters have no values.
 ///
 /// The hints the sheet's `checked` names are looked at and kept as they
 /// are: left out. A key `checked` names that is no hint now is told.
@@ -199,15 +200,20 @@ List<LintHint> _hints(Sheet sheet, Messages m) {
   ];
 }
 
-/// The hints of the tags: one no page has; one most pages have (three
-/// quarters or more), the pages without it named.
+/// The hints of the tags: one no page has (nor a state of it); one most
+/// pages have (three quarters or more), the pages without it named; a path
+/// a tag's url is made with whose parameters have no values.
 List<LintHint> _lintTags(Sheet sheet, Messages m) {
   final findings = <LintHint>[];
   final all = sheet.pages.length;
   for (final tag in sheet.tags) {
     final without = [
       for (final page in sheet.pages)
-        if (!page.tags.any((t) => t.tag == tag.name)) page,
+        if (![
+          page.tags,
+          for (final s in page.states) s.tags,
+        ].any((tags) => tags.any((t) => t.tag == tag.name)))
+          page,
     ];
     final has = all - without.length;
     if (has == 0) {
@@ -224,6 +230,27 @@ List<LintHint> _lintTags(Sheet sheet, Messages m) {
             all,
             without.map((p) => p.label).join(', '),
           ),
+        ),
+      );
+    }
+  }
+  if (!sheet.tags.any((t) => t.url?.contains('{path}') ?? false)) {
+    return findings;
+  }
+  for (final page in sheet.pages) {
+    final path = page.path;
+    if (path == null) continue;
+    final missing = {
+      for (final state in page.states)
+        for (final name in pathParameters(path))
+          if (!page.params.containsKey(name) && !state.params.containsKey(name))
+            name,
+    };
+    if (missing.isNotEmpty) {
+      findings.add(
+        LintHint(
+          'path-params ${page.id}',
+          m.lintPathParams(page.label, page.id, missing.join(', '), '{path}'),
         ),
       );
     }

@@ -25,12 +25,15 @@ conditions:
     values: [Empty, Has items]
     source: lib/data/cart_repository.dart
 
-# What the pages are tagged with: a page's design is at the same place for
-# each, by its name.
+# What the pages are tagged with: where each lives outside the sheet. A
+# page's design is at the same place for each, by its name; a state drawn
+# apart has its own. Web is made of each page's path, without a value.
 tags:
   - name: Spec
   - name: Design
     url: https://example.com/designs/{value}
+  - name: Web
+    url: https://shop.example.com{path}
 
 pages:
   - id: home
@@ -55,6 +58,7 @@ pages:
         if: {Login: Signed in}
         preview: contact_sheet/lib/preview/home.dart#home@1
         uses: {AuthRepository: signed in, ProductRepository: 3 products}
+        tags: {Design: home_signed_in}
 
   # It looks the same signed in or not: only the router's redirect, when
   # Buy now is tapped, reads AuthRepository.
@@ -64,6 +68,8 @@ pages:
     widget: ProductDetailPage
     source: lib/features/product_detail_page.dart
     path: /products/:id
+    # The product its preview shows.
+    params: {id: p1}
     tags: {Design: product}
     dependencies: [ProductRepository, CartRepository]
     states:
@@ -88,6 +94,7 @@ pages:
         if: {Cart: Empty}
         preview: contact_sheet/lib/preview/cart.dart#cart@1
         uses: {CartRepository: empty}
+        tags: {Design: cart_empty}
 
   - id: checkout
     label: Checkout

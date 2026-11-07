@@ -488,12 +488,10 @@ class SheetMap {
             'widget': page.widget,
             'source': page.source,
             'path': page.path,
+            'params': page.params,
             'route': page.route,
             'memo': page.memo,
-            'tags': [
-              for (final t in page.tags)
-                {'tag': t.tag, 'label': t.label, 'url': t.url},
-            ],
+            'tags': _tags(page.tags),
             'dependencies': [
               for (final d in sheet.dependenciesOf(page))
                 {'name': d.name, 'target': d.target, 'source': d.source},
@@ -662,10 +660,17 @@ class SheetMap {
     'uses': state.uses,
     'data': state.data,
     'if': state.conditions,
+    'params': state.params,
+    // Its page's, but where it has its own.
+    'tags': _tags(state.tags),
     // In the first variant, the map's; then in each, the first again.
     ..._drawn(state, sheet.variants.first),
     'variants': [for (final v in sheet.variants) _drawn(state, v)],
   };
+
+  static List<Map<String, Object?>> _tags(List<SheetPageTag> tags) => [
+    for (final t in tags) {'tag': t.tag, 'label': t.label, 'url': t.url},
+  ];
 
   static double _round(double v) => (v * 10).roundToDouble() / 10;
 }

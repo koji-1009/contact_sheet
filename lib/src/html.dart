@@ -205,6 +205,7 @@ code { font: 12px ui-monospace, Menlo, monospace; }
 .tags a::after { content: '↗'; }
 .tags small { color: var(--muted); font-size: 11px; }
 .tags span { color: var(--text); }
+.state .tags { margin: 4px 0 0; }
 /* map */
 /* Under the header, however many lines it takes (--header-h, measured). */
 /* No element's id is a view's address (#map, #list, #table), or opening one would scroll to it. */
@@ -461,7 +462,7 @@ const findText = (p, dev) => [
   p.label, p.section, p.memo,
   ...(dev ? [p.path, p.id] : []),
   ...p.states.map((s) => s.name),
-  ...p.tags.flatMap((t) => [t.tag, t.label]),
+  ...[p, ...p.states].flatMap((x) => x.tags.flatMap((t) => [t.tag, t.label])),
   ...edges.filter((e) => e.from === p.id).map((e) => said(e, dev)),
 ].filter(Boolean).join(' ').toLowerCase();
 // What it looks for in a transition: its pages, states, and what is done.
@@ -528,17 +529,25 @@ function sentence(e, { from = false, state = null, sets = e.set } = {}) {
   // [from]: its page's name said first, or what to say instead.
   return `${from ? `<b>${esc(typeof from === 'string' ? from : label(e.from))}</b>: ` : ''}${when}${what}${to}${then}${redirected}${setting(sets)}`;
 }
-// What the sheet says of a page: its memo, and its tags' values, those of
-// the tags [shown] (by name), each its tag's name before it. Only web and
-// mail links are followed: a `javascript:` one would run here.
+// What the sheet says of a page: its memo, and the values of its tags (a
+// page's, or a state's), those of the tags [shown] (by name), each its tag's
+// name before it. Only web and mail links are followed: a `javascript:` one
+// would run here.
 const memoHtml = (p) => p.memo ? `<p class="memo">${esc(p.memo)}</p>` : '';
 const followed = (url) => /^(https?:|mailto:)/i.test(url ?? '');
-const tagsHtml = (p, shown = () => true) => {
-  const values = p.tags.filter((t) => shown(t.tag));
+const tagsHtml = (tags, shown = () => true) => {
+  const values = tags.filter((t) => shown(t.tag));
   return values.length ? `<p class="tags">${values.map((t) => followed(t.url)
     ? `<a href="${esc(t.url)}" target="_blank" rel="noopener noreferrer" title="${esc(t.url)}"><small>${esc(t.tag)}</small>${esc(t.label)}</a>`
     : `<span${t.url ? ` title="${esc(t.url)}"` : ''}><small>${esc(t.tag)}</small>${esc(t.label)}</span>`).join('')}</p>` : '';
 };
+// A state's values of the tags it has its own of, other than its page's.
+const tagValues = (tags, name) => JSON.stringify(tags.filter((t) => t.tag === name));
+const ownTags = (p, s) => s.tags.filter((t) => tagValues(s.tags, t.tag) !== tagValues(p.tags, t.tag));
+// The state each page shows on the map, by its place among the page's
+// states (see showState); the tags of the one [p] is shown in.
+const shownState = {};
+const shownTags = (p) => p.states[shownState[p.id] ?? 0].tags;
 const codeMeta = (p) => [p.path, p.widget, p.route, p.source].filter(Boolean).map((c) => `<code>${esc(c)}</code>`).join(' · ');
 // The ways every state is shot (a platform, a size), the first the map's:
 // the one shown, chosen in the header, from the address or as the viewer
@@ -556,12 +565,13 @@ const variantName = () => variants[variant]?.name ?? '';
 // A state shutter could not draw says why; one the variant has none of
 // says so. As wide as its screen is to the first variant's: a larger screen
 // drawn larger, not smaller.
-const stateHtml = (s) => {
+const stateHtml = (s, p) => {
   const d = drawn(s);
+  const own = p ? tagsHtml(ownTags(p, s)) : '';
   return `<div class="state" style="--k:${d.width / s.width}">${d.image
     ? `<img src="${esc(d.image)}" alt="${esc(s.name)}" loading="lazy" style="aspect-ratio:${d.width}/${d.height}" data-zoom="${esc(s.name)}">`
     : `<div class="none${d.error ? ' error' : ''}" style="aspect-ratio:${d.width}/${d.height}" title="${esc(d.error ?? '')}">${esc(d.error ?? (s.preview == null ? T('noPreview') : d.shot == null && variant ? T('notInVariant', { variant: variantName() }) : T('noImage')))}</div>`}
-  <div class="name">${esc(s.name)}</div></div>`;
+  <div class="name">${esc(s.name)}</div>${own}</div>`;
 };
 
 $('#app').textContent = S.app;
@@ -787,26 +797,28 @@ const hidden = (() => {
   try { return new Set(JSON.parse(localStorage.getItem(kept('hide')) ?? '[]')); } catch { return new Set(); }
 })();
 const noteOn = (key) => !hidden.has(key);
-// Each page's marks above it: its memo, and each tag it has, a link where
-// it is one value that is.
-function renderMarks() {
-  for (const p of S.pages) {
-    const marks = [];
-    if (p.memo && noteOn('memo')) marks.push(`<span class="mark" title="${esc(p.memo)}">ⓘ</span>`);
-    for (const t of S.tags ?? []) {
-      const values = p.tags.filter((v) => v.tag === t.name);
-      if (!values.length || !noteOn('tag:' + t.name)) continue;
-      const title = esc(values.map((v) => v.label).join('\n'));
-      marks.push(values.length === 1 && followed(values[0].url)
-        ? `<a class="mark" href="${esc(values[0].url)}" target="_blank" rel="noopener noreferrer" title="${title}">${esc(t.name)}</a>`
-        : `<span class="mark" title="${title}">${esc(t.name)}${values.length > 1 ? ' ×' + values.length : ''}</span>`);
-    }
-    nodes[p.id].querySelector('.marks').innerHTML = marks.join('');
+// A page's marks above it: its memo, and each tag the state shown has, a
+// link where it is one value that is.
+function renderMark(p) {
+  const marks = [];
+  if (p.memo && noteOn('memo')) marks.push(`<span class="mark" title="${esc(p.memo)}">ⓘ</span>`);
+  for (const t of S.tags ?? []) {
+    const values = shownTags(p).filter((v) => v.tag === t.name);
+    if (!values.length || !noteOn('tag:' + t.name)) continue;
+    const title = esc(values.map((v) => v.label).join('\n'));
+    marks.push(values.length === 1 && followed(values[0].url)
+      ? `<a class="mark" href="${esc(values[0].url)}" target="_blank" rel="noopener noreferrer" title="${title}">${esc(t.name)}</a>`
+      : `<span class="mark" title="${title}">${esc(t.name)}${values.length > 1 ? ' ×' + values.length : ''}</span>`);
   }
+  nodes[p.id].querySelector('.marks').innerHTML = marks.join('');
 }
-// What the card says of [p], of what is shown with the pages.
+function renderMarks() {
+  for (const p of S.pages) renderMark(p);
+}
+// What the card says of [p], of what is shown with the pages: the tags of
+// the state shown.
 const cardNotes = (p) => (noteOn('memo') ? memoHtml(p) : '')
-  + tagsHtml(p, (tag) => noteOn('tag:' + tag)) + (noteOn('says') ? sentences(p) : '');
+  + tagsHtml(shownTags(p), (tag) => noteOn('tag:' + tag)) + (noteOn('says') ? sentences(p) : '');
 function setNote(key, on) {
   if (on) hidden.delete(key); else hidden.add(key);
   try { localStorage.setItem(kept('hide'), JSON.stringify([...hidden])); } catch {}
@@ -988,10 +1000,9 @@ function around(ids) {
   return { x: x0 - pad, y: y0 - pad, width: x1 - x0 + pad * 2, height: y1 - y0 + pad * 2 };
 }
 
-// Which state each page shows on the map: its first, unless another is
-// chosen (beside the page, or as where an arrow arrives); its name under
-// the page's then, so whoever looks knows which.
-const shownState = {};
+// Which state each page shows on the map ([shownState]): its first, unless
+// another is chosen (beside the page, or as where an arrow arrives); its
+// name under the page's then, so whoever looks knows which.
 function showState(id, i) {
   const p = pageById[id];
   const s = p.states[i];
@@ -1002,6 +1013,7 @@ function showState(id, i) {
   loadImages();
   n.querySelector('.label small').textContent = i ? s.name : '';
   n.classList.toggle('other-state', i > 0);
+  renderMark(p);
 }
 const stateIndex = (id, name) => pageById[id].states.findIndex((s) => s.name === name);
 // All pages back in their first state.
@@ -1301,8 +1313,8 @@ const renderList = () => $('#page-list').innerHTML = Object.entries(sections).ma
       <header><h3>${esc(p.label)}</h3><span class="meta dev">${codeMeta(p)}</span>
         ${p.sheetChanged.length ? `<span class="badge changed dev" title="${esc(p.sheetChanged.join('\n'))}">${esc(T('sheetChanged'))}</span>` : ''}
         <span class="actions"><button class="link" data-go="map/${esc(p.id)}">${esc(T('onMap'))}</button><button class="link" data-detail="${esc(p.id)}">${esc(T('detail'))}</button></span></header>
-      ${memoHtml(p)}${tagsHtml(p)}
-      <div class="states">${p.states.map(stateHtml).join('')}</div>
+      ${memoHtml(p)}${tagsHtml(p.tags)}
+      <div class="states">${p.states.map((s) => stateHtml(s, p)).join('')}</div>
       <div class="flows">
         <div><h4>${esc(T('goesTo'))}</h4><div class="chips">${goes || none}</div></div>
         <div><h4>${esc(T('comesFrom'))}</h4><div class="chips">${comes || none}</div></div>
@@ -1501,9 +1513,9 @@ function openPage(id) {
   if (!p) return;
   openPanel(`<h2 style="margin-top:0;color:var(--text)">${esc(p.label)}</h2>
     <p class="meta">${esc(p.section)}</p><p class="meta dev">${codeMeta(p)}</p>
-    ${memoHtml(p)}${tagsHtml(p)}
+    ${memoHtml(p)}${tagsHtml(p.tags)}
     ${p.sheetChanged.length ? `<p class="meta dev"><span class="badge changed">${esc(T('sheetChanged'))}</span> ${p.sheetChanged.map((f) => `<code>${esc(f)}</code>`).join(' ')}</p>` : ''}
-    <div class="states">${p.states.map((s) => `<div>${stateHtml(s)}${
+    <div class="states">${p.states.map((s) => `<div>${stateHtml(s, p)}${
       Object.keys(s.uses).length ? `<div class="meta dev">${Object.entries(s.uses).map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(' · ')}</div>` : ''}</div>`).join('')}</div>
     ${p.dependencies.length ? `<div class="dev"><h2>${esc(T('dependencies'))}</h2><table><tbody>${p.dependencies.map((d) => `<tr><td>${esc(d.name)}</td><td>${d.target ? `<code>${esc(d.target)}</code>` : '—'}</td><td>${d.source ? `<code>${esc(d.source)}</code>` : '—'}</td></tr>`).join('')}</tbody></table></div>` : ''}
     <h2>${esc(T('outgoing'))}</h2>${edgeRows(out[id] ?? [], [COLS.when, COLS.trigger, COLS.to, COLS.kind, COLS.code])}

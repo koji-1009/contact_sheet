@@ -130,6 +130,43 @@ edges:
     final far = sheet.edges.indexWhere((e) => e.key == 'e3>a3 text:Far push');
     expect(layout.jumps, contains(sheet.edges[far]));
     expect((json['edges']! as List<Object?>)[far], containsPair('jump', true));
+    // Its label says where it goes, for anyone too.
+    const said =
+        '<tspan class="l-does">Far</tspan><tspan class="l-to"> → a3</tspan>';
+    expect(mapOver(map), contains('data-i="$far"'));
+    expect(mapOver(map), contains(said));
+    expect(mapOver(map, plain: true), contains(said));
+  });
+
+  test('a tab\'s first page has its bar under it, its own tab lit', () {
+    final sheet = Sheet.parse('''
+pages:
+  - ${_page('feed', 'Tabs')}
+  - ${_page('search', 'Tabs')}
+  - ${_page('me', 'Tabs')}
+tabs:
+  - pages:
+      - {page: feed, trigger: text:Feed}
+      - {page: search, trigger: text:Search}
+      - {page: me, trigger: text:Me}
+''', m);
+    final map = SheetMap(sheet, shots: const {}, m: m);
+    final bars = RegExp(r'<g class="tabbar">(.*?)</g>')
+        .allMatches(mapUnder(map))
+        .map((b) => b[1]!)
+        .toList();
+    expect(bars, hasLength(3));
+    for (final (i, bar) in bars.indexed) {
+      final rects = RegExp('<rect[^>]*>').allMatches(bar).toList();
+      expect(rects, hasLength(3));
+      for (final (j, rect) in rects.indexed) {
+        expect(rect[0]!.contains('class="on"'), i == j, reason: 'bar $i');
+      }
+    }
+    // The first pages of one bar's tabs stand in one column.
+    final nodes = map.layout.nodes;
+    expect(nodes['search']!.left, nodes['feed']!.left);
+    expect(nodes['me']!.left, nodes['feed']!.left);
   });
 
   test('arrows that go back are bundled apart from those that do not, and '

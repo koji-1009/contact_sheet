@@ -683,7 +683,7 @@ edges:
     final sheet = Sheet.parse('''
 pages:
   - {id: a, label: A, states: [{name: s, preview: a.dart#a}]}
-  - {id: b, label: B, states: [{name: s, preview: b.dart#b}]}
+  - {id: b, label: B, states: [{name: s, preview: b.dart#b}, {name: t, preview: b.dart#b@1}]}
 edges:
   - {from: b, to: a, trigger: text:A}
 ''', _m);
@@ -691,21 +691,45 @@ edges:
       'b:s',
       'b>a text:A push => a:s',
     ]);
+    // In the state chosen, alone too.
+    expect(_said(sheet, sheet.router.route('b', 't', 'a')), [
+      'b:t',
+      'b>a text:A push => a:s',
+    ]);
     expect(sheet.router.route('a', null, 'b').steps, isNull);
   });
 
-  test('it reads sheet.json as it reads the sheet', () {
-    for (final sheet in [_shop, _random(Random(1)), _random(Random(2))]) {
+  test('it reads sheet.json as it reads the sheet: tab bars, parents, '
+      'states and the values chosen too', () {
+    for (final sheet in [
+      _shop,
+      _random(Random(1)),
+      _random(Random(2)),
+      _random(Random(3), tabs: true),
+      _random(Random(4), tabs: true),
+    ]) {
       final json = jsonDecode(
         jsonEncode(SheetMap(sheet, shots: const {}, m: _m).json(app: 'shop')),
       ) as Map<String, Object?>;
       final router = Router.fromJson(json);
       for (final from in sheet.pages) {
-        for (final to in sheet.pages) {
-          expect(
-            jsonEncode(router.route(from.id, null, to.id).toJson()),
-            jsonEncode(sheet.router.route(from.id, null, to.id).toJson()),
-          );
+        for (final state in [null, from.states.last.name]) {
+          for (final chosen in [
+            const <String, String>{},
+            for (final c in sheet.conditions) {c.name: c.values.last},
+          ]) {
+            for (final to in sheet.pages) {
+              expect(
+                jsonEncode(
+                  router.route(from.id, state, to.id, chosen).toJson(),
+                ),
+                jsonEncode(
+                  sheet.router.route(from.id, state, to.id, chosen).toJson(),
+                ),
+                reason: '${from.id} ($state) to ${to.id} under $chosen',
+              );
+            }
+          }
         }
       }
     }
