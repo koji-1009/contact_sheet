@@ -460,10 +460,10 @@ checked:
 Three views of the same pages, and what goes with them:
 
 - **The map.** Each page with its image, each transition an arrow.
-  - A page chosen brings the map to it and to the pages next to it, and shows beside it its states, its memo, its tags and its transitions as sentences, as far as those are shown with the pages.
+  - A page chosen brings the map to it and to the pages next to it, as large as their arrows' words read (where they are too many for that, the page chosen stays in view), and shows beside it its states, its memo, its tags and its transitions as sentences, as far as those are shown with the pages.
   - A state chosen there is shown on the map, with only the arrows that can happen in it, and the pages they arrive at in the state they arrive in; its name is under the page's. A page tapped twice shows its image large.
   - An arrow tapped, or its label, says what it is, as a sentence, beside the map, with the pages at its ends; a label's parts read apart (what is done, the states and the values it needs, a redirect).
-  - It opens where the app starts: its first page with its section, as large as its words read, or whole where the whole map reads so. ⤢ shows it whole; nothing else moves it there: a page or a route let go leaves the map where it is. From far out, the sections' names lead in.
+  - It opens where the app starts: its first page with its section at the top left, as large as its words read and no larger than drawn, or whole where the whole map reads so. ⤢ shows it whole; nothing else moves it there: a page or a route let go leaves the map where it is. From far out, the sections' names lead in.
   - A page's image is loaded once the map shows it large enough to make out, or when it is chosen, next to the page chosen, or on the route.
 - **The tree.** The pages top to bottom, as a site map draws an app: each page under the page from which the fewest steps from the app's start first reach it, by a transition forward or a tab of its bar. It goes by the transitions alone, whatever states and conditions they need: a site map, not a route. A page's children are in the sheet's order, and its branch has the words of what reaches it. A transition back, one from every page, or one from a page to itself is no branch: the map and a page's sentences tell those. The pages nothing from the start reaches are trees of their own, after it, said so. It scrolls, zooms and opens as the map does; a page tapped opens its details.
 - **The list.** One page under the other, by section, each with its states and the pages it goes to and comes from. With it, the table of every transition (by page: in which state, doing what, it leads where).
@@ -474,11 +474,11 @@ And in every view:
 - **A page's details**, and each image opening large.
 - **Search**: pages by their names, memo, states, tags (their names and values) and what is done on them (a button's words find its page). The table narrows as it is typed.
 - **How much the map shows**, chosen under it: the pages alone, with the arrows, or with what each arrow says (the default); and the arrows back, shown or hidden (tapping "Back" in the legend). A page chosen, or a route, shows its own arrows whatever is chosen, and beside the map says them as sentences.
-- **What is shown with the pages** ("With"), on the map above each page and beside a page chosen: its transitions as sentences, its memo, and each tag, each shown (the default) or hidden.
+- **What is shown with the pages** ("With"), on the map above each page and beside a page chosen: its transitions as sentences, its memo, and each tag, each shown (the default) or hidden. Above a page, they are one row no wider than it, those past it one `+<n>`.
 - **Variants**, chosen in the header ("Shown as"): every image follows, and the map and the tree are laid out again, each page's box its screen at the scale the first variant's is drawn at.
 - **Where it is from**: which app it was drawn from (its version and branch; its commit, for developers), when it was exported, and, with a basis, how many changes to the app's code the sheet names for no page.
 - **For developers**, ticked: what only developers read (the code's names, files, fakes, `go` and `replace`).
-- Light or dark as the browser is set; on a phone, one column; printed, the list or the table.
+- Light or dark as the browser is set; on a phone, one column, where it is from behind the app's name, and what the map shows behind one button under it; printed, the list or the table.
 - **Addresses**, to pass a view around:
   - `#map/<page id>`, `#map/<page id>/<state>`;
   - `#route/<from>/<to>`, `#route/<from>/<state>/<to>`, each followed by `/<condition>=<value>` for each value chosen;

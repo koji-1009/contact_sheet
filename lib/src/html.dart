@@ -181,15 +181,15 @@ body:not(.plain) .plain-only { display: none !important; }
 header { position: sticky; top: 0; z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); padding: 8px 16px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
 header h1 { font-size: 16px; margin: 0; }
 #meta { display: flex; flex-wrap: wrap; gap: 0 10px; }
-header input[type=search] { font: inherit; padding: 4px 10px; border: 1px solid var(--line); border-radius: 6px; min-width: 200px; }
+header input[type=search] { font: inherit; padding: 4px 12px; border: 1px solid var(--line); border-radius: 8px; min-width: 200px; }
 header label { font-size: 12px; color: var(--muted); display: flex; gap: 4px; align-items: center; cursor: pointer; }
-header select { font: inherit; font-size: 13px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--text); }
+header select { font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); }
 nav { display: flex; gap: 4px; margin-left: auto; }
-nav button { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 6px; padding: 4px 12px; cursor: pointer; font: inherit; }
+nav button { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 8px; padding: 4px 12px; cursor: pointer; font: inherit; }
 nav button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
 main > section { display: none; }
 main > section.on { display: block; }
-button.link { border: 1px solid var(--line); background: var(--surface); color: var(--accent); border-radius: 6px; padding: 1px 10px; cursor: pointer; font: inherit; font-size: 12px; }
+button.link { border: 1px solid var(--line); background: var(--surface); color: var(--accent); border-radius: 8px; padding: 2px 12px; cursor: pointer; font: inherit; font-size: 12px; }
 .badge { display: inline-block; border-radius: 999px; padding: 0 8px; font-size: 12px; border: 1px solid currentColor; white-space: nowrap; }
 .e-sheet { color: var(--e-sheet); } .e-entry { color: var(--e-entry); }
 .changed { color: var(--changed); }
@@ -198,8 +198,8 @@ button.badge { background: none; font: inherit; font-size: 12px; cursor: pointer
 code { font: 12px ui-monospace, Menlo, monospace; }
 /* What the sheet says of a page: its memo and tags, each value with its
    tag's name. */
-.memo { white-space: pre-wrap; margin: 6px 0 10px; padding: 8px 12px; background: var(--surface); border-left: 3px solid var(--accent); border-radius: 4px; }
-.tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.memo { white-space: pre-wrap; margin: 8px 0 12px; padding: 8px 12px; background: var(--surface); border-left: 3px solid var(--accent); border-radius: 4px; }
+.tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
 .tags a, .tags span { display: inline-flex; gap: 6px; align-items: baseline; border: 1px solid var(--line); border-radius: 999px; padding: 1px 10px; font-size: 12px; background: var(--surface); color: var(--accent); text-decoration: none; }
 .tags a:hover { border-color: var(--accent); background: var(--hover); }
 .tags a::after { content: '↗'; }
@@ -220,6 +220,8 @@ code { font: 12px ui-monospace, Menlo, monospace; }
 .node img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
 .node .no-preview { display: flex; height: 100%; align-items: center; justify-content: center; padding: 8px; text-align: center; font-size: 11px; color: var(--muted); }
 .node .label { height: var(--label-height); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; line-height: 1.2; white-space: nowrap; }
+/* A tab's first page has its bar under the image (3px down, 3px tall): its name from under the bar, the state's under that, past the label's room. */
+.node.tabbed .label { justify-content: flex-start; padding-top: 7px; }
 /* Another state than its first: named under the page's name. */
 .node .label small { font-size: 10px; color: var(--accent); }
 .node .label small:empty { display: none; }
@@ -233,8 +235,8 @@ code { font: 12px ui-monospace, Menlo, monospace; }
 .node:focus { outline: none; }
 .node:focus-visible .img { outline: 3px solid var(--accent); outline-offset: 2px; }
 .node.sel .img { border: 3px solid var(--accent); }
-/* Above the image, not on it: the image stays readable. On the right, in one row (the room the layout keeps above the page), to the left past the page where they are many: the section's name is above the row. */
-.node .marks { position: absolute; bottom: calc(100% + 4px); right: 0; display: flex; gap: 4px; }
+/* Above the image, not on it: the image stays readable. In one row no wider than the page (the room the layout keeps above it; those past it in one +N), where it covers the fewest arrows meeting the page's top (placeMarks). */
+.node .marks { position: absolute; bottom: calc(100% + 4px); left: 0; display: flex; gap: 4px; }
 .node .marks:empty { display: none; }
 .mark { background: var(--accent); color: #fff; border-radius: 999px; padding: 0 6px; font-size: 11px; line-height: 18px; white-space: nowrap; text-decoration: none; }
 a.mark::after { content: ' ↗'; }
@@ -256,47 +258,53 @@ path.edge, g.lbl, g.entry, g.bundle, g.blbl { transition: opacity .3s; }
 #under path.hit { stroke: transparent; stroke-width: 14; stroke-dasharray: none; fill: none; pointer-events: stroke; cursor: pointer; }
 #over :is(g.lbl, g.blbl) { pointer-events: auto; cursor: pointer; }
 .tools { position: absolute; right: 12px; top: 12px; display: flex; gap: 4px; z-index: 2; }
-.tools button { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 6px; min-width: 32px; height: 32px; cursor: pointer; font-size: 16px; }
-.tools #routeOpen { font-size: 13px; padding: 0 10px; }
+.tools button { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 8px; min-width: 32px; height: 32px; cursor: pointer; font-size: 16px; }
+.tools #routeOpen { font-size: 13px; padding: 0 12px; }
 /* Under the map: how much it shows, and what its lines are. */
 .bar { position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; pointer-events: none; }
 /* Each group whole on its line, to the next where it does not fit; one wider than the map, its buttons over lines. */
 .bar > * { pointer-events: auto; flex: none; max-width: 100%; }
-.levels { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 3px 3px 3px 10px; font-size: 12px; }
+.levels { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 4px 4px 4px 12px; font-size: 12px; }
 .levels > span { color: var(--muted); margin-right: 4px; }
-.levels button { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 6px; padding: 2px 10px; cursor: pointer; font: inherit; }
+.levels button { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 4px; padding: 2px 12px; cursor: pointer; font: inherit; }
 .levels button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
-.legend { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; }
+.legend { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; }
+/* On a phone, all this behind one button (#bar-open). */
+#bar-open { display: none; }
 .legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid currentColor; vertical-align: middle; margin-right: 4px; }
 .legend i.dash { border-top-style: dashed; }
 .legend i.dot { border-top-style: dotted; }
 .legend button { border: 0; background: none; color: inherit; font: inherit; padding: 0; cursor: pointer; }
 .legend button[aria-pressed="false"] { opacity: .45; text-decoration: line-through; }
 /* The chosen page, beside the map. */
-#card { position: absolute; right: 12px; bottom: 12px; z-index: 3; width: 320px; max-height: calc(100% - 68px); overflow: auto; overscroll-behavior: contain; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 10px 12px; display: none; cursor: auto; }
-#card.on { display: block; }
+/* Its body scrolls; what can be done with the page stays at its foot. */
+#card { position: absolute; right: 12px; bottom: 12px; z-index: 3; width: 320px; max-height: calc(100% - 68px); flex-direction: column; overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.18); display: none; cursor: auto; }
+#card.on { display: flex; }
+#card .card-body { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 12px 16px; }
 #card h3 { margin: 0 0 2px; font-size: 15px; }
-#card .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-/* The transitions, as sentences. */
-#card h4 { margin: 10px 0 4px; font-size: 12px; color: var(--muted); font-weight: 600; }
+#card .close { float: right; margin-left: 8px; }
+#card .actions { flex: none; display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 16px; border-top: 1px solid var(--line); }
+#card .memo { background: var(--bg); }
+/* The transitions, as sentences: their words in line with the headings, the hover past them. */
+#card h4 { margin: 12px 0 4px; font-size: 12px; color: var(--muted); font-weight: 600; }
 ul.says { margin: 0; padding: 0; list-style: none; font-size: 13px; }
 ul.says li { margin: 2px 0; }
-ul.says a { display: block; padding: 3px 6px; border-radius: 6px; color: var(--text); text-decoration: none; cursor: pointer; }
+ul.says a { display: block; margin: 0 -8px; padding: 4px 8px; border-radius: 8px; color: var(--text); text-decoration: none; cursor: pointer; }
 ul.says a:hover { background: var(--hover); }
 #route ol code, ul.says code { font-size: 11px; }
 /* Which of the page's states the map shows. */
-.card-states { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
-.card-states button { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--text); padding: 3px; cursor: pointer; font: inherit; font-size: 11px; max-width: 76px; }
+.card-states { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 0; }
+.card-states button { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); padding: 3px; cursor: pointer; font: inherit; font-size: 11px; max-width: 76px; }
 .card-states button[aria-pressed="true"] { border-color: var(--accent); outline: 1px solid var(--accent); }
 .card-states img { width: 40px; height: 64px; object-fit: cover; object-position: top; border-radius: 3px; }
 /* The route between two pages, beside the map. */
-#route { position: absolute; left: 12px; top: 12px; z-index: 3; width: 340px; max-height: calc(100% - 72px); overflow: auto; overscroll-behavior: contain; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 10px 12px; display: none; cursor: auto; }
+#route { position: absolute; left: 12px; top: 12px; z-index: 3; width: 340px; max-height: calc(100% - 72px); overflow: auto; overscroll-behavior: contain; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 12px 16px; display: none; cursor: auto; }
 #route.on { display: block; }
-#route h3 { margin: 0 0 8px; font-size: 14px; }
+#route h3 { margin: 0 0 8px; font-size: 15px; }
 #route .close { float: right; }
-#route .pick { display: grid; grid-template-columns: auto 1fr; gap: 6px 8px; align-items: center; font-size: 12px; color: var(--muted); }
-#route select { font: inherit; font-size: 13px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--text); min-width: 0; }
-#route .row-actions { display: flex; gap: 6px; margin: 8px 0; }
+#route .pick { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+#route select { font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); min-width: 0; }
+#route .row-actions { display: flex; gap: 8px; margin: 8px 0; }
 #route ol { margin: 0; padding-left: 20px; font-size: 13px; }
 #route li { margin: 4px 0; }
 #route li small { display: block; color: var(--muted); }
@@ -314,8 +322,9 @@ ul.says a:hover { background: var(--hover); }
 .tree-outside { position: absolute; font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; }
 /* list */
 .wrap { padding: 16px; max-width: 1200px; margin: 0 auto; }
-h2 { font-size: 15px; margin: 24px 0 8px; color: var(--muted); }
-.row { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; scroll-margin-top: 64px; }
+h2 { font-size: 15px; margin: 24px 0 8px; color: var(--muted); }.row { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; margin-bottom: 12px; scroll-margin-top: 64px; }
+/* The tags under what is above them, as far as a memo is. */
+.row > header + .tags, #card-notes > .tags:first-child { margin-top: 8px; }
 .row.hit { outline: 3px solid var(--accent); }
 .row > header { position: static; padding: 0; border: 0; background: none; gap: 8px 12px; }
 .row h3 { font-size: 15px; margin: 0; }
@@ -348,7 +357,7 @@ tr.group td { border-top: 2px solid var(--line); }
 /* detail */
 #detail { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: none; z-index: 10; }
 #detail.on { display: block; }
-#detail .panel { position: absolute; right: 0; top: 0; bottom: 0; width: min(920px, 100%); background: var(--bg); overflow: auto; overscroll-behavior: contain; padding: 16px 20px; box-shadow: -4px 0 24px rgba(0,0,0,.2); }
+#detail .panel { position: absolute; right: 0; top: 0; bottom: 0; width: min(920px, 100%); background: var(--bg); overflow: auto; overscroll-behavior: contain; padding: 16px 24px; box-shadow: -4px 0 24px rgba(0,0,0,.2); }
 #detail .close { float: right; }
 #detail .state { width: calc(240px * var(--k, 1)); }
 /* An image, large. */
@@ -358,14 +367,31 @@ tr.group td { border-top: 2px solid var(--line); }
 #zoom div { color: #fff; font-size: 13px; }
 .scroll { overflow-x: auto; }
 /* A phone: one column, the panels across the map. */
+.kind-inline { display: none; }
 @media (max-width: 640px) {
-  header { padding: 8px 12px; }
+  /* The header in two lines: the app's name and the views; the search. Its version and date behind its name. */
+  header { padding: 8px 12px; gap: 8px; }
+  header h1 { order: -2; flex: 1 1 auto; cursor: pointer; }
+  header h1::after { content: ' ▾'; font-size: 11px; color: var(--muted); }
+  body.meta-open header h1::after { content: ' ▴'; }
+  nav { order: -1; margin-left: 0; }
+  nav button { padding: 4px 8px; font-size: 13px; }
+  #meta { flex-basis: 100%; }
+  body:not(.meta-open) #meta { display: none; }
   header input[type=search] { min-width: 0; flex: 1 1 140px; }
-  nav { margin-left: 0; }
+  /* Of a size to tap. */
+  nav button, button.link, .levels button, .tools button, #bar-open { min-height: 36px; }
+  .tools button { min-width: 36px; }
+  /* Under the map, one button; what it holds, over the map when opened. */
+  #bar-open { display: block; border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 8px; padding: 0 12px; font: inherit; font-size: 12px; cursor: pointer; }
+  .bar:not(.open) > :not(#bar-open) { display: none !important; }
   .flows { grid-template-columns: 1fr; }
   #card { left: 12px; right: 12px; width: auto; bottom: calc(var(--bar-h, 32px) + 20px); max-height: 45%; }
-  #route { right: 12px; width: auto; }
+  #route { right: 12px; width: auto; max-height: 50%; }
   .wrap { padding: 12px; }
+  /* The table's moves in its pages' column: most are none. */
+  th.kind, td.kind { display: none; }
+  .kind-inline { display: inline; }
 }
 /* On paper: the list, or the table, whole; the map is map.svg's, and from
    the map or the tree, the list is printed. */
@@ -401,7 +427,7 @@ tr.group td { border-top: 2px solid var(--line); }
 <main>
   <section id="sec-map"><div id="map-view"><div class="tools"><button id="routeOpen" data-title="route">⇢ <span data-t="routeButton"></span></button><button id="zin" data-title="zoomIn">＋</button><button id="zout" data-title="zoomOut">－</button><button id="fit" data-title="fit">⤢</button></div>
     <div id="canvas"><svg id="under">__MAP_DEFS____MAP_UNDER__</svg><svg id="over">__MAP_OVER__</svg></div>
-    <div class="bar" id="bar"><div class="levels" id="levels"></div><div class="levels" id="notes" hidden></div><div class="legend" id="legend"></div></div><div id="card"></div><div id="route"></div></div></section>
+    <div class="bar" id="bar"><button id="bar-open" aria-expanded="false" aria-controls="bar"><span data-t="show"></span> ▾</button><div class="levels" id="levels"></div><div class="levels" id="notes" hidden></div><div class="legend" id="legend"></div></div><div id="card"></div><div id="route"></div></div></section>
   <section id="sec-tree"><div class="tree-wrap"><div class="tools"><button id="tzin" data-title="zoomIn">＋</button><button id="tzout" data-title="zoomOut">－</button><button id="tfit" data-title="fit">⤢</button></div>
     <div id="tree-view"><div id="tree-sizer"><div id="tree-canvas"></div></div></div></div></section>
   <section id="sec-list"><div class="wrap"><p id="nomatch" data-t="noMatch"></p><div id="page-list"></div></div></section>
@@ -604,6 +630,12 @@ if (unmapped.length) {
 // The map fills what the header leaves, however many lines it wraps to.
 const fitHeader = () => document.documentElement.style.setProperty('--header-h', $('body > header').offsetHeight + 'px');
 fitHeader();
+// On a phone, the app's version and date behind its name, tapped.
+$('#app').addEventListener('click', () => {
+  if (wide()) return;
+  document.body.classList.toggle('meta-open');
+  fitHeader();
+});
 $('#pages').innerHTML = S.pages.map((p) => `<option value="${esc(p.label)}">${esc(p.section)}</option>`).join('');
 document.documentElement.style.setProperty('--label-height', S.canvas.labelHeight + 'px');
 
@@ -675,10 +707,42 @@ function layMap() {
   }
   for (const chip of islandChips) chip.remove();
   islandChips = laid.sections.filter((s) => s.name).map(islandChip);
+  topSpans = spansAtTops();
+}
+// Where the arrows and deep links meeting each page's top run through the
+// room of its marks (marksHeight above it): [left, right] from the page's
+// left, its arrowhead's width either side. An end with the point its line
+// leaves towards: an arrow's control point, a short line's other end.
+const marksHeight = 22;
+let topSpans = {};
+function spansAtTops() {
+  const nums = (el) => (el.getAttribute('d') ?? '').match(/-?\d+(\.\d+)?/g)?.map(Number) ?? [];
+  const ends = [];
+  for (const path of edgePaths) {
+    if (!path) continue;
+    const n = nums(path);
+    if (n.length === 8) ends.push([n[0], n[1], n[2], n[3]], [n[6], n[7], n[4], n[5]]);
+  }
+  for (const g of [...entryLines, ...bundleLines]) {
+    const n = g ? nums(g.querySelector('path')) : [];
+    if (n.length === 4) ends.push([n[2], n[3], n[0], n[1]]);
+  }
+  const spans = {};
+  for (const id of Object.keys(nodes)) {
+    const b = boxOf(id);
+    for (const [x, y, tx, ty] of ends) {
+      if (Math.abs(y - b.y) > 1 || x < b.x - 6 || x > b.x + b.width + 6) continue;
+      // Where its line is at the top of the marks' room.
+      const up = y - ty;
+      const far = up <= 0 ? x : up < marksHeight ? tx : x + (tx - x) * marksHeight / up;
+      (spans[id] ??= []).push([Math.min(x, far) - 5 - b.x, Math.max(x, far) + 5 - b.x]);
+    }
+  }
+  return spans;
 }
 for (const p of S.pages) {
   const n = document.createElement('div');
-  n.className = 'node';
+  n.className = tabItem[p.id] ? 'node tabbed' : 'node';
   n.dataset.id = p.id;
   const s = drawn(p.states[0]);
   n.innerHTML = `<div class="img">${nodeImage(s)}</div><div class="label"><span>${esc(p.label)}</span><small></small></div><div class="marks"></div>`;
@@ -705,6 +769,7 @@ function islandChip(s) {
   chip.textContent = s.name;
   chip.title = T('section');
   chip.style.left = s.x + 'px'; chip.style.top = s.y + 'px';
+  chip.section = s;
   chip.addEventListener('click', (e) => { e.stopPropagation(); if (!moved) show({ x: s.x - 24, y: s.y - 24, width: s.width + 48, height: s.height + 48 }, true); });
   canvas.appendChild(chip);
   return chip;
@@ -751,6 +816,12 @@ const notes = [
 if (!edges.length && !entries.length && !notes.length) $('#bar').style.display = 'none';
 // How tall what is under the map is, for the card on a phone to sit above it.
 const fitBar = () => map.style.setProperty('--bar-h', $('#bar').offsetHeight + 'px');
+// On a phone, what is under the map opened from its one button.
+$('#bar-open').addEventListener('click', () => {
+  const open = $('#bar').classList.toggle('open');
+  $('#bar-open').setAttribute('aria-expanded', open);
+  fitBar();
+});
 // The pages alone (to look at the screens), with the arrows (to see how they
 // lead to each other), or with what each arrow says (the default). Kept in
 // the address (?show=) to pass around, and for the viewer.
@@ -797,20 +868,53 @@ const hidden = (() => {
   try { return new Set(JSON.parse(localStorage.getItem(kept('hide')) ?? '[]')); } catch { return new Set(); }
 })();
 const noteOn = (key) => !hidden.has(key);
+// How wide a mark is drawn: its words at 11px (`.mark`), and its padding.
+const measure = document.createElement('canvas').getContext('2d');
+const markWidth = (text) => {
+  measure.font = '11px system-ui, sans-serif';
+  return Math.ceil(measure.measureText(text).width) + 13;
+};
 // A page's marks above it: its memo, and each tag the state shown has, a
-// link where it is one value that is.
+// link where it is one value that is. In one row no wider than the page,
+// those past it in one +N (the card says them all); along the page's top
+// where it covers the fewest arrows meeting it ([topSpans]), at its right
+// where none.
 function renderMark(p) {
   const marks = [];
-  if (p.memo && noteOn('memo')) marks.push(`<span class="mark" title="${esc(p.memo)}">ⓘ</span>`);
+  if (p.memo && noteOn('memo')) marks.push({ text: 'ⓘ', title: p.memo, html: `<span class="mark" title="${esc(p.memo)}">ⓘ</span>` });
   for (const t of S.tags ?? []) {
     const values = shownTags(p).filter((v) => v.tag === t.name);
     if (!values.length || !noteOn('tag:' + t.name)) continue;
-    const title = esc(values.map((v) => v.label).join('\n'));
-    marks.push(values.length === 1 && followed(values[0].url)
-      ? `<a class="mark" href="${esc(values[0].url)}" target="_blank" rel="noopener noreferrer" title="${title}">${esc(t.name)}</a>`
-      : `<span class="mark" title="${title}">${esc(t.name)}${values.length > 1 ? ' ×' + values.length : ''}</span>`);
+    const title = values.map((v) => v.label).join('\n');
+    const link = values.length === 1 && followed(values[0].url);
+    const text = t.name + (link ? ' ↗' : values.length > 1 ? ' ×' + values.length : '');
+    marks.push({ text, title: `${t.name}: ${title}`, html: link
+      ? `<a class="mark" href="${esc(values[0].url)}" target="_blank" rel="noopener noreferrer" title="${esc(title)}">${esc(t.name)}</a>`
+      : `<span class="mark" title="${esc(title)}">${esc(text)}</span>` });
   }
-  nodes[p.id].querySelector('.marks').innerHTML = marks.join('');
+  const width = boxOf(p.id).width;
+  const widths = marks.map((m) => markWidth(m.text));
+  const across = (k) => widths.slice(0, k).reduce((sum, w) => sum + w + 4, 0);
+  let shown = marks.length;
+  if (across(shown) - 4 > width) {
+    shown--;
+    while (shown > 0 && across(shown) + markWidth('+' + (marks.length - shown)) > width) shown--;
+  }
+  const rest = marks.slice(shown);
+  const row = across(shown) + (rest.length ? markWidth('+' + rest.length) : -4);
+  const box = nodes[p.id].querySelector('.marks');
+  box.innerHTML = marks.slice(0, shown).map((m) => m.html).join('')
+    + (rest.length ? `<span class="mark" title="${esc(rest.map((m) => m.title).join('\n'))}">+${rest.length}</span>` : '');
+  const spans = topSpans[p.id] ?? [];
+  const covers = (l) => spans.reduce((sum, [a, b]) => sum + Math.max(0, Math.min(b, l + row) - Math.max(a, l)), 0);
+  const room = width - row;
+  let left = room;
+  for (const l of spans.flatMap(([a, b]) => [b, a - row, 0])) {
+    if (l < 0 || l > room) continue;
+    const c = covers(l), best = covers(left);
+    if (c < best || (c === best && l > left)) left = l;
+  }
+  box.style.left = Math.min(left, room) + 'px';
 }
 function renderMarks() {
   for (const p of S.pages) renderMark(p);
@@ -853,9 +957,33 @@ const readable = 0.75, far = 0.45;
 const apply = () => {
   canvas.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.k})`;
   canvas.style.setProperty('--inv', 1 / view.k);
-  canvas.classList.toggle('far', islandChips.length >= 4 && view.k < far);
+  const isFar = islandChips.length >= 4 && view.k < far;
+  canvas.classList.toggle('far', isFar);
+  if (isFar) keepChips();
   loadImages();
 };
+// The sections' names, far out, each at its island's top left; of an
+// island the map shows, kept inside the map's sides (a name is wider than a
+// small island) and clear of its tools.
+function keepChips() {
+  const m = map.getBoundingClientRect();
+  const t = $('.tools').getBoundingClientRect();
+  const tools = { left: t.left - m.left - 8, bottom: t.bottom - m.top + 8 };
+  for (const chip of islandChips) {
+    const s = chip.section;
+    const left = view.x + s.x * view.k, right = left + s.width * view.k;
+    const top = view.y + s.y * view.k, bottom = top + s.height * view.k;
+    let x = left, y = top;
+    if (right > 0 && left < m.width && bottom > 0 && top < m.height) {
+      const w = chip.offsetWidth;
+      x = Math.max(8, Math.min(x, m.width - 8 - w));
+      y = Math.max(8, y);
+      if (x + w > tools.left && y < tools.bottom) y = tools.bottom;
+    }
+    chip.style.left = (x - view.x) / view.k + 'px';
+    chip.style.top = (y - view.y) / view.k + 'px';
+  }
+}
 // The pages' images, loaded where the map shows them: on it, or a quarter
 // of the view off it (to be there when moved to); not far out, where they
 // are too small to make out, but for a page chosen and the pages next to
@@ -886,17 +1014,21 @@ function loadImages() {
 // opens where the app starts ([showStart]).
 let placed = false;
 // Moves the map to show [box] (in map pixels) whole, gliding there; clear
-// of the [left], [right], [top] and [bottom] pixels a panel takes. No
-// smaller than [min]: then from its top left, [keep] (a box) in the view.
-function show(box, glide, { left = 0, right = 0, top = 0, bottom = 0, min = 0, keep = null } = {}) {
+// of the [left], [right], [top] and [bottom] pixels a panel takes, and of
+// the tools at the top. No larger than [max]; with [start], from the top
+// left of what it leaves, not in its middle. No smaller than [min]: then
+// from its top left, [keep] (a box) in the view.
+function show(box, glide, { left = 0, right = 0, top = 0, bottom = 0, min = 0, max = 1.6, start = false, keep = null } = {}) {
   const m = map.getBoundingClientRect();
   if (!m.width) return;
-  top = Math.min(top, m.height * 2 / 3);
+  const tools = $('.tools');
+  top = Math.min(Math.max(top, tools.offsetTop + tools.offsetHeight + 8), m.height * 2 / 3);
   right = Math.min(right, m.width / 2);
   const w = m.width - left - right, h = Math.max(m.height - top - bottom, m.height / 3);
-  const k = Math.min(w / box.width, h / box.height, 1.6);
+  const k = Math.min(w / box.width, h / box.height, max);
   if (k >= min) {
-    view = { k, x: left + (w - box.width * k) / 2 - box.x * k, y: top + (h - box.height * k) / 2 - box.y * k };
+    const dx = start ? 0 : (w - box.width * k) / 2, dy = start ? 0 : (h - box.height * k) / 2;
+    view = { k, x: left + dx - box.x * k, y: top + dy - box.y * k };
   } else {
     const pad = 24 / min;
     const at = keep ?? box;
@@ -931,16 +1063,19 @@ function toMiddle(id) {
   apply();
 }
 // Where the map opens: whole, where it reads so; else where the app starts,
-// its first page with its section, as large as reads. Nothing else shows
-// it whole but its button: whole, a large app's pages are too small to make
-// out.
+// its first page with its section, as large as reads, at the map's top left
+// with what follows it beside. No larger than drawn: a small section is not
+// blown up. Nothing else shows it whole but its button: whole, a large
+// app's pages are too small to make out.
 function showStart(glide) {
   const m = map.getBoundingClientRect();
   const all = whole();
-  if (Math.min(m.width / all.width, m.height / all.height) >= readable) { show(all, glide); return; }
+  if (Math.min(m.width / all.width, m.height / all.height) >= readable) { show(all, glide, { max: 1 }); return; }
   const b = boxOf(S.pages[0].id);
   const island = laid.sections.find((s) => b.x >= s.x && b.y >= s.y && b.x + b.width <= s.x + s.width && b.y + b.height <= s.y + s.height);
-  show(island ?? around([S.pages[0].id]), glide, { min: readable, keep: b });
+  const pad = 24;
+  const at = island ? { x: island.x - pad, y: island.y - pad, width: island.width + pad * 2, height: island.height + pad * 2 } : around([S.pages[0].id]);
+  show(at, glide, { min: readable, max: 1, start: true, keep: b });
 }
 // Whether the panels sit beside what the map shows, or across it (a phone):
 // as the CSS lays them out.
@@ -1103,13 +1238,15 @@ function focus(id, glide, { state } = {}) {
     }
   });
   highlight(near, (i) => on.has(i), (i) => entries[i].to === focused, focused);
-  card.innerHTML = `<h3>${esc(p.label)}</h3><div class="meta">${esc(p.section)}</div>${tabMeta(p)}<div class="meta dev">${codeMeta(p)}</div>${statesHtml(p)}<div id="card-notes">${cardNotes(p)}</div>
+  card.innerHTML = `<div class="card-body">${cardClose}<h3>${esc(p.label)}</h3><div class="meta">${esc(p.section)}</div>${tabMeta(p)}<div class="meta dev">${codeMeta(p)}</div>${statesHtml(p)}<div id="card-notes">${cardNotes(p)}</div></div>
     <div class="actions"><button class="link" id="enlarge">${esc(T('enlarge'))}</button><button class="link" data-go="list/${esc(p.id)}">${esc(T('inList'))}</button><button class="link" data-detail="${esc(p.id)}">${esc(T('detail'))}</button></div>`;
   card.classList.add('on');
   $('#enlarge').onclick = () => enlarge(focused);
   // The pages beside the card, at the right; on a phone, where it lies
-  // across the bottom, above it.
-  show(around(frame), glide, clearOfCard(card));
+  // across the bottom, above it. As large as the arrows' words read: where
+  // the pages next to it are too many for that, the page chosen is kept in
+  // the view, and the card names them all.
+  show(around(frame), glide, { ...clearOfCard(card), min: readable, keep: around([focused]) });
 }
 // An arrow tapped on the map, or its label (a bundle's: each arrow in it):
 // what it is, as a sentence, in the card, with the pages at its ends.
@@ -1123,13 +1260,16 @@ function pick(list, glide) {
   const ends = new Set(list.flatMap((i) => [edges[i].from, edges[i].to]));
   highlight(ends, (i) => list.includes(i), () => false, null);
   const card = $('#card');
-  card.innerHTML = `<h3>${esc(T('legendSheet'))}</h3><ul class="says">${list.map((i) => `<li>${sentence(edges[i], { from: true })}</li>`).join('')}</ul>
+  card.innerHTML = `<div class="card-body">${cardClose}<h3>${esc(T('legendSheet'))}</h3><ul class="says">${list.map((i) => `<li>${sentence(edges[i], { from: true })}</li>`).join('')}</ul></div>
     <div class="actions">${[...ends].map((id) => `<button class="link" data-go="map/${esc(id)}">${esc(label(id))}</button>`).join('')}</div>`;
   card.classList.add('on');
   show(around(ends), glide, clearOfCard(card));
 }
+// The card closed, as the route's panel is: what is chosen lets go.
+const cardClose = `<button class="link close" data-close-card>${esc(T('close'))}</button>`;
 // A state chosen beside the page: the map shows it, and its address says it.
 $('#card').addEventListener('click', (e) => {
+  if (e.target.closest('[data-close-card]')) { go('map'); return; }
   const b = e.target.closest('[data-state]');
   if (!b || !focused) return;
   const p = pageById[focused];
@@ -1380,14 +1520,18 @@ function action(e) {
 }
 // A redirect and a back tell anyone something; push, go and replace only
 // how the code keeps its pages.
-const kindWords = (e) => e.kind === 'redirect' || e.kind === 'pop'
+const forAnyone = (e) => e.kind === 'redirect' || e.kind === 'pop';
+const kindWords = (e) => forAnyone(e)
   ? esc(T('kind_' + e.kind)) : `<span class="dev">${esc(T('kind_' + e.kind))}</span>`;
+// On a phone, its own column gone, after what is done (each table with a
+// move has that column).
+const kindAfter = (e) => `<span class="kind-inline${forAnyone(e) ? '' : ' dev'}"> · ${esc(T('kind_' + e.kind))}</span>`;
 const COLS = {
   from: [esc(T('colFrom')), (e) => e.anywhere ? esc(T('fromAnywhere')) : link(e.from)],
   to: [esc(T('colTo')), (e) => link(e.to) + arriving(e, null)],
-  trigger: [esc(T('colTrigger')), action],
+  trigger: [esc(T('colTrigger')), (e) => action(e) + kindAfter(e)],
   when: [esc(T('colWhen')), (e) => esc(needs(e).length ? needs(e).join(T('conditionAnd')) : T('whenAny'))],
-  kind: [esc(T('colKind')), kindWords],
+  kind: [esc(T('colKind')), kindWords, 'kind'],
   code: [esc(T('colCode')), (e) => e.source ? `<code>${esc(e.source)}</code>` : '—', 'dev'],
   via: [esc(T('colVia')), (e) => esc(e.via)],
 };
@@ -1397,7 +1541,7 @@ const entryRows = (list, cols) => list.length ? `<h2>${esc(T('entries'))}</h2>${
 // in the sheet's order.
 const pageOrder = Object.fromEntries(S.pages.map((p, i) => [p.id, i]));
 const rowOrder = (e) => e.anywhere ? -1 : pageOrder[e.from];
-$('#edge-table').innerHTML = edgeRows([...once].sort((a, b) => rowOrder(a) - rowOrder(b)),
+$('#edge-table').innerHTML = `<h2>${esc(T('tabTable'))}</h2>` + edgeRows([...once].sort((a, b) => rowOrder(a) - rowOrder(b)),
   [COLS.from, COLS.when, COLS.trigger, COLS.to, COLS.kind, COLS.code], true)
   + entryRows(entries, [COLS.to, COLS.via, COLS.code]);
 

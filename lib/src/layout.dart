@@ -869,18 +869,29 @@ class MapLayout {
       final line = [for (var i = 1; i < 20; i++) bezier(s, c1, c2, e, i / 20)];
       final side = Point(w / 2 + 6, 0);
       final step = Point(0, h + 2);
-      final candidates = [
-        for (final t in [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8])
-          for (final p in [bezier(s, c1, c2, e, t)]) ...[
-            p,
-            p + side,
-            p - side,
-            for (var k = 1; k <= 3; k++) ...[
-              p + step * k.toDouble(),
-              p - step * k.toDouble(),
-            ],
-          ],
-      ];
+      // A jump's label starts where its short arrow ends, as it reads on:
+      // centred on so short an arrow, it would lie over its own page.
+      final ahead = e + Point(w / 2 + 4, 0);
+      final candidates = jumps.contains(edge)
+          ? [
+              ahead,
+              for (var k = 1; k <= 3; k++) ...[
+                ahead + step * k.toDouble(),
+                ahead - step * k.toDouble(),
+              ],
+            ]
+          : [
+              for (final t in [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8])
+                for (final p in [bezier(s, c1, c2, e, t)]) ...[
+                  p,
+                  p + side,
+                  p - side,
+                  for (var k = 1; k <= 3; k++) ...[
+                    p + step * k.toDouble(),
+                    p - step * k.toDouble(),
+                  ],
+                ],
+            ];
       double away(Box box) => line.map(box.center.distanceTo).reduce(math.min);
       placed[edge] = _cheapest(
         candidates,

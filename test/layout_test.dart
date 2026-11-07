@@ -100,6 +100,10 @@ edges:
           expect(map.bundleLabel(bundle), endsWith('← ${edge.from}'));
         }
         expect(map.drawnLabel(edge), endsWith('→ ${edge.to}'));
+        // Its label after its arrow, off its page.
+        final label = map.edgeLabels[edge]!;
+        expect(label.left, greaterThanOrEqualTo(d.x));
+        expect(label.overlap(layout.nodes[edge.from]!), 0);
         continue;
       }
       // Drawn whole: through where no island's pages are but its own two's.

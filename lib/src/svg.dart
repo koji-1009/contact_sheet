@@ -52,7 +52,7 @@ final mapCss =
     '''
 .map-bg { fill: var(--bg); }
 .island { fill: var(--island); }
-.island-name { font-size: 13px; font-weight: 600; fill: var(--muted); }
+.island-name { font-size: 13px; font-weight: 600; fill: var(--muted); paint-order: stroke; stroke: var(--island); stroke-width: 4px; stroke-linejoin: round; }
 path.edge { fill: none; stroke: var(--e-sheet); stroke-width: 1.5; }
 path.edge.pop, g.bundle.pop path { stroke-dasharray: 6 4; }
 .arrow-sheet { fill: var(--e-sheet); }
@@ -98,12 +98,6 @@ String mapUnder(SheetMap map) {
       '<rect class="island" x="${_n(b.left)}" y="${_n(b.top)}" '
       'width="${_n(b.width)}" height="${_n(b.height)}" rx="12"/>',
     );
-    if (island.name.isNotEmpty) {
-      out.write(
-        '<text class="island-name" x="${_n(b.left + 12)}" '
-        'y="${_n(b.top + 22)}">${_esc(island.name)}</text>',
-      );
-    }
   }
   // Under each tab's first page, its bar (`g.tabbar`), its own tab lit.
   for (final bar in sheet.tabBars) {
@@ -155,6 +149,16 @@ String mapUnder(SheetMap map) {
       '<title>${_esc('${from.join(', ')} → ${label(bundle.to)}')}</title></g>',
     );
   }
+  // The sections' names over the arrows, edged in the island's colour: an
+  // arrow between sections may pass over one, and it still reads.
+  for (final island in layout.sections) {
+    if (island.name.isEmpty) continue;
+    final b = island.box;
+    out.write(
+      '<text class="island-name" x="${_n(b.left + 12)}" '
+      'y="${_n(b.top + 22)}">${_esc(island.name)}</text>',
+    );
+  }
   return '$out';
 }
 
@@ -182,18 +186,25 @@ String? _labelText(SheetMap map, SheetEdge edge, {required bool plain}) {
 /// an arrow with nothing of that having none.
 String mapOver(SheetMap map, {bool plain = false}) {
   final out = StringBuffer();
-  void label(String cls, int i, Box box, String text) => out.write(
-    '<g class="$cls" data-i="$i"><rect class="edge-bg" '
-    'x="${_n(box.left)}" y="${_n(box.top)}" width="${_n(box.width)}" '
-    'height="${_n(box.height)}" rx="4"/><text class="edge-label" '
-    'x="${_n(box.center.x)}" y="${_n(box.center.y + 4)}" '
-    'text-anchor="middle">$text</text></g>',
-  );
-  // With [plain], a background the size of what is left.
-  Box fit(Box box, String? words) {
+  // With [start], the text from the box's left on (a jump's, after its
+  // arrow): measured again wider, it grows away from the arrow.
+  void label(String cls, int i, Box box, String text, {bool start = false}) =>
+      out.write(
+        '<g class="$cls" data-i="$i"><rect class="edge-bg" '
+        'x="${_n(box.left)}" y="${_n(box.top)}" width="${_n(box.width)}" '
+        'height="${_n(box.height)}" rx="4"/><text class="edge-label" '
+        'x="${_n(start ? box.left + 4 : box.center.x)}" '
+        'y="${_n(box.center.y + 4)}" '
+        'text-anchor="${start ? 'start' : 'middle'}">$text</text></g>',
+      );
+  // With [plain], a background the size of what is left; from the same
+  // left, with [start].
+  Box fit(Box box, String? words, {bool start = false}) {
     if (!plain || words == null) return box;
     final (w, h) = labelSize(words);
-    return Box.around(box.center, w, h);
+    return start
+        ? Box(box.left, box.center.y - h / 2, w, h)
+        : Box.around(box.center, w, h);
   }
 
   for (final (i, edge) in map.sheet.edges.indexed) {
@@ -201,8 +212,9 @@ String mapOver(SheetMap map, {bool plain = false}) {
     if (box == null) continue;
     var text = _labelText(map, edge, plain: plain);
     var words = map.labelOf(edge).plain;
+    final jump = map.jumpTo(edge);
     // A jump says where it goes.
-    if (map.jumpTo(edge) case final to?) {
+    if (jump case final to?) {
       text =
           '${text ?? ''}<tspan class="l-to">${text == null ? '' : ' '}'
           '→ ${_esc(to)}</tspan>';
@@ -210,7 +222,13 @@ String mapOver(SheetMap map, {bool plain = false}) {
     }
     if (text == null) continue;
     final pop = edge.kind == NavigationKind.pop;
-    label('lbl${pop ? ' pop' : ''}', i, fit(box, words), text);
+    label(
+      'lbl${pop ? ' pop' : ''}',
+      i,
+      fit(box, words, start: jump != null),
+      text,
+      start: jump != null,
+    );
   }
   for (final (i, entry) in map.sheet.entries.indexed) {
     label('entry', i, map.entryLabels[entry]!, _esc(entry.via));
