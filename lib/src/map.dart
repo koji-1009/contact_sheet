@@ -105,9 +105,17 @@ class SheetMap {
     this.drift,
     this.release,
     this.laidOutIn,
+    this.imagesDir = defaultImagesDir,
   });
 
   final Sheet sheet;
+
+  /// The folder the images are in, next to `index.html`, as `index.html`
+  /// and `sheet.json` name it: a relative path, `/` between its parts.
+  final String imagesDir;
+
+  /// [imagesDir] unless told.
+  static const defaultImagesDir = 'images';
 
   /// The variant the map is laid out in (the first by default): each page's
   /// box is its first state as that variant shot it, at the scale the first
@@ -123,6 +131,7 @@ class SheetMap {
     drift: drift,
     release: release,
     laidOutIn: variant,
+    imagesDir: imagesDir,
   );
 
   /// shutter's shot of each state, by [shotKeyOf].
@@ -646,7 +655,7 @@ class SheetMap {
               : null),
       'width': width,
       'height': height,
-      'image': image == null ? null : 'images/$image',
+      'image': image == null ? null : '$imagesDir/$image',
       'error': shot?.status == ShotStatus.error ? shot!.error ?? '' : null,
     };
   }

@@ -34,7 +34,7 @@ Contact Sheet draws the sheet as it is: it does not check it against the app.
 
 `contact_sheet/map/` holds:
 
-- `index.html`, with the images in `images/` next to it: opened from disk or served anywhere.
+- `index.html`, with the images in `images/` next to it (or the folder `--images` names): opened from disk or served anywhere.
 - `sheet.json`: what it is drawn from, for other tools and AI agents.
 - With `export --svg`, `map.svg`: the whole map as one picture, images included, to be passed around alone; `map-dev.svg`, with what developers read too.
 

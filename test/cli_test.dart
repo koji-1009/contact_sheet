@@ -327,6 +327,37 @@ pages:
     }
   });
 
+  test('export --images writes the images there; one that cannot be a '
+      'folder of the export is a wrong use', () async {
+    File('${app.path}/contact_sheet/sheet.yaml')
+      ..createSync(recursive: true)
+      ..writeAsStringSync(
+        'pages: [{id: home, label: Home, '
+        'states: [{name: s, preview: lib/home.dart#home}]}]',
+      );
+    File('${app.path}/lib/home.dart')
+      ..createSync(recursive: true)
+      ..writeAsStringSync('// previews\n');
+    expect(await cli(['export', '--images', 'static/shots', app.path]), 0);
+    expect(
+      Directory('${app.path}/contact_sheet/map/static/shots').existsSync(),
+      isTrue,
+    );
+    expect(
+      Directory('${app.path}/contact_sheet/map/images').existsSync(),
+      isFalse,
+    );
+    for (final wrong in ['../up', '/abs', 'sheet.json']) {
+      ratios.clear();
+      expect(await cli(['export', '--images', wrong, app.path]), 64);
+      expect(
+        err.reversed.elementAt(1),
+        startsWith('Not a folder for the images: $wrong ('),
+      );
+      expect(ratios, isEmpty);
+    }
+  });
+
   test('lint says when it finds nothing, and when only what checked '
       'names', () async {
     final sheet = File('${app.path}/contact_sheet/sheet.yaml')

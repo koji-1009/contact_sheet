@@ -673,6 +673,76 @@ pages:
     );
   });
 
+  test('the images go in the folder told, which index.html and sheet.json '
+      'name; the folder an export before used goes', () async {
+    SheetExport export(String images) => SheetExport(
+      repo,
+      runner: Tools(),
+      shoot: _Shutter(shots.path).shot,
+      m: Messages.of('en'),
+      imagesDir: images,
+    );
+    final first = await export(SheetMap.defaultImagesDir).run();
+    final out = first.dir;
+    expect(Directory(p.join(out, 'images')).existsSync(), isTrue);
+    await export('assets/shots').run();
+    final told = Directory(p.join(out, 'assets', 'shots'));
+    expect(told.listSync(), hasLength(3));
+    expect(Directory(p.join(out, 'images')).existsSync(), isFalse);
+    final data = jsonDecode(
+      File(p.join(out, 'sheet.json')).readAsStringSync(),
+    ) as Map<String, Object?>;
+    final images = [
+      for (final page in data['pages']! as List<Object?>)
+        if (page case {'states': final List<Object?> states})
+          for (final state in states)
+            if (state case {'image': final String image}) image,
+    ];
+    expect(images, isNotEmpty);
+    expect(images, everyElement(startsWith('assets/shots/')));
+    for (final image in images) {
+      expect(File(p.join(out, image)).existsSync(), isTrue, reason: image);
+    }
+    expect(
+      File(p.join(out, 'index.html')).readAsStringSync(),
+      contains('"image":"assets/shots/'),
+    );
+    // Kept from there, with only some pages.
+    final lines = <String>[];
+    await SheetExport(
+      repo,
+      runner: Tools(),
+      shoot: _Shutter(shots.path).shot,
+      m: Messages.of('en'),
+      imagesDir: 'assets/shots',
+      log: lines.add,
+    ).run(null, {'home'});
+    expect(lines, contains('Images kept from the map before: 1'));
+    expect(told.listSync(), hasLength(3));
+    // Back to the default: assets/shots goes.
+    await export(SheetMap.defaultImagesDir).run();
+    expect(told.existsSync(), isFalse);
+    expect(Directory(p.join(out, 'images')).listSync(), hasLength(3));
+    for (final wrong in [
+      '',
+      '.',
+      '../up',
+      '/abs',
+      'a b',
+      'a//b',
+      'index.html',
+    ]) {
+      expect(SheetExport.isImagesDir(wrong), isFalse, reason: wrong);
+      await expectLater(
+        export(wrong).run(),
+        throwsA(
+          isA<ExportException>().having((e) => e.exitCode, 'exitCode', 64),
+        ),
+        reason: wrong,
+      );
+    }
+  });
+
   test('with only some pages, the others keep each variant\'s image, one '
       'shot two variants\' too', () async {
     // The Desktop variant names the second Preview, which the second state

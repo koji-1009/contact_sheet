@@ -16,6 +16,8 @@
   "helpStrict": "画像のない状態があれば失敗にする（終了コード 65）",
   "helpPixelRatio": "Preview を描く画素の倍率（画面の 1 論理ピクセルあたりの画像のピクセル数）",
   "noPixelRatio": "画素の倍率ではありません: {ratio}",
+  "helpImages": "画像を書き出し、index.html が読む、index.html の隣のフォルダ（相対パス、区切りは /）。書き出すたびに置き換える",
+  "noImagesDir": "画像のフォルダにできません: {dir}（相対パスで区切りは /、各部分は英数字と . _ - のみ、. と .. は不可、書き出すファイルの名前も不可）",
   "helpSvg": "map.svg と map-dev.svg も書き出す（画像を含む地図全体の 1 枚絵。単体で渡せる）",
   "exportUnknownPage": "sheet に {id} という画面はありません",
   "exportKept": "前の地図から使った画像: {count}",

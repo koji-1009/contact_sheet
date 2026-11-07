@@ -33,7 +33,8 @@ typedef Shoot = Future<ShotRun> Function(
 /// is drawn from), or into a folder of its own elsewhere:
 ///
 /// - `index.html`: the map and the list of the pages, the table of the
-///   transitions; one file, the images next to it in `images/`;
+///   transitions; one file, the images next to it in `images/` (or the
+///   folder [imagesDir] names);
 /// - `sheet.json`: what `index.html` is drawn from, for other tools and AI
 ///   agents;
 /// - with [svg], `map.svg`: the whole map as one picture, images included,
@@ -52,9 +53,33 @@ class SheetExport {
     this.locale,
     this.svg = false,
     this.pixelRatio = defaultPixelRatio,
+    this.imagesDir = SheetMap.defaultImagesDir,
     this.log = _silent,
     void Function(String line)? warn,
   }) : warn = warn ?? log;
+
+  /// The folder, next to `index.html`, the images are written in and
+  /// `index.html` reads them from: a relative path ([isImagesDir]).
+  final String imagesDir;
+
+  /// Whether [dir] can be the images' folder: a path relative to the
+  /// export's folder, `/` between its parts, each of letters, digits, `.`,
+  /// `_` and `-` (as it is written in `index.html`), none of them `.` or
+  /// `..`, and not a file the export writes. The export replaces it, so it
+  /// is its own.
+  static bool isImagesDir(String dir) {
+    final parts = dir.split('/');
+    return parts.every(
+          (s) =>
+              RegExp(r'^[A-Za-z0-9._-]+$').hasMatch(s) && s != '.' && s != '..',
+        ) &&
+        !const {
+          'index.html',
+          'sheet.json',
+          'map.svg',
+          'map-dev.svg',
+        }.contains(parts.first);
+  }
 
   final SheetRepo repo;
   final ProcessRunner runner;
@@ -124,6 +149,9 @@ class SheetExport {
     String? folder,
     Set<String> only = const {},
   ]) async {
+    if (!isImagesDir(imagesDir)) {
+      throw ExportException(m.noImagesDir(imagesDir), ExitCode.usage.code);
+    }
     final sheet = readSheet();
     for (final id in only) {
       if (!sheet.pages.any((p) => p.id == id)) {
@@ -152,6 +180,7 @@ class SheetExport {
         m: Messages.of(locale ?? sheet.locale ?? 'en'),
         drift: await drift,
         release: (version: repo.appVersion, commit: commit, branch: branch),
+        imagesDir: imagesDir,
       );
       final missing = _tellMissing(map, only);
       _write(out, map);
@@ -487,9 +516,17 @@ class SheetExport {
 
   void _write(String out, SheetMap map) {
     Directory(out).createSync(recursive: true);
-    final images = Directory(p.join(out, 'images'));
+    // The folder an export before put its images in, when another: not
+    // this map's.
+    for (final before in _imagesDirsIn(out)) {
+      final dir = Directory(p.joinAll([out, ...before.split('/')]));
+      if (before != imagesDir && dir.existsSync()) {
+        dir.deleteSync(recursive: true);
+      }
+    }
+    final images = Directory(p.joinAll([out, ...imagesDir.split('/')]));
     if (images.existsSync()) images.deleteSync(recursive: true);
-    images.createSync();
+    images.createSync(recursive: true);
     // Each page's first state in the first variant, for the SVGs, which
     // hold its image.
     final firsts = <SheetState, List<int>>{};
@@ -533,6 +570,31 @@ class SheetExport {
         file.deleteSync();
       }
     }
+  }
+
+  /// The folders the map at [out] has its images in, as its `sheet.json`
+  /// names them: those that can be one ([isImagesDir]).
+  Set<String> _imagesDirsIn(String out) {
+    final Object? json;
+    try {
+      json = jsonDecode(File(p.join(out, 'sheet.json')).readAsStringSync());
+    } on FileSystemException {
+      return const {};
+    } on FormatException {
+      return const {};
+    }
+    return {
+      if (json case {'pages': final List<Object?> pages})
+        for (final page in pages)
+          if (page case {'states': final List<Object?> states})
+            for (final state in states)
+              if (state case {'variants': final List<Object?> drawn})
+                for (final d in drawn)
+                  if (d case {'image': final String image}
+                      when image.contains('/') &&
+                          isImagesDir(p.posix.dirname(image)))
+                    p.posix.dirname(image),
+    };
   }
 
   /// What the app changed since the sheet's basis, if it has one.

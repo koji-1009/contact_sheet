@@ -245,12 +245,12 @@ checked:
 
 ## The map
 
-`sheet export` writes the map to `contact_sheet/map/`; with `--out <folder>`, to `<app>_contact_sheet/` in that folder (or to that folder itself, when it is named so). Each export replaces `images/`.
+`sheet export` writes the map to `contact_sheet/map/`; with `--out <folder>`, to `<app>_contact_sheet/` in that folder (or to that folder itself, when it is named so). Each export replaces `images/`, or the folder `--images` names.
 
 | File | What |
 | --- | --- |
 | `index.html` | The map to open: one file, its images in `images/` next to it, opened from disk or served anywhere |
-| `images/` | Each state's shot |
+| `images/` | Each state's shot. `--images <folder>` puts them in that folder instead, a path relative to `index.html` (`static/shots`), which `index.html` and `sheet.json` name; the folder an export before used goes |
 | `sheet.json` | What they are drawn from, for other tools and AI agents |
 | `map.svg`, `map-dev.svg` | With `--svg` only: the whole map as one picture |
 
@@ -358,7 +358,7 @@ The WebP made of each shot is kept in `contact_sheet/.dart_tool/contact_sheet/we
 | `agent` | Print the playbook for AI agents |
 | `manual` | Print this reference |
 | `init [--package]` | Write an empty sheet; with `--package`, the sheet package's skeleton too |
-| `export [--out <folder>] [--only <page id>]... [--locale <en\|ja>] [--strict] [--svg] [--pixel-ratio <ratio>]` | Shoot the previews the sheet names and write the map. `--only`: those pages' previews alone, the others keeping their images. `--locale`: the map in that language (else the sheet's `locale`, else English). `--strict`: fail while a state has no image. `--svg`: write `map.svg` and `map-dev.svg` too. `--pixel-ratio`: the images drawn at it (1.5 by default) |
+| `export [--out <folder>] [--only <page id>]... [--locale <en\|ja>] [--strict] [--svg] [--pixel-ratio <ratio>] [--images <folder>]` | Shoot the previews the sheet names and write the map. `--only`: those pages' previews alone, the others keeping their images. `--locale`: the map in that language (else the sheet's `locale`, else English). `--strict`: fail while a state has no image. `--svg`: write `map.svg` and `map-dev.svg` too. `--pixel-ratio`: the images drawn at it (1.5 by default). `--images`: the folder next to `index.html` the images are in (`images` by default): a relative path, `/` between its parts, each of letters, digits, `.`, `_` and `-` |
 | `lint` | Tell what the sheet itself shows may be missing or written twice |
 | `basis` | Record the app as the sheet was written against |
 | `changed [--by-page]` | List the app's files changed since the basis; with `--by-page`, by the pages the sheet names them for |

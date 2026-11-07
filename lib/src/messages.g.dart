@@ -36,6 +36,8 @@ abstract class Messages {
   String get helpStrict;
   String get helpPixelRatio;
   String noPixelRatio(Object ratio);
+  String get helpImages;
+  String noImagesDir(Object dir);
   String get helpSvg;
   String exportUnknownPage(Object id);
   String exportKept(Object count);
@@ -299,6 +301,14 @@ class MessagesEn extends Messages {
 
   @override
   String noPixelRatio(Object ratio) => "No pixel ratio: ${ratio}";
+
+  @override
+  String get helpImages =>
+      "The folder next to index.html the images are written in, and index.html reads them from: a relative path, / between its parts. Each export replaces it.";
+
+  @override
+  String noImagesDir(Object dir) =>
+      "Not a folder for the images: ${dir} (a relative path, / between its parts, each of letters, digits, ., _ and -, none of them . or .., not a file the export writes)";
 
   @override
   String get helpSvg =>
@@ -1035,6 +1045,14 @@ class MessagesJa extends Messages {
 
   @override
   String noPixelRatio(Object ratio) => "画素の倍率ではありません: ${ratio}";
+
+  @override
+  String get helpImages =>
+      "画像を書き出し、index.html が読む、index.html の隣のフォルダ（相対パス、区切りは /）。書き出すたびに置き換える";
+
+  @override
+  String noImagesDir(Object dir) =>
+      "画像のフォルダにできません: ${dir}（相対パスで区切りは /、各部分は英数字と . _ - のみ、. と .. は不可、書き出すファイルの名前も不可）";
 
   @override
   String get helpSvg => "map.svg と map-dev.svg も書き出す（画像を含む地図全体の 1 枚絵。単体で渡せる）";

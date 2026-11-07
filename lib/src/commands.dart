@@ -205,6 +205,12 @@ class _ExportCommand extends _AppCommand {
         valueHelp: 'ratio',
         defaultsTo: '${SheetExport.defaultPixelRatio}',
         help: m.helpPixelRatio,
+      )
+      ..addOption(
+        'images',
+        valueHelp: 'folder',
+        defaultsTo: SheetMap.defaultImagesDir,
+        help: m.helpImages,
       );
   }
 
@@ -223,6 +229,8 @@ class _ExportCommand extends _AppCommand {
     if (pixelRatio == null || !(pixelRatio > 0) || !pixelRatio.isFinite) {
       usageException(m.noPixelRatio(ratio));
     }
+    final images = args.option('images')!;
+    if (!SheetExport.isImagesDir(images)) usageException(m.noImagesDir(images));
     final (:dir, :missing) = await SheetExport(
       repo,
       runner: cli.processes,
@@ -231,6 +239,7 @@ class _ExportCommand extends _AppCommand {
       locale: locale,
       svg: args.flag('svg'),
       pixelRatio: pixelRatio,
+      imagesDir: images,
       log: cli.out,
       warn: cli.err,
     ).run(args.option('out'), {...args.multiOption('only')});
