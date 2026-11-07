@@ -47,7 +47,6 @@ Map<String, String> htmlStrings(Messages m) => {
   'level_actions': m.htmlLevelActions,
   'backToggle': m.htmlBackToggle,
   'notes': m.htmlNotes,
-  'noteSays': m.htmlNoteSays,
   'noteMemo': m.htmlNoteMemo,
   'noteToggle': m.htmlNoteToggle,
   'routeButton': m.htmlRouteButton,
@@ -267,6 +266,8 @@ path.edge, g.lbl, g.entry, g.bundle, g.blbl { transition: opacity .3s; }
 .bar > * { pointer-events: auto; flex: none; max-width: 100%; }
 .levels { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 4px 4px 4px 12px; font-size: 12px; }
 .levels > span { color: var(--muted); margin-right: 4px; }
+/* How many pages a mark is on. */
+.levels button small { font-size: 11px; opacity: .75; }
 .levels button { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 4px; padding: 2px 12px; cursor: pointer; font: inherit; }
 .levels button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
 .legend { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; }
@@ -812,13 +813,13 @@ $('#legend').innerHTML = [
   edges.some((e) => e.kind === 'pop') ? `<button class="key e-sheet" id="backToggle" aria-pressed="true" title="${esc(T('backToggle'))}"><i class="dash"></i>${esc(T('legendBack'))}</button>` : '',
   entries.length ? `<span class="key e-entry"><i class="dot"></i>${esc(T('legendEntries'))}</span>` : '',
 ].join('');
-// What can be shown with the pages, on the map and beside a page chosen:
-// its transitions as sentences, its memo, each tag. Their keys: `says`,
-// `memo`, `tag:<name>`.
+// What can be shown on the pages, a mark above each that has it and beside
+// a page chosen: its memo, each tag; their keys `memo`, `tag:<name>`. Each
+// with how many pages have it, for whoever chooses to know where to look.
 const notes = [
-  ...(edges.length ? [{ key: 'says', name: T('noteSays') }] : []),
-  ...(S.pages.some((p) => p.memo) ? [{ key: 'memo', name: T('noteMemo') }] : []),
-  ...(S.tags ?? []).map((t) => ({ key: 'tag:' + t.name, name: t.name })),
+  ...(S.pages.some((p) => p.memo) ? [{ key: 'memo', name: T('noteMemo'), count: S.pages.filter((p) => p.memo).length }] : []),
+  ...(S.tags ?? []).map((t) => ({ key: 'tag:' + t.name, name: t.name,
+    count: S.pages.filter((p) => p.states.some((s) => s.tags.some((v) => v.tag === t.name))).length })),
 ];
 if (!edges.length && !entries.length && !notes.length) $('#bar').style.display = 'none';
 // How tall what is under the map is, for the card on a phone to sit above it.
@@ -831,14 +832,14 @@ $('#bar-open').addEventListener('click', () => {
 });
 // The pages alone (to look at the screens), with the arrows (to see how they
 // lead to each other), or with what each arrow says: as the address says
-// (?show=pages, ?show=flow), else with what each arrow says.
-let level = levels.includes(query().get('show')) ? query().get('show') : 'actions';
+// (?show=flow, ?show=actions), else the pages alone.
+let level = levels.includes(query().get('show')) ? query().get('show') : 'pages';
 function setLevel(l, { remember = true } = {}) {
   level = l;
   map.dataset.level = l;
   for (const b of $('#levels').querySelectorAll('[data-level]')) b.setAttribute('aria-pressed', b.dataset.level === l);
   requestAnimationFrame(fitBar);
-  if (remember) setQuery('show', l === 'actions' ? null : l);
+  if (remember) setQuery('show', l === 'pages' ? null : l);
 }
 $('#levels').addEventListener('click', (e) => {
   const b = e.target.closest('[data-level]');
@@ -846,8 +847,8 @@ $('#levels').addEventListener('click', (e) => {
 });
 setLevel(level, { remember: false });
 // What the map shows that can be hidden, by key: the arrows back (`back`),
-// and with the pages, the transitions as sentences (`says`), the memo
-// (`memo`) and each tag (`tag:<name>`). Shown when the address names it
+// and on the pages, the memo (`memo`) and each tag (`tag:<name>`). Shown
+// when the address names it
 // (?with=<key>, once for each), and only then: what the buttons show is
 // what the address says.
 const withNotes = new Set(query().getAll('with').filter(Boolean));
@@ -922,10 +923,10 @@ function renderMark(p) {
 function renderMarks() {
   for (const p of S.pages) renderMark(p);
 }
-// What the card says of [p], of what is shown with the pages: the tags of
-// the state shown.
+// What the card says of [p], of what is shown on the pages: its memo, the
+// tags of the state shown.
 const cardNotes = (p) => (noteOn('memo') ? memoHtml(p) : '')
-  + tagsHtml(shownTags(p), (tag) => noteOn('tag:' + tag)) + (noteOn('says') ? sentences(p) : '');
+  + tagsHtml(shownTags(p), (tag) => noteOn('tag:' + tag));
 function setNote(key, on) {
   keepWith(key, on);
   for (const b of $('#notes').querySelectorAll('[data-note]')) b.setAttribute('aria-pressed', noteOn(b.dataset.note));
@@ -939,7 +940,7 @@ if (notes.length) {
   box.setAttribute('role', 'group');
   box.setAttribute('aria-label', T('notes'));
   box.innerHTML = `<span>${esc(T('notes'))}</span>${notes.map((n) =>
-    `<button data-note="${esc(n.key)}" aria-pressed="${noteOn(n.key)}" title="${esc(T('noteToggle'))}">${esc(n.name)}</button>`).join('')}`;
+    `<button data-note="${esc(n.key)}" aria-pressed="${noteOn(n.key)}" title="${esc(T('noteToggle'))}">${esc(n.name)} <small>${n.count}</small></button>`).join('')}`;
   box.addEventListener('click', (e) => {
     const b = e.target.closest('[data-note]');
     if (b) setNote(b.dataset.note, !noteOn(b.dataset.note));
@@ -1236,7 +1237,7 @@ function focus(id, glide, { state } = {}) {
     }
   });
   highlight(near, (i) => on.has(i), (i) => entries[i].to === focused, focused);
-  card.innerHTML = `<div class="card-body">${cardClose}<h3>${esc(p.label)}</h3><div class="meta">${esc(p.section)}</div>${tabMeta(p)}<div class="meta dev">${codeMeta(p)}</div>${statesHtml(p)}<div id="card-notes">${cardNotes(p)}</div></div>
+  card.innerHTML = `<div class="card-body">${cardClose}<h3>${esc(p.label)}</h3><div class="meta">${esc(p.section)}</div>${tabMeta(p)}<div class="meta dev">${codeMeta(p)}</div>${statesHtml(p)}<div id="card-notes">${cardNotes(p)}</div>${sentences(p)}</div>
     <div class="actions"><button class="link" id="enlarge">${esc(T('enlarge'))}</button><button class="link" data-go="list/${esc(p.id)}">${esc(T('inList'))}</button><button class="link" data-detail="${esc(p.id)}">${esc(T('detail'))}</button></div>`;
   card.classList.add('on');
   $('#enlarge').onclick = () => enlarge(focused);

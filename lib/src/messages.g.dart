@@ -158,7 +158,6 @@ abstract class Messages {
   String get htmlLevelActions;
   String get htmlBackToggle;
   String get htmlNotes;
-  String get htmlNoteSays;
   String get htmlNoteMemo;
   String get htmlNoteToggle;
   String get htmlRouteButton;
@@ -735,17 +734,14 @@ class MessagesEn extends Messages {
   String get htmlBackToggle => "Show or hide the arrows back";
 
   @override
-  String get htmlNotes => "With";
-
-  @override
-  String get htmlNoteSays => "Transitions";
+  String get htmlNotes => "On pages";
 
   @override
   String get htmlNoteMemo => "Memo";
 
   @override
   String get htmlNoteToggle =>
-      "Show or hide it with the pages: on the map and beside a page chosen";
+      "A mark above each page that has it (the number), and beside a page chosen";
 
   @override
   String get htmlRouteButton => "Route";
@@ -1455,16 +1451,13 @@ class MessagesJa extends Messages {
   String get htmlBackToggle => "戻る矢印を表示・非表示";
 
   @override
-  String get htmlNotes => "添える";
-
-  @override
-  String get htmlNoteSays => "遷移";
+  String get htmlNotes => "ページに表示";
 
   @override
   String get htmlNoteMemo => "メモ";
 
   @override
-  String get htmlNoteToggle => "ページに添えて表示・非表示（地図上と、選んだページの横）";
+  String get htmlNoteToggle => "それがあるページ（数字の数）の上に印を、選んだページの横に中身を表示";
 
   @override
   String get htmlRouteButton => "経路";

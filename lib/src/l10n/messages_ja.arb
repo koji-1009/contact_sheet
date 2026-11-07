@@ -144,10 +144,9 @@
   "htmlLevelFlow": "流れ",
   "htmlLevelActions": "操作",
   "htmlBackToggle": "戻る矢印を表示・非表示",
-  "htmlNotes": "添える",
-  "htmlNoteSays": "遷移",
+  "htmlNotes": "ページに表示",
   "htmlNoteMemo": "メモ",
-  "htmlNoteToggle": "ページに添えて表示・非表示（地図上と、選んだページの横）",
+  "htmlNoteToggle": "それがあるページ（数字の数）の上に印を、選んだページの横に中身を表示",
   "htmlRouteButton": "経路",
 
   "htmlTabMap": "地図",

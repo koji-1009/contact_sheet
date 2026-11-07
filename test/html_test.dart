@@ -206,7 +206,8 @@ void main() {
     expect(cardOf(design), contains('https://example.com/designs/home"'));
     expect(cardOf(design), isNot(contains('https://example.com/specs/home')));
     expect(cardOf(design), isNot(contains('class="memo"')));
-    expect(cardOf(design), isNot(contains('class="says"')));
+    // Its transitions as sentences, whatever is shown on the pages.
+    expect(design, contains('<ul class="says">'));
     expect(marksOf(design), contains('>Design<'));
     expect(marksOf(design), isNot(contains('Spec')));
     expect(marksOf(design), isNot(contains('ⓘ')));
@@ -224,16 +225,26 @@ void main() {
     );
     // For developers, and how much the map shows: as the address says too.
     expect(none, contains('<body class="plain"'));
-    expect(none, contains('data-level="actions"'));
-    final dev = _open(shopHtml, '?dev&show=pages#map/home', drawn: drawn).dom;
+    expect(none, contains('data-level="pages"'));
+    final dev = _open(shopHtml, '?dev&show=actions#map/home', drawn: drawn).dom;
     expect(dev, isNot(contains('<body class="plain"')));
-    expect(dev, contains('data-level="pages"'));
+    expect(dev, contains('data-level="actions"'));
     // Named, its button pressed.
     expect(
       design,
       matches(RegExp(r'data-note="tag:Design" aria-pressed="true"')),
     );
     expect(design, matches(RegExp(r'data-note="memo" aria-pressed="false"')));
+    // Each button with how many pages have it: every page has a design,
+    // only home a memo.
+    expect(
+      design,
+      matches(RegExp(r'data-note="tag:Design"[^>]*>Design <small>7</small>')),
+    );
+    expect(
+      design,
+      matches(RegExp(r'data-note="memo"[^>]*>Memo <small>1</small>')),
+    );
   }, skip: _skip);
 
   test(

@@ -206,7 +206,7 @@ A page gives, by a tag's name:
 
 A state gives the same, for the tags whose values in it differ from its page's (`Design: home_signed_in`); `[]` for none in it. In that state, those values take the place of the page's; the other tags are the page's. Its `params` fill the path for it.
 
-In the HTML, the tags of the state shown are shown with the memo: beside the page when it is chosen, and on the map above it. A page in the list and its details show the page's, and under each state its own. Under the map ("With"), each tag, the memo and the transitions as sentences are chosen to be shown (none is, at first), so that the map shows, say, its arrows and the analytics alone. Only `https:`, `http:` and `mailto:` values are links.
+In the HTML, the tags of the state shown are shown with the memo: beside the page when it is chosen, and on the map above it. A page in the list and its details show the page's, and under each state its own. Under the map ("On pages"), each tag and the memo are chosen to be shown (none is, at first), each with how many pages have it, so that the map shows, say, its arrows and the analytics alone. Only `https:`, `http:` and `mailto:` values are links.
 
 ### `dependencies`
 
@@ -259,7 +259,7 @@ checked:
 Three views of the same pages, and what goes with them:
 
 - **The map.** Each page with its image, each transition an arrow.
-  - A page chosen brings the map to it and to the pages next to it, as large as their arrows' words read (where they are too many for that, the page chosen stays in view), and shows beside it its states, its memo, its tags and its transitions as sentences, as far as those are shown with the pages.
+  - A page chosen brings the map to it and to the pages next to it, as large as their arrows' words read (where they are too many for that, the page chosen stays in view), and shows beside it its states, its transitions as sentences, and its memo and tags as far as those are shown on the pages.
   - A state chosen there is shown on the map, with only the arrows that can happen in it, and the pages they arrive at in the state they arrive in; its name is under the page's. A page tapped twice shows its image large.
   - An arrow tapped, or its label, says what it is, as a sentence, beside the map, with the pages at its ends; a label's parts read apart (what is done, the states and the values it needs, a redirect).
   - It opens where the app starts: its first page with its section at the top left, as large as its words read and no larger than drawn, or whole where the whole map reads so. ⤢ shows it whole; nothing else moves it there: a page or a route let go leaves the map where it is. From far out, the sections' names lead in.
@@ -272,8 +272,8 @@ And in every view:
 - **The route between two pages**: the fewest steps from one to the other as the app's navigator goes, each as a sentence (see "The route").
 - **A page's details**, and each image opening large.
 - **Search**: pages by their names, memo, states, tags (their names and values) and what is done on them (a button's words find its page). The table narrows as it is typed.
-- **How much the map shows**, chosen under it: the pages alone, with the arrows, or with what each arrow says (the default); and the arrows back, shown or hidden (tapping "Back" in the legend). A page chosen, or a route, shows its own arrows whatever is chosen, and beside the map says them as sentences.
-- **What is shown with the pages** ("With"), on the map above each page and beside a page chosen: its transitions as sentences, its memo and each tag, each shown when chosen (none is, at first). Above a page, they are one row no wider than it, those past it one `+<n>`, clear of the arrows and labels there; where those take all the room above, on the top edge of its image.
+- **How much the map shows**, chosen under it: the pages alone (the default), with the arrows, or with what each arrow says; and the arrows back, shown or hidden (tapping "Back" in the legend). A page chosen, or a route, shows its own arrows whatever is chosen, and beside the map says them as sentences.
+- **What is shown on the pages** ("On pages"), a mark above each page that has it and beside a page chosen: its memo and each tag, each shown when chosen (none is, at first), each button with how many pages have it. Above a page, they are one row no wider than it, those past it one `+<n>`, clear of the arrows and labels there; where those take all the room above, on the top edge of its image.
 - **Variants**, chosen in the header ("Shown as"): every image follows, and the map and the tree are laid out again, each page's box its screen at the scale the first variant's is drawn at.
 - **Where it is from**: which app it was drawn from (its version and branch; its commit, for developers), when it was exported, and, with a basis, how many changes to the app's code the sheet names for no page.
 - **For developers**, ticked: what only developers read (the code's names, files, fakes, `go` and `replace`).
@@ -282,7 +282,7 @@ And in every view:
   - `#map/<page id>`, `#map/<page id>/<state>`;
   - `#route/<from>/<to>`, `#route/<from>/<state>/<to>`, each followed by `/<condition>=<value>` for each value chosen;
   - `#tree/<page id>`, `#list/<page id>`, `#page/<page id>` (its details), `#table`;
-  - before them: `?variant=<name>`, with variants (none: the first); `?show=pages` or `?show=flow`, for how much the map shows (none: what each arrow says); `?dev`, for developers; and `?with=<key>`, once for each of what is shown of the arrows back (`back`), the sentences (`says`), the memo (`memo`) and the tags (`tag:<name>`): only those it names are shown, and their buttons pressed.
+  - before them: `?variant=<name>`, with variants (none: the first); `?show=flow` or `?show=actions`, for how much the map shows (none: the pages alone); `?dev`, for developers; and `?with=<key>`, once for each of what is shown of the arrows back (`back`), the memo (`memo`) and the tags (`tag:<name>`): only those it names are shown, and their buttons pressed.
 
 ### The route
 

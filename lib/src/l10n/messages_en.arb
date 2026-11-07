@@ -221,10 +221,9 @@
   "htmlLevelFlow": "Flow",
   "htmlLevelActions": "Actions",
   "htmlBackToggle": "Show or hide the arrows back",
-  "htmlNotes": "With",
-  "htmlNoteSays": "Transitions",
+  "htmlNotes": "On pages",
   "htmlNoteMemo": "Memo",
-  "htmlNoteToggle": "Show or hide it with the pages: on the map and beside a page chosen",
+  "htmlNoteToggle": "A mark above each page that has it (the number), and beside a page chosen",
   "htmlRouteButton": "Route",
 
   "htmlTabMap": "Map",
