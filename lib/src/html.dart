@@ -497,11 +497,15 @@ const findEdge = (e, dev) => [label(e.from), label(e.to), said(e, dev), ...e.whe
 // What is searched in, as the developers' information is shown or not.
 const forDev = () => !document.body.classList.contains('plain');
 const findIn = (el) => forDev() ? el.dataset.findDev : el.dataset.find;
-// A viewer's choice, kept in their browser when it can be, for this app's
-// map alone: maps opened from disk all share one store.
-const kept = (name) => `contact_sheet.${S.app}.${name}`;
-const load =(key, fallback) => { try { const v = localStorage.getItem(key); return v === null ? fallback : v === '1'; } catch { return fallback; } };
-const save = (key, on) => { try { localStorage.setItem(key, on ? '1' : '0'); } catch {} };
+// What the viewer chooses is in the address, and only there: the address is
+// what is shown, to pass around as it is. The address's query, and [name]
+// set to [value] in it (null: taken out).
+const query = () => new URLSearchParams(location.search);
+function setQuery(name, value) {
+  const url = new URL(location.href);
+  if (value == null) url.searchParams.delete(name); else url.searchParams.set(name, value);
+  history.replaceState(null, '', url);
+}
 // An arrow's words: what only the code names, for developers; what anyone
 // reads; how the code keeps its pages, for developers.
 const edgeWords = (e) => [
@@ -577,15 +581,10 @@ const shownState = {};
 const shownTags = (p) => p.states[shownState[p.id] ?? 0].tags;
 const codeMeta = (p) => [p.path, p.widget, p.route, p.source].filter(Boolean).map((c) => `<code>${esc(c)}</code>`).join(' · ');
 // The ways every state is shot (a platform, a size), the first the map's:
-// the one shown, chosen in the header, from the address or as the viewer
-// last chose.
+// the one shown, chosen in the header: the one the address names
+// (?variant=), else the first.
 const variants = S.variants;
-let variant = (() => {
-  let saved = null;
-  try { saved = localStorage.getItem(kept('variant')); } catch {}
-  const i = variants.findIndex((v) => v.name === (new URLSearchParams(location.search).get('variant') ?? saved));
-  return i < 0 ? 0 : i;
-})();
+let variant = Math.max(0, variants.findIndex((v) => v.name === query().get('variant')));
 // [s] as the variant shown draws it: its image, size and error.
 const drawn = (s) => s.variants?.[variant] ?? s;
 const variantName = () => variants[variant]?.name ?? '';
@@ -831,24 +830,15 @@ $('#bar-open').addEventListener('click', () => {
   fitBar();
 });
 // The pages alone (to look at the screens), with the arrows (to see how they
-// lead to each other), or with what each arrow says (the default). Kept in
-// the address (?show=) to pass around, and for the viewer.
-let level = (() => {
-  let saved = null;
-  try { saved = localStorage.getItem(kept('show')); } catch {}
-  const asked = new URLSearchParams(location.search).get('show') ?? saved;
-  return levels.includes(asked) ? asked : 'actions';
-})();
+// lead to each other), or with what each arrow says: as the address says
+// (?show=pages, ?show=flow), else with what each arrow says.
+let level = levels.includes(query().get('show')) ? query().get('show') : 'actions';
 function setLevel(l, { remember = true } = {}) {
   level = l;
   map.dataset.level = l;
   for (const b of $('#levels').querySelectorAll('[data-level]')) b.setAttribute('aria-pressed', b.dataset.level === l);
   requestAnimationFrame(fitBar);
-  if (!remember) return;
-  try { localStorage.setItem(kept('show'), l); } catch {}
-  const url = new URL(location.href);
-  if (l === 'actions') url.searchParams.delete('show'); else url.searchParams.set('show', l);
-  history.replaceState(null, '', url);
+  if (remember) setQuery('show', l === 'actions' ? null : l);
 }
 $('#levels').addEventListener('click', (e) => {
   const b = e.target.closest('[data-level]');
@@ -860,7 +850,7 @@ setLevel(level, { remember: false });
 // (`memo`) and each tag (`tag:<name>`). Shown when the address names it
 // (?with=<key>, once for each), and only then: what the buttons show is
 // what the address says.
-const withNotes = new Set(new URLSearchParams(location.search).getAll('with').filter(Boolean));
+const withNotes = new Set(query().getAll('with').filter(Boolean));
 const noteOn = (key) => withNotes.has(key);
 // [key] shown or not, in the address.
 function keepWith(key, on) {
@@ -1793,26 +1783,22 @@ $('#search').addEventListener('change', () => {
   const hit = S.pages.find((p) => p.label.toLowerCase() === q) ?? S.pages.find((p) => findText(p, forDev()).includes(q));
   if (hit) go(current, hit.id);
 });
-// Developers' information, shown or not: only CSS changes, and the labels'
-// backgrounds follow their words.
+// Developers' information, shown where the address says so (?dev): only CSS
+// changes, and the labels' backgrounds follow their words.
 const code = $('#code');
-function setCode(on) {
+function setCode(on, { remember = true } = {}) {
   document.body.classList.toggle('plain', !on);
-  save(kept('code'), on);
+  if (remember) setQuery('dev', on ? '' : null);
   // What the search finds follows what is shown.
   filter();
 }
 // The variant shown: every image follows, and the map and the tree are laid
-// out at its screens' sizes. Kept in the address (?variant=) to pass around,
-// and for the viewer.
+// out at its screens' sizes. In the address (?variant=), the first's not.
 function setVariant(i) {
   // With nothing chosen, the page in the middle of the map stays there.
   const middle = current === 'map' && !focused && !routed && !picked ? middlePage() : null;
   variant = i;
-  try { localStorage.setItem(kept('variant'), variantName()); } catch {}
-  const url = new URL(location.href);
-  if (i) url.searchParams.set('variant', variantName()); else url.searchParams.delete('variant');
-  history.replaceState(null, '', url);
+  setQuery('variant', i ? variantName() : null);
   laid = laidOut();
   layMap();
   measured = false;
@@ -1841,8 +1827,8 @@ if (variants.length > 1) {
   pick.onchange = () => setVariant(+pick.value);
   $('#variant-pick').hidden = false;
 }
-code.checked = load(kept('code'), false);
-setCode(code.checked);
+code.checked = query().has('dev');
+setCode(code.checked, { remember: false });
 code.onchange = () => { setCode(code.checked); requestAnimationFrame(backgrounds); };
 route();
 </script>

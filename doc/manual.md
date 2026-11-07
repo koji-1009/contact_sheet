@@ -278,11 +278,11 @@ And in every view:
 - **Where it is from**: which app it was drawn from (its version and branch; its commit, for developers), when it was exported, and, with a basis, how many changes to the app's code the sheet names for no page.
 - **For developers**, ticked: what only developers read (the code's names, files, fakes, `go` and `replace`).
 - Light or dark as the browser is set; on a phone, one column, where it is from behind the app's name, and what the map shows behind one button under it; printed, the list or the table.
-- **Addresses**, to pass a view around:
+- **Addresses**, to pass a view around: what is chosen is in the address and nowhere else, so the address opens what was shown, for anyone:
   - `#map/<page id>`, `#map/<page id>/<state>`;
   - `#route/<from>/<to>`, `#route/<from>/<state>/<to>`, each followed by `/<condition>=<value>` for each value chosen;
   - `#tree/<page id>`, `#list/<page id>`, `#page/<page id>` (its details), `#table`;
-  - before them: `?variant=<name>`, with variants; `?show=pages` or `?show=flow`, for how much the map shows; and `?with=<key>`, once for each of what is shown of the arrows back (`back`), the sentences (`says`), the memo (`memo`) and the tags (`tag:<name>`): only those it names are shown, and their buttons pressed.
+  - before them: `?variant=<name>`, with variants (none: the first); `?show=pages` or `?show=flow`, for how much the map shows (none: what each arrow says); `?dev`, for developers; and `?with=<key>`, once for each of what is shown of the arrows back (`back`), the sentences (`says`), the memo (`memo`) and the tags (`tag:<name>`): only those it names are shown, and their buttons pressed.
 
 ### The route
 

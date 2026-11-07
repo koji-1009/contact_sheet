@@ -222,6 +222,12 @@ void main() {
       none,
       matches(RegExp(r'<div id="map-view"[^>]*class="[^"]*no-back')),
     );
+    // For developers, and how much the map shows: as the address says too.
+    expect(none, contains('<body class="plain"'));
+    expect(none, contains('data-level="actions"'));
+    final dev = _open(shopHtml, '?dev&show=pages#map/home', drawn: drawn).dom;
+    expect(dev, isNot(contains('<body class="plain"')));
+    expect(dev, contains('data-level="pages"'));
     // Named, its button pressed.
     expect(
       design,
