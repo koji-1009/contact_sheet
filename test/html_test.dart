@@ -169,25 +169,43 @@ void main() {
     timeout: const Timeout(Duration(minutes: 3)),
   );
 
-  test('a state chosen shows its own tags, its page\'s others', () {
+  test('the tags chosen in the address are shown; a state chosen shows its '
+      'own, its page\'s others', () {
     bool drawn(String dom) => dom.contains('id="card-notes"');
+    const all = '?tag=Spec&tag=Design&tag=Web';
     final (:dom, :errors) = _open(
       shopHtml,
-      '#map/home/Signed%20in',
+      '$all#map/home/Signed%20in',
       drawn: drawn,
     );
     expect(errors, isEmpty);
-    final card = RegExp(
+    String cardOf(String dom) => RegExp(
       r'<div id="card-notes">(.*?)</div>',
       dotAll: true,
     ).firstMatch(dom)![1]!;
+    // The marks above the page.
+    String marksOf(String dom) => RegExp(
+      r'data-id="home".*?<div class="marks[^"]*"[^>]*>(.*?)</div>',
+      dotAll: true,
+    ).firstMatch(dom)![1]!;
+    final card = cardOf(dom);
     expect(card, contains('https://example.com/designs/home_signed_in'));
     expect(card, isNot(contains('https://example.com/designs/home"')));
     expect(card, contains('https://example.com/specs/home'));
     expect(card, contains('https://shop.example.com/'));
     // The first state shows the page's.
-    final first = _open(shopHtml, '#map/home', drawn: drawn).dom;
-    expect(first, contains('https://example.com/designs/home"'));
+    final first = _open(shopHtml, '$all#map/home', drawn: drawn).dom;
+    expect(cardOf(first), contains('https://example.com/designs/home"'));
+    // Only those chosen, on the card and above the page; none, where none
+    // is.
+    final design = _open(shopHtml, '?tag=Design#map/home', drawn: drawn).dom;
+    expect(cardOf(design), contains('https://example.com/designs/home"'));
+    expect(cardOf(design), isNot(contains('https://example.com/specs/home')));
+    expect(marksOf(design), contains('>Design<'));
+    expect(marksOf(design), isNot(contains('Spec')));
+    final none = _open(shopHtml, '#map/home', drawn: drawn).dom;
+    expect(cardOf(none), isNot(contains('https://')));
+    expect(marksOf(none), isNot(contains('Design')));
   }, skip: _skip);
 
   test(

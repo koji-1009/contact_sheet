@@ -813,9 +813,10 @@ $('#legend').innerHTML = [
   edges.some((e) => e.kind === 'pop') ? `<button class="key e-sheet" id="backToggle" aria-pressed="true" title="${esc(T('backToggle'))}"><i class="dash"></i>${esc(T('legendBack'))}</button>` : '',
   entries.length ? `<span class="key e-entry"><i class="dot"></i>${esc(T('legendEntries'))}</span>` : '',
 ].join('');
-// What is shown with the pages, on the map and beside a page chosen, each
-// shown (the default) or hidden: its transitions as sentences, its memo,
-// each tag. Their keys: `says`, `memo`, `tag:<name>`.
+// What is shown with the pages, on the map and beside a page chosen: its
+// transitions as sentences and its memo, each shown (the default) or
+// hidden; each tag, shown when chosen. Their keys: `says`, `memo`,
+// `tag:<name>`.
 const notes = [
   ...(edges.length ? [{ key: 'says', name: T('noteSays') }] : []),
   ...(S.pages.some((p) => p.memo) ? [{ key: 'memo', name: T('noteMemo') }] : []),
@@ -868,14 +869,17 @@ function setBack(on, { remember = true } = {}) {
 }
 setBack(new URLSearchParams(location.search).get('back') === 'hide' ? false : load(kept('back'), true), { remember: false });
 $('#backToggle')?.addEventListener('click', () => setBack(map.classList.contains('no-back')));
-// What is shown with the pages, hidden as the viewer chose: kept in the
-// address (?hide=<key>, once for each) to pass around, and for the viewer.
-const hidden = (() => {
-  const asked = new URLSearchParams(location.search).getAll('hide');
-  if (asked.length) return new Set(asked);
-  try { return new Set(JSON.parse(localStorage.getItem(kept('hide')) ?? '[]')); } catch { return new Set(); }
-})();
-const noteOn = (key) => !hidden.has(key);
+// What is shown with the pages as the viewer chose, kept in the address to
+// pass around, and for the viewer: the sentences and the memo hidden
+// (?hide=<key>), the tags shown (?tag=<name>), once for each.
+const keptSet = (name, key) => {
+  const list = new URLSearchParams(location.search).getAll(name);
+  if (list.length) return new Set(list);
+  try { return new Set(JSON.parse(localStorage.getItem(kept(key)) ?? '[]')); } catch { return new Set(); }
+};
+const hidden = keptSet('hide', 'hide');
+const tagsOn = keptSet('tag', 'tags');
+const noteOn = (key) => key.startsWith('tag:') ? tagsOn.has(key.slice(4)) : !hidden.has(key);
 // How wide a mark is drawn: its words at 11px (`.mark`), and its padding.
 const measure = document.createElement('canvas').getContext('2d');
 const markWidth = (text) => {
@@ -935,11 +939,13 @@ function renderMarks() {
 const cardNotes = (p) => (noteOn('memo') ? memoHtml(p) : '')
   + tagsHtml(shownTags(p), (tag) => noteOn('tag:' + tag)) + (noteOn('says') ? sentences(p) : '');
 function setNote(key, on) {
-  if (on) hidden.delete(key); else hidden.add(key);
-  try { localStorage.setItem(kept('hide'), JSON.stringify([...hidden])); } catch {}
+  const tag = key.startsWith('tag:');
+  const [set, item, name, store] = tag ? [tagsOn, key.slice(4), 'tag', 'tags'] : [hidden, key, 'hide', 'hide'];
+  if (on === tag) set.add(item); else set.delete(item);
+  try { localStorage.setItem(kept(store), JSON.stringify([...set])); } catch {}
   const url = new URL(location.href);
-  url.searchParams.delete('hide');
-  for (const k of hidden) url.searchParams.append('hide', k);
+  url.searchParams.delete(name);
+  for (const k of set) url.searchParams.append(name, k);
   history.replaceState(null, '', url);
   for (const b of $('#notes').querySelectorAll('[data-note]')) b.setAttribute('aria-pressed', noteOn(b.dataset.note));
   renderMarks();
@@ -955,7 +961,7 @@ if (notes.length) {
     `<button data-note="${esc(n.key)}" aria-pressed="${noteOn(n.key)}" title="${esc(T('noteToggle'))}">${esc(n.name)}</button>`).join('')}`;
   box.addEventListener('click', (e) => {
     const b = e.target.closest('[data-note]');
-    if (b) setNote(b.dataset.note, hidden.has(b.dataset.note));
+    if (b) setNote(b.dataset.note, !noteOn(b.dataset.note));
   });
 }
 renderMarks();
