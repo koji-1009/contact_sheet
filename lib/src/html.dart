@@ -102,6 +102,10 @@ Map<String, String> htmlStrings(Messages m) => {
   'stateSeparator': m.stateSeparator,
   'variant': m.htmlVariant,
   'notInVariant': m.htmlNotInVariant('{variant}'),
+  'held': m.htmlHeld,
+  'heldAny': m.htmlHeldAny,
+  'heldAbout': m.htmlHeldAbout,
+  'heldNone': m.htmlHeldNone,
 };
 
 /// `index.html` of an export: one file that reads [sheet] (`sheet.json`)
@@ -270,6 +274,14 @@ path.edge, g.lbl, g.entry, g.bundle, g.blbl { transition: opacity .3s; }
 .levels button small { font-size: 11px; opacity: .75; }
 .levels button { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 4px; padding: 2px 12px; cursor: pointer; font: inherit; }
 .levels button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* The conditions' values the map is shown while: a choice for each. */
+.levels label { display: inline-flex; align-items: center; gap: 4px; margin-right: 4px; }
+.levels select { font: inherit; padding: 1px 4px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--text); }
+.levels select.on { border-color: var(--accent); color: var(--accent); }
+#held-none { color: var(--muted); }
+/* What the app does not show while the conditions keep the values chosen:
+   gone, where it is, unless a page chosen or a route brings it out. */
+#canvas .held-out:not(.near) { visibility: hidden; pointer-events: none; }
 .legend { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; }
 /* On a phone, all this behind one button (#bar-open). */
 #bar-open { display: none; }
@@ -429,7 +441,7 @@ tr.group td { border-top: 2px solid var(--line); }
 <main>
   <section id="sec-map"><div id="map-view"><div class="tools"><button id="routeOpen" data-title="route">⇢ <span data-t="routeButton"></span></button><button id="zin" data-title="zoomIn">＋</button><button id="zout" data-title="zoomOut">－</button><button id="fit" data-title="fit">⤢</button></div>
     <div id="canvas"><svg id="under">__MAP_DEFS____MAP_UNDER__</svg><svg id="over">__MAP_OVER__</svg></div>
-    <div class="bar" id="bar"><button id="bar-open" aria-expanded="false" aria-controls="bar"><span data-t="show"></span> ▾</button><div class="levels" id="levels"></div><div class="levels" id="notes" hidden></div><div class="legend" id="legend"></div></div><div id="card"></div><div id="route"></div></div></section>
+    <div class="bar" id="bar"><button id="bar-open" aria-expanded="false" aria-controls="bar"><span data-t="show"></span> ▾</button><div class="levels" id="levels"></div><div class="levels" id="held" hidden></div><div class="levels" id="notes" hidden></div><div class="legend" id="legend"></div></div><div id="card"></div><div id="route"></div></div></section>
   <section id="sec-tree"><div class="tree-wrap"><div class="tools"><button id="tzin" data-title="zoomIn">＋</button><button id="tzout" data-title="zoomOut">－</button><button id="tfit" data-title="fit">⤢</button></div>
     <div id="tree-view"><div id="tree-sizer"><div id="tree-canvas"></div></div></div></div></section>
   <section id="sec-list"><div class="wrap"><p id="nomatch" data-t="noMatch"></p><div id="page-list"></div></div></section>
@@ -821,7 +833,7 @@ const notes = [
   ...(S.tags ?? []).map((t) => ({ key: 'tag:' + t.name, name: t.name,
     count: S.pages.filter((p) => p.states.some((s) => s.tags.some((v) => v.tag === t.name))).length })),
 ];
-if (!edges.length && !entries.length && !notes.length) $('#bar').style.display = 'none';
+if (!edges.length && !entries.length && !notes.length && !(S.conditions ?? []).length) $('#bar').style.display = 'none';
 // How tall what is under the map is, for the card on a phone to sit above it.
 const fitBar = () => map.style.setProperty('--bar-h', $('#bar').offsetHeight + 'px');
 // On a phone, what is under the map opened from its one button.
@@ -1150,9 +1162,13 @@ function showState(id, i) {
   renderMark(p);
 }
 const stateIndex = (id, name) => pageById[id].states.findIndex((s) => s.name === name);
-// All pages back in their first state.
+// All pages back in their first state: while the conditions keep values
+// chosen, the first the app shows them in.
 function firstStates() {
-  for (const id of Object.keys(shownState)) showState(id, 0);
+  for (const p of S.pages) {
+    const i = baseState(p.id);
+    if ((shownState[p.id] ?? 0) !== i) showState(p.id, i);
+  }
 }
 // The state of [id] chosen beside it, by name; null for its first, when it
 // has more than one but none was chosen.
@@ -1171,8 +1187,8 @@ const statesHtml = (p) => p.states.length < 2 ? '' : `<div class="card-states" a
 // shown; each leads to the page at its other end.
 const sentences = (p) => {
   const state = shownName(p.id);
-  const goes = (out[p.id] ?? []).filter((e) => can(e, state));
-  const comes = into[p.id] ?? [];
+  const goes = (out[p.id] ?? []).filter((e) => can(e, state) && heldEdge(e));
+  const comes = (into[p.id] ?? []).filter(heldEdge);
   const item = (e, other, from, state) => `<li><a data-go="map/${esc(other)}">${sentence(e, { from, state })}</a></li>`;
   // In a tab bar, its tabs: a switch to each other one, and to the tab
   // shown again where that goes back to its first page.
@@ -1221,13 +1237,16 @@ function focus(id, glide, { state } = {}) {
   const frame = new Set([focused]);
   const on = new Set();
   edges.forEach((e, i) => {
+    // Not what the app shows while the conditions keep the values chosen.
+    if (!heldIn(i)) return;
     const drawnHere = e.bundle == null;
     // An edge from every page is the page it goes to's, not each page's.
     if (e.from === focused && !e.anywhere && can(e, here)) {
       on.add(i); near.add(e.to);
       if (drawnHere) frame.add(e.to);
-      // Of the states it can arrive in, the first.
-      const then = arrival(e, here)[0];
+      // Of the states it can arrive in, the first; while the conditions
+      // keep values chosen, the first the app shows.
+      const then = arrival(e, here).find((s) => heldShown?.states[e.to]?.includes(s) ?? true) ?? arrival(e, here)[0];
       if (then && e.to !== focused) showState(e.to, Math.max(0, stateIndex(e.to, then)));
     }
     if (e.to === focused) {
@@ -1236,7 +1255,7 @@ function focus(id, glide, { state } = {}) {
       if (drawnHere) frame.add(e.from);
     }
   });
-  highlight(near, (i) => on.has(i), (i) => entries[i].to === focused, focused);
+  highlight(near, (i) => on.has(i), (i) => entries[i].to === focused && heldEntry(i), focused);
   card.innerHTML = `<div class="card-body">${cardClose}<h3>${esc(p.label)}</h3><div class="meta">${esc(p.section)}</div>${tabMeta(p)}<div class="meta dev">${codeMeta(p)}</div>${statesHtml(p)}<div id="card-notes">${cardNotes(p)}</div>${sentences(p)}</div>
     <div class="actions"><button class="link" id="enlarge">${esc(T('enlarge'))}</button><button class="link" data-go="list/${esc(p.id)}">${esc(T('inList'))}</button><button class="link" data-detail="${esc(p.id)}">${esc(T('detail'))}</button></div>`;
   card.classList.add('on');
@@ -1304,6 +1323,8 @@ function goRoute(from, to, state, valuation) {
   if (location.hash === hash) route(); else location.hash = hash;
 }
 function showRoute(from, to, glide, state, valuation) {
+  // None chosen for the route: the values the map is shown while.
+  valuation ??= Object.keys(held).length ? { ...held } : undefined;
   from = pageById[from] ? from : S.pages[0].id;
   to = pageById[to] ? to : (S.pages.find((p) => p.id !== from) ?? S.pages[0]).id;
   focused = null;
@@ -1802,6 +1823,7 @@ function setVariant(i) {
   setQuery('variant', i ? variantName() : null);
   laid = laidOut();
   layMap();
+  holdMap();
   measured = false;
   for (const p of S.pages) showState(p.id, shownState[p.id] ?? 0);
   renderList();
@@ -1828,6 +1850,101 @@ if (variants.length > 1) {
   pick.onchange = () => setVariant(+pick.value);
   $('#variant-pick').hidden = false;
 }
+
+// --- what the app shows while conditions keep values chosen: from its
+// launch with them, nothing done that would change them (a guest, never
+// signed in). The rest of the map is gone where it is: the pages keep their
+// places, to compare one choice with another. As the address says
+// (?if=<condition>=<value>, once for each, an `=` escaped in names); none,
+// the whole map. lib/src/route.dart finds it (contactSheetShown), as it
+// finds a route ---
+const held = {};
+for (const v of query().getAll('if')) {
+  const [c, x] = v.split('=', 2).map((r) => { try { return decodeURIComponent(r); } catch { return r; } });
+  if ((S.conditions ?? []).some((k) => k.name === c && k.values.includes(x))) held[c] = x;
+}
+// What the app shows so, null for the whole map: { states: { page: [state] },
+// edges: [place], entries: [place] }, each choice found once.
+let shownOf = null;
+const heldFound = {};
+let heldShown = null;
+let heldEdges = new Set(), heldEntries = new Set();
+const findHeld = () => {
+  if (!Object.keys(held).length) return null;
+  const key = JSON.stringify((S.conditions ?? []).map((c) => held[c.name] ?? null));
+  shownOf ??= contactSheetShown(document.getElementById('sheet').textContent);
+  return heldFound[key] ??= JSON.parse(shownOf(JSON.stringify(held)));
+};
+// Whether the edge [e], or the deep link at [i], is shown: an edge from
+// every page, drawn once, when it is from any.
+const heldEdge = (e) => !heldShown || (e.anywhere
+  ? edges.some((x, i) => x.anywhere && x.item === e.item && x.to === e.to && heldEdges.has(i))
+  : heldEdges.has(edges.indexOf(e)));
+const heldIn = (i) => heldEdge(edges[i]);
+const heldEntry = (i) => !heldShown || heldEntries.has(i);
+// The state a page is shown in at first: the first the app shows it in.
+const baseState = (id) => {
+  const names = heldShown?.states[id];
+  return names ? Math.max(0, stateIndex(id, names[0])) : 0;
+};
+// The map drawn as what is shown says: what is not, gone (a bundle, when
+// every arrow in it is; a tab's bar, with its page).
+function holdMap() {
+  const out = (on) => heldShown != null && !on;
+  for (const [id, n] of Object.entries(nodes)) n.classList.toggle('held-out', out(heldShown?.states[id]));
+  edges.forEach((e, i) => {
+    for (const el of [edgePaths[i], edgeHits[i], edgeLabels[i]]) el?.classList.toggle('held-out', out(heldIn(i)));
+  });
+  entries.forEach((en, i) => {
+    for (const el of [entryLines[i], entryLabels[i]]) el?.classList.toggle('held-out', out(heldEntry(i)));
+  });
+  bundles.forEach((b, i) => {
+    for (const el of [bundleLines[i], bundleLabels[i]]) el?.classList.toggle('held-out', out(b.edges.some(heldIn)));
+  });
+  // The bars, in the order they are drawn: each bar's tabs.
+  const tabPages = (S.tabs ?? []).flatMap((bar) => bar.pages.map((t) => t.page));
+  canvas.querySelectorAll('g.tabbar').forEach((g, i) => g.classList.toggle('held-out', out(heldShown?.states[tabPages[i]])));
+}
+function hold() {
+  heldShown = findHeld();
+  heldEdges = new Set(heldShown?.edges ?? []);
+  heldEntries = new Set(heldShown?.entries ?? []);
+  holdMap();
+  firstStates();
+  const none = $('#held-none');
+  if (none) none.hidden = !heldShown || Object.keys(heldShown.states).length > 0;
+  for (const sel of document.querySelectorAll('[data-held]')) sel.classList.toggle('on', sel.value !== '');
+}
+// The values chosen, in the address.
+function keepHeld() {
+  const url = new URL(location.href);
+  url.searchParams.delete('if');
+  for (const c of S.conditions ?? []) {
+    if (held[c.name] != null) url.searchParams.append('if', `${encodeURIComponent(c.name)}=${encodeURIComponent(held[c.name])}`);
+  }
+  history.replaceState(null, '', url);
+}
+if ((S.conditions ?? []).length) {
+  const box = $('#held');
+  box.hidden = false;
+  box.setAttribute('role', 'group');
+  box.setAttribute('aria-label', T('held'));
+  box.title = T('heldAbout');
+  box.innerHTML = `<span>${esc(T('held'))}</span>${S.conditions.map((c, i) => `<label>${esc(c.name)}<select data-held="${i}"><option value="">${esc(T('heldAny'))}</option>${
+    c.values.map((v, k) => `<option value="${k}"${held[c.name] === v ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select></label>`).join('')}<span id="held-none" hidden>${esc(T('heldNone'))}</span>`;
+  box.addEventListener('change', (e) => {
+    const sel = e.target.closest('[data-held]');
+    if (!sel) return;
+    const c = S.conditions[+sel.dataset.held];
+    if (sel.value === '') delete held[c.name]; else held[c.name] = c.values[+sel.value];
+    keepHeld();
+    hold();
+    requestAnimationFrame(fitBar);
+    // What the map shows, shown again as it now is.
+    if (current === 'map') route();
+  });
+}
+hold();
 code.checked = query().has('dev');
 setCode(code.checked, { remember: false });
 code.onchange = () => { setCode(code.checked); requestAnimationFrame(backgrounds); };

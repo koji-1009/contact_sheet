@@ -4,6 +4,7 @@
 import 'dart:io';
 
 import 'package:contact_sheet/contact_sheet.dart';
+import 'package:contact_sheet/src/route.dart';
 import 'package:path/path.dart' as p;
 import 'package:shutter/shutter.dart';
 import 'package:test/test.dart';
@@ -246,6 +247,100 @@ void main() {
       matches(RegExp(r'data-note="memo"[^>]*>Memo <small>1</small>')),
     );
   }, skip: _skip);
+
+  test(
+    'with values chosen, the map shows what the Dart router says the app '
+    'shows, and a route starts with them',
+    () {
+      String held(Map<String, String> values) => [
+        for (final MapEntry(:key, :value) in values.entries)
+          'if=${Uri.encodeQueryComponent('${Uri.encodeComponent(key)}=${Uri.encodeComponent(value)}')}',
+      ].join('&');
+      for (final (sheet, html, values) in [
+        (shop, shopHtml, const {'Login': 'Guest'}),
+        (shop, shopHtml, const {'Login': 'Signed in', 'Cart': 'Empty'}),
+        (trips, tripsHtml, const {'Login': 'Guest'}),
+        (trips, tripsHtml, const {'Login': 'Guest', 'Language': 'Français'}),
+      ]) {
+        final (:dom, :errors) = _open(html, '?${held(values)}#map');
+        expect(errors, isEmpty, reason: '$values');
+        final shown =
+            Router(
+              sheet.router.pages,
+              sheet.router.edges,
+              conditions: sheet.router.conditions,
+              tabBars: sheet.router.tabBars,
+              held: values,
+            ).shown([
+              for (final e in sheet.entries)
+                (to: e.to, then: e.then, guard: e.guard, tab: e.tab),
+            ]);
+        final classes = {
+          for (final m in RegExp(
+            r'<div class="(node[^"]*)" data-id="([^"]+)"',
+          ).allMatches(dom))
+            m[2]!: m[1]!.split(' '),
+        };
+        expect(classes.keys, containsAll(sheet.pages.map((p) => p.id)));
+        for (final page in sheet.pages) {
+          expect(
+            classes[page.id]!.contains('held-out'),
+            !shown.states.containsKey(page.id),
+            reason: '${page.id} under $values',
+          );
+        }
+        // Each page shown in the first state the app shows it in, named
+        // under it when that is not its first.
+        for (final MapEntry(key: page, value: names) in shown.states.entries) {
+          final first = sheet.pageOf(page)!.states.first.name;
+          final small = first == names.first ? '' : names.first;
+          expect(
+            dom,
+            matches(
+              RegExp(
+                'data-id="${RegExp.escape(page)}"[^>]*>.*?'
+                '<small>${RegExp.escape(small)}</small>',
+                dotAll: true,
+              ),
+            ),
+            reason: '$page under $values',
+          );
+        }
+        // Some page is gone, and some is not.
+        expect(shown.states, isNotEmpty, reason: '$values');
+        expect(shown.states.length, lessThan(sheet.pages.length));
+        // Each value chosen, in its choice.
+        for (final MapEntry(:key, :value) in values.entries) {
+          final c = sheet.conditions.indexWhere((c) => c.name == key);
+          final k = sheet.conditions[c].values.indexOf(value);
+          expect(
+            dom,
+            matches(
+              RegExp(
+                'data-held="$c"[^>]*>.*?<option value="$k" selected',
+                dotAll: true,
+              ),
+            ),
+          );
+        }
+      }
+      // Home to checkout: as a guest, through logging in; signed in, not.
+      for (final (values, steps) in [
+        (const {'Login': 'Guest'}, 3),
+        (const {'Login': 'Signed in'}, 2),
+      ]) {
+        final (:dom, :errors) = _open(
+          shopHtml,
+          '?${held(values)}#route/home/checkout',
+          drawn: (dom) => dom.contains('<div id="route" class="on">'),
+        );
+        expect(errors, isEmpty);
+        expect(_routeSteps(dom), hasLength(steps), reason: '$values');
+      }
+    },
+    skip: _skip,
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
 
   test(
     'the route the page shows is the one the Dart route finds',

@@ -324,5 +324,9 @@
   "htmlSection": "Show this section",
   "htmlVariant": "Shown as",
   "htmlNotInVariant": "Not in {variant}",
-  "@htmlNotInVariant": {"placeholders": {"variant": {}}}
+  "@htmlNotInVariant": {"placeholders": {"variant": {}}},
+  "htmlHeld": "While",
+  "htmlHeldAny": "Any",
+  "htmlHeldAbout": "Only what the app shows while these keep the values chosen: launched with them, nothing done that would change them",
+  "htmlHeldNone": "No page is shown with these values."
 }

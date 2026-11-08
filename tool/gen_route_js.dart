@@ -38,7 +38,8 @@ Future<void> main() async {
       '// sources: ${routeSourcesHash()}\n'
       '\n'
       '/// The route\'s search, compiled to JavaScript: `index.html` inlines\n'
-      '/// it, and calls `contactSheetRouter(sheetJson)(from, state, to)`.\n'
+      '/// it, and calls `contactSheetRouter(sheetJson)(from, state, to)` and\n'
+      '/// `contactSheetShown(sheetJson)(held)`.\n'
       'const routeJs = $literal;\n',
     );
     // As `dart format` has it, so that formatting changes nothing.

@@ -24,6 +24,7 @@ Contact Sheet draws the sheet as it is: it does not check it against the app.
 - Tags, set alike for every page (where its analytics are, its design, its spec, its address on the web, made of its path): each page's values beside it and above it on the map, a state's own where they differ.
 - How much it shows: the pages alone, with the arrows, or with what each arrow says; the arrows back shown or hidden; on the pages, each tag and the memo, shown or hidden (the arrows and the analytics alone, say).
 - The tree: the pages top to bottom, as a site map draws an app, each under the page the app's start first reaches it from.
+- What the app shows while what it keeps across its pages stays as chosen: as a guest, never signed in, only the pages and transitions a guest sees, the rest gone where it is.
 - The route between two pages: the fewest steps as the app's navigator goes. It follows redirects, what the app keeps across its pages (signed in, the cart) and the tabs' own histories.
 - A list of the pages, a table of the transitions, search, and an address to pass around for each page, state and route.
 - Variants, where the sheet names them: iOS or Android, phone or tablet.

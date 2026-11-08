@@ -226,5 +226,9 @@
   "htmlEnlarge": "拡大して見る",
   "htmlSection": "このセクションを見る",
   "htmlVariant": "表示",
-  "htmlNotInVariant": "{variant} にはありません"
+  "htmlNotInVariant": "{variant} にはありません",
+  "htmlHeld": "条件",
+  "htmlHeldAny": "すべて",
+  "htmlHeldAbout": "選んだ値のままアプリが表示するものだけ: 起動時からその値で、値を変える操作はしない",
+  "htmlHeldNone": "この値で表示される画面はありません。"
 }

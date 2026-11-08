@@ -44,6 +44,27 @@ edges:
   - {from: done, to: home, trigger: text:Home, then: Member, kind: replace}
 ''', _m);
 
+/// [sheet]'s router, the conditions' values [held].
+Router _holding(Sheet sheet, Map<String, String> held) => Router(
+  sheet.router.pages,
+  sheet.router.edges,
+  conditions: sheet.router.conditions,
+  tabBars: sheet.router.tabBars,
+  held: held,
+);
+
+/// [sheet]'s deep links, as the router reads them.
+List<RouteEntry> _entries(Sheet sheet) => [
+  for (final e in sheet.entries)
+    (to: e.to, then: e.then, guard: e.guard, tab: e.tab),
+];
+
+/// What [shown] shows as `page:state`.
+Set<String> _framesOf(RouteShown shown) => {
+  for (final MapEntry(key: page, value: states) in shown.states.entries)
+    for (final s in states) '$page:$s',
+};
+
 /// [route] as `page:state` and, for each step, `edge key|back => page:state`.
 List<String> _said(Sheet sheet, Route route) => [
   route.start.map((f) => '${f.page}:${f.state}').join(' '),
@@ -699,6 +720,111 @@ edges:
     expect(sheet.router.route('a', null, 'b').steps, isNull);
   });
 
+  group('with values held, what the app shows', () {
+    final sheet = Sheet.parse('''
+conditions: [{name: Login, values: [Guest, Member]}]
+pages:
+  - id: home
+    label: Home
+    states:
+      - {name: Guest, if: {Login: Guest}, preview: a.dart#a}
+      - {name: Member, if: {Login: Member}, preview: a.dart#a@1}
+  - {id: login, label: Log in, states: [{name: s, preview: b.dart#b}]}
+  - {id: perks, label: Perks, states: [{name: s, preview: c.dart#c}]}
+  - {id: help, label: Help, states: [{name: s, preview: d.dart#d}]}
+edges:
+  - {from: home, to: login, trigger: text:Log in, if: {Login: Guest}}
+  - {from: login, to: home, trigger: text:Log in, set: {Login: Member}, kind: go}
+  - {from: home, to: perks, trigger: text:Perks, if: {Login: Member}}
+  - {from: perks, to: home, trigger: text:Log out, set: {Login: Guest}, kind: go}
+  - {from: home, to: help, trigger: text:Help}
+entries:
+  - {to: perks, via: /perks, if: {Login: Member}}
+''', _m);
+
+    test('nothing held: every page the app reaches, every edge', () {
+      final shown = sheet.router.shown(_entries(sheet));
+      expect(_framesOf(shown), {
+        'home:Guest',
+        'home:Member',
+        'login:s',
+        'perks:s',
+        'help:s',
+      });
+      expect(shown.edges, [0, 1, 2, 3, 4]);
+      expect(shown.entries, [0]);
+    });
+
+    test('a guest: never signed in, so neither the member\'s look nor the '
+        'perks, and logging in does not happen', () {
+      final shown = _holding(sheet, {'Login': 'Guest'}).shown(_entries(sheet));
+      expect(shown.states, {
+        'home': ['Guest'],
+        'login': ['s'],
+        'help': ['s'],
+      });
+      expect(shown.edges, [0, 4]);
+      expect(shown.entries, isEmpty);
+    });
+
+    test('a member: launched signed in, never signed out; the deep link '
+        'opens', () {
+      final shown = _holding(sheet, {'Login': 'Member'}).shown(_entries(sheet));
+      expect(shown.states, {
+        'home': ['Member'],
+        'perks': ['s'],
+        'help': ['s'],
+      });
+      expect(shown.edges, [2, 4]);
+      expect(shown.entries, [0]);
+    });
+  });
+
+  test('with values held, the pages shown are those every history keeps '
+      'them on, searched in full', () {
+    // Random sheets, against a search over every stack up to [limit] steps
+    // that never changes the values held: what it reaches is shown, and a
+    // page shown that it does not reach is one the route takes more steps
+    // to, or, in a tab bar, one the route cannot tell of.
+    for (final tabs in [false, true]) {
+      final limit = tabs ? 6 : 7;
+      for (var seed = 1; seed <= 25; seed++) {
+        final sheet = _random(Random(seed), tabs: tabs);
+        for (final value in ['u', 'v']) {
+          final router = _holding(sheet, {'C': value});
+          final shown = router.shown(const []);
+          final first = sheet.pages.first.id;
+          final start = router.route(first, null, first);
+          final reason = 'seed $seed${tabs ? ', tabs' : ''}, C: $value';
+          // Its first page has no look with the value: nothing is shown.
+          if (start.valuation['C'] != value) {
+            expect(shown.states, isEmpty, reason: reason);
+            continue;
+          }
+          final frames = <String>{};
+          final reached = _searched(
+            router,
+            start,
+            limit,
+            held: {'C': value},
+            frames: frames,
+          );
+          expect(_framesOf(shown), containsAll(frames), reason: reason);
+          for (final page in shown.states.keys) {
+            if (reached.containsKey(page)) continue;
+            final route = router.route(first, null, page);
+            if (!route.searched || route.bounded) continue;
+            expect(
+              route.steps?.length,
+              greaterThan(limit),
+              reason: '$reason, $page',
+            );
+          }
+        }
+      }
+    }
+  });
+
   test('it reads sheet.json as it reads the sheet: tab bars, parents, '
       'states and the values chosen too', () {
     for (final sheet in [
@@ -712,6 +838,22 @@ edges:
         jsonEncode(SheetMap(sheet, shots: const {}, m: _m).json(app: 'shop')),
       ) as Map<String, Object?>;
       final router = Router.fromJson(json);
+      // What it shows with values held, its deep links too.
+      for (final held in [
+        const <String, String>{},
+        for (final c in sheet.conditions) {c.name: c.values.last},
+      ]) {
+        expect(
+          jsonEncode(
+            Router.fromJson(
+              json,
+              held: held,
+            ).shown(Router.entriesFromJson(json)).toJson(),
+          ),
+          jsonEncode(_holding(sheet, held).shown(_entries(sheet)).toJson()),
+          reason: 'held $held',
+        );
+      }
       for (final from in sheet.pages) {
         for (final state in [null, from.states.last.name]) {
           for (final chosen in [
@@ -942,11 +1084,16 @@ Sheet _random(Random r, {bool tabs = false}) {
 /// tab's history, the others kept; tapping the tab shown again, where the
 /// bar says so, goes back to its first page. Without [switchDepth], a tab's
 /// history has no bound.
+///
+/// No step changes the values [held] names. Each page shown, in its state,
+/// is put in [frames] as `page:state`.
 Map<String, int> _searched(
   Router router,
   Route route,
   int limit, {
   int? switchDepth,
+  Map<String, String> held = const {},
+  Set<String>? frames,
 }) {
   final reached = <String, int>{};
   final pages = {for (final p in router.pages) p.id: p};
@@ -1067,6 +1214,7 @@ Map<String, int> _searched(
   for (var d = 0; d <= limit && layer.isNotEmpty; d++) {
     final next = <_Config>[];
     void add(_Config c) {
+      if (held.entries.any((h) => c.g[h.key] != h.value)) return;
       if (seen.add(key(c))) next.add(c);
     }
 
@@ -1076,6 +1224,7 @@ Map<String, int> _searched(
       final stack = shell?.stacks[shell.active];
       final top = onShell ? stack!.last : above.last.frame;
       reached.putIfAbsent(top.page, () => d);
+      frames?.add('${top.page}:${top.state}');
       _Config withStack(
         List<RouteFrame> s,
         Map<String, String> g2, {

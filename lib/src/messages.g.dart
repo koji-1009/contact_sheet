@@ -239,6 +239,10 @@ abstract class Messages {
   String get htmlSection;
   String get htmlVariant;
   String htmlNotInVariant(Object variant);
+  String get htmlHeld;
+  String get htmlHeldAny;
+  String get htmlHeldAbout;
+  String get htmlHeldNone;
 }
 
 class MessagesEn extends Messages {
@@ -989,6 +993,19 @@ class MessagesEn extends Messages {
 
   @override
   String htmlNotInVariant(Object variant) => "Not in ${variant}";
+
+  @override
+  String get htmlHeld => "While";
+
+  @override
+  String get htmlHeldAny => "Any";
+
+  @override
+  String get htmlHeldAbout =>
+      "Only what the app shows while these keep the values chosen: launched with them, nothing done that would change them";
+
+  @override
+  String get htmlHeldNone => "No page is shown with these values.";
 }
 
 class MessagesJa extends Messages {
@@ -1712,4 +1729,16 @@ class MessagesJa extends Messages {
 
   @override
   String htmlNotInVariant(Object variant) => "${variant} にはありません";
+
+  @override
+  String get htmlHeld => "条件";
+
+  @override
+  String get htmlHeldAny => "すべて";
+
+  @override
+  String get htmlHeldAbout => "選んだ値のままアプリが表示するものだけ: 起動時からその値で、値を変える操作はしない";
+
+  @override
+  String get htmlHeldNone => "この値で表示される画面はありません。";
 }

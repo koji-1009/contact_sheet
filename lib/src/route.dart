@@ -46,6 +46,11 @@
 /// summaries, the shell's moves among them. The shell is never pushed: no
 /// summary holds it.
 ///
+/// Some conditions can be held at a value ([Router.held]): the app launches
+/// with them, and nothing that would change them happens. What the app shows
+/// so ([Router.shown]) is what the map shows to whoever chose those values:
+/// what a guest sees, never signed in.
+///
 /// It reads no file and draws nothing: `index.html` runs it compiled to
 /// JavaScript (`tool/route_js.dart`), from `sheet.json`.
 library;
@@ -183,6 +188,34 @@ class RouteEdge {
 
 /// A page in a state.
 typedef RouteFrame = ({String page, String state});
+
+/// A deep link: its page, the state it opens in (null: as nothing says),
+/// the values of the conditions it opens while (none named: any), and the
+/// tab it opens the page in, by its first page.
+typedef RouteEntry = ({
+  String to,
+  String? then,
+  Map<String, List<String>> guard,
+  String? tab,
+});
+
+/// What the app shows while some conditions keep their values
+/// ([Router.held]): each page it reaches, by id, with the states it reaches
+/// it in, in the pages' order; the edges that happen, and the deep links
+/// that open, by their places.
+class RouteShown {
+  const RouteShown(this.states, this.edges, this.entries);
+
+  final Map<String, List<String>> states;
+  final List<int> edges;
+  final List<int> entries;
+
+  Map<String, Object?> toJson() => {
+    'states': states,
+    'edges': edges,
+    'entries': entries,
+  };
+}
 
 /// A step of a route: [edge] done (its place in the edges), or, without
 /// one, what [move] says (`back`, `switch` to another tab, `retap` the tab
@@ -360,6 +393,7 @@ class Router {
     this.tabBars = const [],
     this.tabDepth = 3,
     this.searchLimit = 20000,
+    this.held = const {},
   }) {
     var count = 1;
     for (final (i, c) in conditions.indexed) {
@@ -424,8 +458,13 @@ class Router {
     }
   }
 
-  /// [json], `sheet.json`: its conditions, tab bars, pages and edges.
-  factory Router.fromJson(Map<String, Object?> json) => Router(
+  /// [json], `sheet.json`: its conditions, tab bars, pages and edges; the
+  /// conditions' values [held].
+  factory Router.fromJson(
+    Map<String, Object?> json, {
+    Map<String, String> held = const {},
+  }) => Router(
+    held: held,
     [
       for (final p in _maps(json['pages']))
         RoutePage(
@@ -474,6 +513,17 @@ class Router {
     ],
   );
 
+  /// The deep links of [json], `sheet.json`.
+  static List<RouteEntry> entriesFromJson(Map<String, Object?> json) => [
+    for (final e in _maps(json['entries']))
+      (
+        to: e['to']! as String,
+        then: e['then'] as String?,
+        guard: _lists(e['if']),
+        tab: e['tab'] as String?,
+      ),
+  ];
+
   final List<RoutePage> pages;
   final List<RouteEdge> edges;
   final List<RouteCondition> conditions;
@@ -489,6 +539,20 @@ class Router {
   /// takes all of them, can be past any time an open page has, though a
   /// route found is found long before. Past it, [Route.searched] is false.
   final int searchLimit;
+
+  /// The conditions' values held, by condition: the app launches with them,
+  /// and nothing that would change them happens (a transition setting
+  /// another, a state of another arrived in). None: every value can be.
+  final Map<String, String> held;
+
+  late final List<_Value> _held = _values(held);
+
+  /// The values the app launches with: each condition's first, but those
+  /// held.
+  late final int _first = _apply(_held, 0);
+
+  /// Whether [node]'s values are those held.
+  bool _keeps(int node) => _holds(_held, _gOf(node));
 
   final _conditions = <String, int>{};
   final _strides = <int>[];
@@ -653,7 +717,8 @@ class Router {
   bool _guarded(List<(int, Set<int>)> guard, int g) =>
       guard.every((cv) => cv.$2.contains(_value(g, cv.$1)));
 
-  bool _valid(int node) => _holds(_requires[_frameOf(node)], _gOf(node));
+  bool _valid(int node) =>
+      _holds(_requires[_frameOf(node)], _gOf(node)) && _keeps(node);
 
   Map<String, String> _named(int g) => {
     for (final (c, condition) in conditions.indexed)
@@ -704,8 +769,14 @@ class Router {
     }();
   }
 
-  /// The nodes, of canonical frames, the edge [i] arrives at from [node].
-  List<int> _arrive(int i, int node) {
+  /// The nodes, of canonical frames, the edge [i] arrives at from [node]:
+  /// none where it would change the values held.
+  List<int> _arrive(int i, int node) => [
+    for (final n in _arriving(i, node))
+      if (_keeps(n)) n,
+  ];
+
+  List<int> _arriving(int i, int node) {
     final e = edges[i];
     final state = _frames[_frameOf(node)].state;
     final g = _apply(_sets[i], _gOf(node));
@@ -760,8 +831,14 @@ class Router {
   }
 
   /// The nodes, of canonical frames, landed on in place of the frame
-  /// [under] when [top] is taken off by [j].
-  List<int> _landOn(int under, int top, int? j) {
+  /// [under] when [top] is taken off by [j]: none where it would change the
+  /// values held.
+  List<int> _landOn(int under, int top, int? j) => [
+    for (final n in _landing(under, top, j))
+      if (_keeps(n)) n,
+  ];
+
+  List<int> _landing(int under, int top, int? j) {
     final own = _canon[under];
     final page = _frames[own].page;
     final state = _frames[_frameOf(top)].state;
@@ -809,13 +886,13 @@ class Router {
       (stack.length >= 2 || _frames[stack.single].page != _tabRoots[t]);
 
   /// Where the app launches: its first page, in the first state its first
-  /// values allow, in its tab if it is in one.
+  /// values (and those held) allow, in its tab if it is in one.
   int get _launch {
     final first = pages.first;
-    final unsaid = _unsaid(first.id, 0);
+    final unsaid = _unsaid(first.id, _first);
     final f = _pageFrames[first.id]!.first;
     return _startAt(
-      unsaid.isNotEmpty ? unsaid.first : _node(f, _apply(_requires[f], 0)),
+      unsaid.isNotEmpty ? unsaid.first : _node(f, _apply(_requires[f], _first)),
       -1,
     );
   }
@@ -1753,7 +1830,7 @@ class Router {
     // Not reached within the bound: alone, unless a switch from past it
     // might have reached it.
     final bounded = deep != null;
-    final g = _apply(want, 0);
+    final g = _apply(want, _first);
     if (named != null) {
       return (
         [_startAt(_node(named, _apply(_requires[named], g)), -1)],
@@ -1878,24 +1955,28 @@ class Router {
   /// another; a pop that names its page may land elsewhere too.
   Map<String, List<String>> arrivals(int i) {
     final e = edges[i];
-    List<int> arriving(int node) {
-      if (e.move != RouteMove.pop) return _arrive(i, node);
-      return [
-        for (final u in _overFrames[e.from] ?? const <int>{})
-          if (_frames[u].page == e.to) ..._landOn(u, node, i),
-        if (!e.under) ..._arrive(i, node),
-      ];
-    }
-
     return {
       for (final f in _pageFrames[e.from] ?? const <int>[])
         if (e.can(_frames[f].state))
           _frames[f].state: _states([
             for (var g = 0; g < _valuations; g++)
               if (_holds(_requires[f], g) && _guarded(_guards[i], g))
-                ...arriving(_node(f, g)),
+                ..._lands(i, _node(f, g)),
           ]),
     };
+  }
+
+  /// The nodes, of canonical frames, the edge [i] can arrive at from
+  /// [node]: a pop back to the page under it on each page it can be over
+  /// that is its own, and, naming its page, where it goes.
+  List<int> _lands(int i, int node) {
+    final e = edges[i];
+    if (e.move != RouteMove.pop) return _arrive(i, node);
+    return [
+      for (final u in _overFrames[e.from] ?? const <int>{})
+        if (_frames[u].page == e.to) ..._landOn(u, node, i),
+      if (!e.under) ..._arrive(i, node),
+    ];
   }
 
   /// The frames each page can be put over, as [_over] has their pages: of
@@ -1950,16 +2031,75 @@ class Router {
   ];
 
   /// The edges that can happen on some history: from the app's launch, or
-  /// from a deep link into [entries]' pages (each its page, the state it
-  /// opens in, the values of the conditions it opens while, and the tab).
-  Set<int> happening(
-    List<
-      ({String to, String? then, Map<String, List<String>> guard, String? tab})
-    >
-    entries,
-  ) {
-    final starts = <int>{_launch};
-    for (final entry in entries) {
+  /// from a deep link into [entries]' pages.
+  Set<int> happening(List<RouteEntry> entries) => {
+    for (final n in _reached(_origins(entries).starts)) ..._outs(n),
+  };
+
+  /// What the app shows while the conditions keep the values [held] names:
+  /// the pages, in their states, it reaches from its launch (with those
+  /// values) or from a deep link into [entries]' pages that opens while
+  /// they are so; the edges that happen between them, arriving without
+  /// changing those values; and those deep links.
+  ///
+  /// With tab bars, every history would be too many: a page in a state the
+  /// moves with the other tabs' histories left out reach (as [happening])
+  /// is shown where a route's search finds it, or cannot tell (stopped
+  /// short, or past a tab's bound).
+  RouteShown shown(List<RouteEntry> entries) {
+    final (:starts, :opened) = _origins(entries);
+    final reached = _reached(starts);
+    final found = {for (final n in reached) _canon[_frameOf(n)]};
+    if (tabBars.isNotEmpty) {
+      found.removeWhere((f) => !_shownFrom(starts, f));
+    }
+    final frames = found.toList()..sort();
+    final states = <String, List<String>>{};
+    for (final f in frames) {
+      (states[_frames[f].page] ??= []).add(_frames[f].state);
+    }
+    final happens = <int>{};
+    for (final n in reached) {
+      if (!found.contains(_canon[_frameOf(n)])) continue;
+      for (final i in _outs(n)) {
+        if (!happens.contains(i) &&
+            _lands(i, n).any((h) => found.contains(_canon[_frameOf(h)]))) {
+          happens.add(i);
+        }
+      }
+    }
+    return RouteShown(
+      states,
+      happens.toList()..sort(),
+      opened.toList()..sort(),
+    );
+  }
+
+  /// Whether the canonical frame [f] is shown on a history from one of
+  /// [starts], as a route's search finds it: found, or not told (the search
+  /// stopped short, or a switch from past a tab's bound might find it).
+  bool _shownFrom(Set<int> starts, int f) {
+    var unknown = false;
+    for (final s in starts) {
+      final (steps, deep, short, _) = _search([
+        s,
+      ], (n) => _canon[_frameOf(n)] == f);
+      if (steps != null) return true;
+      if (short || deep != null) unknown = true;
+    }
+    return unknown;
+  }
+
+  /// Where the app's histories start, under the values held: its launch,
+  /// unless its first page has no look then; and each deep link of
+  /// [entries] (each its page, the state it opens in, the values of the
+  /// conditions it opens while, and the tab), under each of those values,
+  /// the places of those that open.
+  ({Set<int> starts, Set<int> opened}) _origins(List<RouteEntry> entries) {
+    final launch = _launch;
+    final starts = <int>{if (_keeps(launch)) launch};
+    final opened = <int>{};
+    for (final (j, entry) in entries.indexed) {
       final allowed = _guard(entry.guard);
       final t = entry.then == null ? null : _frame(entry.to, entry.then!);
       for (var g = 0; g < _valuations; g++) {
@@ -1970,13 +2110,20 @@ class Router {
           else
             ..._unsaid(entry.to, g),
         ]) {
+          if (!_keeps(n)) continue;
+          opened.add(j);
           starts.add(_startAt(n, -1, named: entry.tab));
         }
       }
     }
-    // With tab bars, every history would be too many: the moves with the
-    // other tabs' histories left out, which take every one of a route's
-    // steps, from where they start (an edge they find may still not happen).
+    return (starts: starts, opened: opened);
+  }
+
+  /// The canonical nodes shown on some history from [starts]. With tab
+  /// bars, every history would be too many: the moves with the other tabs'
+  /// histories left out, which take every one of a route's steps, from
+  /// where they start (a node they reach may still not be shown).
+  Set<int> _reached(Set<int> starts) {
     if (tabBars.isNotEmpty) {
       return {
         for (final s in starts)
@@ -1986,7 +2133,7 @@ class Router {
             ])
               for (final id in b.moves.keys) (id, b),
           ])
-            ..._outs(id < _canonCount ? id : bound.shown(id, _node)),
+            id < _canonCount ? id : bound.shown(id, _node),
       };
     }
     final (seen, _, _, _) = _explore(
@@ -1995,7 +2142,7 @@ class Router {
       alone: [...starts],
       limited: false,
     );
-    return {for (final (f, _, _) in seen.keys) ..._outs(f)};
+    return {for (final (f, _, _) in seen.keys) _plain(f)};
   }
 }
 
