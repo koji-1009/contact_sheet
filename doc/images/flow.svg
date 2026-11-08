@@ -26,7 +26,7 @@
     </g>
     <g>
       <rect x="743" y="46" width="196" height="128" rx="12" fill="#ffffff" stroke="#d9dde3" stroke-width="1.5"/>
-      <text x="841" y="96" font-size="17" font-weight="600" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">contact_sheet</text>
+      <text x="841" y="96" font-size="17" font-weight="600" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">sheet export</text>
       <text x="841" y="124" font-size="13" fill="#5f6672">shoots the app's</text>
       <text x="841" y="144" font-size="13" fill="#5f6672">@Previews with shutter</text>
     </g>

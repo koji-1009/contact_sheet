@@ -4,11 +4,13 @@ version: 0.1.0
 repository: https://github.com/koji-1009/contact_sheet
 issue_tracker: https://github.com/koji-1009/contact_sheet/issues
 screenshots:
-  - description: The map of the shop example, its pages and the transitions between them.
+  - description: The map of the shop example, its pages, the transitions between them, and each page's design linked above it.
     path: doc/images/map.png
-  - description: The tree of the shop example, each page under the page the app's start first reaches it from.
+  - description: The cart of the shop example chosen, its states, and its transitions as sentences.
+    path: doc/images/page.png
+  - description: The tree of the trips example, 37 pages, each under the page the app's start first reaches it from.
     path: doc/images/tree.png
-  - description: Code and specifications, looked into by an AI agent, become the sheet, and contact_sheet draws the map.
+  - description: Code and specifications, looked into by an AI agent, become the sheet, and sheet export draws the map.
     path: doc/images/flow.png
 topics:
   - flutter

@@ -1,13 +1,13 @@
 Every page of a Flutter app as one map: each state of each page as an image, each transition as an arrow.
 The map is HTML and JSON (and SVG, when asked), opened without any tool, for everyone who works on the app, whether in its code or not: product managers, designers, marketing, support.
 
-![The map of the shop example: its pages, each as its preview, and the transitions between them](https://raw.githubusercontent.com/koji-1009/contact_sheet/main/doc/images/map.png)
+![The map of the shop example: its pages, each as its preview, the transitions between them, and each page's design linked above it](https://raw.githubusercontent.com/koji-1009/contact_sheet/main/doc/images/map.png)
 
 **See it:** [the maps of the example apps](https://koji-1009.github.io/contact_sheet/), exported from the examples in [the repository](https://github.com/koji-1009/contact_sheet).
 
 ## How it works
 
-![Code, specifications and the like, looked into by an AI agent, become the sheet; contact_sheet shoots the previews and draws the map](https://raw.githubusercontent.com/koji-1009/contact_sheet/main/doc/images/flow.png)
+![Code, specifications and the like, looked into by an AI agent, become the sheet; sheet export shoots the previews and draws the map](https://raw.githubusercontent.com/koji-1009/contact_sheet/main/doc/images/flow.png)
 
 1. An AI agent finds out the screen transitions that actually happen in the app, from whatever tells how the app works (its code, its specifications), and writes them as the app's **sheet** (`contact_sheet/sheet.yaml`), naming a `@Preview` for each state of each page.
 2. `sheet export` shoots those previews with [shutter](https://pub.dev/packages/shutter), drawn as iOS (or Android, where the sheet asks for it), and draws the map.
@@ -29,9 +29,12 @@ Contact Sheet draws the sheet as it is: it does not check it against the app.
 - A list of the pages, a table of the transitions, search, and an address to pass around for each page, state and route.
 - Variants, where the sheet names them: iOS or Android, phone or tablet.
 - What only developers read (the code's names and files) is behind “For developers”.
+- Where it is from: the app's version and branch, when it was exported, and how many of the app's changes since the sheet was written it names for no page.
 - Light and dark, a phone's width, and print.
 
-![The tree of the shop example: each page under the page the app's start first reaches it from](https://raw.githubusercontent.com/koji-1009/contact_sheet/main/doc/images/tree.png)
+![The cart of the shop example chosen: its states, and its transitions as sentences](https://raw.githubusercontent.com/koji-1009/contact_sheet/main/doc/images/page.png)
+
+![The tree of the trips example, 37 pages: each page under the page the app's start first reaches it from](https://raw.githubusercontent.com/koji-1009/contact_sheet/main/doc/images/tree.png)
 
 `contact_sheet/map/` holds:
 
@@ -79,7 +82,7 @@ An export deletes the runs of shutter's it made, so the team's own runs in the a
 Contact Sheet adds `contact_sheet/` to the app, and with `init --package`, a line to its `.gitignore`:
 
 - `sheet.yaml` and `basis.json`, and the sheet package where there is one: kept in git.
-- `map/`: the map (about 0.33 MB for the shop example's 11 states, its images WebP drawn at a pixel ratio of 1.5). Commit it, or ignore it and export it where it is shared (`export --out <folder>`), or have CI export it. Its images depend on the machine's fonts (Cupertino text is SF Pro on macOS, Roboto elsewhere): export it on one kind of machine, macOS to look as an iPhone does.
+- `map/`: the map (about 0.38 MB for the shop example's 11 states, its images WebP drawn at a pixel ratio of 1.5). Commit it, or ignore it and export it where it is shared (`export --out <folder>`), or have CI export it. Its images depend on the machine's fonts (Cupertino text is SF Pro on macOS, Roboto elsewhere): export it on one kind of machine, macOS to look as an iPhone does.
 - `.dart_tool/`: what an export keeps between runs, and the sheet package's shots: out of git. Flutter's `.gitignore` ignores `.dart_tool/` at any depth; where the app's `.gitignore` does not, `init --package` adds `contact_sheet/.dart_tool/` to it.
 
 ## More
