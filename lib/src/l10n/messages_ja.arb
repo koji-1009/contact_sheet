@@ -230,5 +230,7 @@
   "htmlHeld": "条件",
   "htmlHeldAny": "すべて",
   "htmlHeldAbout": "選んだ値のままアプリが表示するものだけ: 起動時からその値で、値を変える操作はしない",
-  "htmlHeldNone": "この値で表示される画面はありません。"
+  "htmlHeldNone": "この値で表示される画面はありません。",
+  "htmlHeldBusy": "アプリが表示するものを調べています…",
+  "htmlRouteBusy": "経路を調べています…"
 }

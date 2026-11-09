@@ -328,5 +328,7 @@
   "htmlHeld": "While",
   "htmlHeldAny": "Any",
   "htmlHeldAbout": "Only what the app shows while these keep the values chosen: launched with them, nothing done that would change them",
-  "htmlHeldNone": "No page is shown with these values."
+  "htmlHeldNone": "No page is shown with these values.",
+  "htmlHeldBusy": "Finding what the app shows…",
+  "htmlRouteBusy": "Finding the route…"
 }

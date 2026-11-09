@@ -330,29 +330,74 @@ Map<String, String> _frameJson(RouteFrame f) => {
 typedef _Value = (int, int);
 
 /// The moves a search's bound below is the fewest of ([Router._boundOf]):
-/// canonical nodes, numbered as the router does, and tab states after them.
+/// canonical nodes, numbered as the router does, and tab states after them;
+/// and switches, numbered below 0.
 class _Bound {
   _Bound(this.base);
 
   final int base;
   final moves = <int, Set<int>>{};
   final tabs = <_TabState>[];
-  final _ids = <String, int>{};
+
+  /// A switch to another tab: from each node switching in a bar, under some
+  /// values, from its own tab (-1: from a page over the bar), the one move
+  /// to this node; and from it, in no step, to each tab it can find so (as
+  /// many moves as the tabs' histories, not those for each node).
+  final switches = <(int, int, int)>[];
+
+  /// The moves backwards: for each node, those that move to it.
+  late final Map<int, List<int>> back = () {
+    final back = <int, List<int>>{};
+    for (final MapEntry(key: from, value: tos) in moves.entries) {
+      for (final to in tos) {
+        (back[to] ??= []).add(from);
+      }
+    }
+    return back;
+  }();
+
+  static int switchId(int i) => -1 - i;
+  static int switchAt(int id) => -1 - id;
+  static bool isSwitch(int id) => id < 0;
+  final _ids = <_Ints, int>{};
+
+  /// The router's shells, as the tab states they are ([Router._boundNode]).
+  final shells = <int, int?>{};
 
   /// The tab state of [t] showing [history] under [g], numbered as met.
   int tab(int bar, int t, List<int> history, int g) =>
-      _ids['$t|${history.join(',')}|$g'] ??= () {
+      _ids[_Ints([t, g, ...history])] ??= () {
         tabs.add(_TabState(bar, t, history, g));
         return base + tabs.length - 1;
       }();
 
-  int? find(int t, List<int> history, int g) =>
-      _ids['$t|${history.join(',')}|$g'];
+  int? find(int t, List<int> history, int g) => _ids[_Ints([t, g, ...history])];
 
   /// The canonical node the tab state [id] shows, by [node].
   int shown(int id, int Function(int frame, int g) node) {
     final a = tabs[id - base];
     return node(a.history.last, a.g);
+  }
+}
+
+/// Numbers, as a key: equal when they are, in order.
+class _Ints {
+  _Ints(this.values) : hashCode = Object.hashAll(values);
+
+  final List<int> values;
+
+  @override
+  final int hashCode;
+
+  @override
+  bool operator ==(Object other) {
+    if (other is! _Ints || other.hashCode != hashCode) return false;
+    final a = values, b = other.values;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 }
 
@@ -420,7 +465,7 @@ class Router {
     for (final p in pages) {
       final frames = _pageFrames[p.id] = [];
       for (final (i, s) in p.states.indexed) {
-        _ids['${p.id}\u0000${s.name}'] = _frames.length;
+        (_ids[p.id] ??= {})[s.name] = _frames.length;
         frames.add(_frames.length);
         _addFrame((page: p.id, state: s.name), null, _frames.length);
         _requires.add(_values(s.conditions));
@@ -579,7 +624,7 @@ class Router {
 
   /// For each canonical frame, the tabs it has a frame in past the bound.
   final _deepTabs = <List<int>>[];
-  final _ids = <String, int>{};
+  final _ids = <String, Map<String, int>>{};
   final _pageFrames = <String, List<int>>{};
 
   void _addFrame(RouteFrame frame, int? tab, int canon) {
@@ -601,9 +646,9 @@ class Router {
 
   /// The shells met, and their numbers by what they hold.
   final _shells = <_Shell>[];
-  final _shellIds = <String, int>{};
+  final _shellIds = <_Ints, int>{};
 
-  int? _frame(String page, String state) => _ids['$page\u0000$state'];
+  int? _frame(String page, String state) => _ids[page]?[state];
 
   int _node(int frame, int g) => frame * _valuations + g;
   int get _nodeCount => _frames.length * _valuations;
@@ -626,11 +671,11 @@ class Router {
   /// numbers of its histories, and a history a shell keeps from the one it
   /// came from is not read again.
   final _histories = <List<int>>[];
-  final _historyIds = <String, int>{};
+  final _historyIds = <_Ints, int>{};
   final _historyOf = Map<List<int>, int>.identity();
 
   int _history(List<int> history) =>
-      _historyOf[history] ??= _historyIds[history.join(',')] ??= () {
+      _historyOf[history] ??= _historyIds[_Ints(history)] ??= () {
         _histories.add(history);
         return _histories.length - 1;
       }();
@@ -638,7 +683,7 @@ class Router {
   /// The shell of [bar] showing [active], with [stacks], under [g].
   int _shell(int bar, int active, List<List<int>> stacks, int g) {
     final ids = [for (final s in stacks) _history(s)];
-    return _shellIds['$bar|$active|${ids.join(',')}|$g'] ??= () {
+    return _shellIds[_Ints([bar, active, g, ...ids])] ??= () {
       _shells.add(
         _Shell(bar, active, [for (final id in ids) _histories[id]], g),
       );
@@ -733,10 +778,13 @@ class Router {
   };
 
   /// The nodes [page] can show in under [g] where nothing says which.
-  List<int> _unsaid(String page, int g) => [
-    for (final f in _pageFrames[page] ?? const <int>[])
-      if (_decided[f] && _holds(_requires[f], g)) _node(f, g),
-  ];
+  List<int> _unsaid(String page, int g) =>
+      (_unsaidCache[page] ??= List.filled(_valuations, null))[g] ??= [
+        for (final f in _pageFrames[page] ?? const <int>[])
+          if (_decided[f] && _holds(_requires[f], g)) _node(f, g),
+      ];
+
+  final _unsaidCache = <String, List<List<int>?>>{};
 
   late final List<List<int>?> _outCache = List.filled(_nodeCount, null);
   late final List<List<int?>?> _popCache = List.filled(_nodeCount, null);
@@ -770,11 +818,15 @@ class Router {
   }
 
   /// The nodes, of canonical frames, the edge [i] arrives at from [node]:
-  /// none where it would change the values held.
-  List<int> _arrive(int i, int node) => [
-    for (final n in _arriving(i, node))
-      if (_keeps(n)) n,
-  ];
+  /// none where it would change the values held. Each once: they are of the
+  /// state it leaves and the values, the canonical node's.
+  List<int> _arrive(int i, int node) =>
+      _arriveCache[i * _canonCount + _plain(node)] ??= [
+        for (final n in _arriving(i, node))
+          if (_keeps(n)) n,
+      ];
+
+  final _arriveCache = <int, List<int>>{};
 
   List<int> _arriving(int i, int node) {
     final e = edges[i];
@@ -811,8 +863,18 @@ class Router {
 
   /// The nodes that take [below]'s place (its frame read; the conditions
   /// are the top's) when [top] is taken off by the pop [j] (null: the
-  /// back). Under a shell, its tab shown's top is what is landed on.
+  /// back). Under a shell, its tab shown's top is what is landed on. Each
+  /// once: a summary is left again onto the same frames many times.
   List<int> _land(int below, int top, int? j) {
+    // A frame's are of its frame alone: the values are the top's.
+    final b = _isShell(below) ? below : _frameOf(below);
+    final key = (b * _nodeCount + top) * (edges.length + 1) + (j ?? -1) + 1;
+    return _landCache[key] ??= _landed(below, top, j);
+  }
+
+  final _landCache = <int, List<int>>{};
+
+  List<int> _landed(int below, int top, int? j) {
     if (_isShell(below)) {
       final s = _shellAt(below);
       final stack = s.stacks[_tabPos[s.active]];
@@ -958,6 +1020,13 @@ class Router {
 
   final _bounds = <String, _Bound>{};
 
+  /// The moves from all of [starts] (each a node with nothing under it) at
+  /// once: each start's are among them, and they are found once, not once
+  /// for each (a deep link opens under each of the values it allows). The
+  /// pages each start shows can be under a page from another: a few moves
+  /// more than each start's together, never fewer.
+  _Bound _starting(Set<int> starts) => _bound([...starts]);
+
   /// The moves reached from [stack], over two kinds of node: a canonical
   /// node (a page over the bar, or out of it, with no history under it but
   /// what [_over] says can be), and a tab's state (a bar showing one tab,
@@ -995,15 +1064,13 @@ class Router {
 
     // The histories each tab can have been left with; the pages of a tab
     // it can have been left at deeper than that, as a page over the bar (a
-    // route past the bound switches from there, and back to it); and what
-    // switches in each bar: a node, its values, its own tab (-1: a page
-    // over the bar). Each grows, and the moves with it.
-    final left = List.generate(_tabRoots.length, (_) => <String, List<int>>{});
+    // route past the bound switches from there, and back to it); and the
+    // switches in each bar ([_Bound.switches]). Each grows, and the moves
+    // with it.
+    final left = List.generate(_tabRoots.length, (_) => <_Ints, List<int>>{});
     final leftDeep = List.generate(_tabRoots.length, (_) => <int>{});
-    final switchers = List.generate(
-      _barTabs.length,
-      (_) => <(int, int, int)>[],
-    );
+    final barSwitches = List.generate(_barTabs.length, (_) => <int>[]);
+    final switchIds = <_Ints, int>{};
     void restore(int from, int t, List<int> history, int g) {
       for (final x in shown(history.last, g)) {
         add(
@@ -1014,42 +1081,55 @@ class Router {
     }
 
     void leave(int t, List<int> history) {
-      if (left[t].putIfAbsent(history.join(','), () => history) != history) {
+      if (left[t].putIfAbsent(_Ints(history), () => history) != history) {
         return;
       }
-      for (final (from, g, own) in [...switchers[_tabBar[t]]]) {
+      for (final id in [...barSwitches[_tabBar[t]]]) {
+        final (_, g, own) = bound.switches[_Bound.switchAt(id)];
         if (own != t && _guarded(_tabGuards[t], g)) {
-          restore(from, t, history, g);
+          restore(id, t, history, g);
         }
       }
     }
 
     void leaveDeep(int t, int f) {
       if (!leftDeep[t].add(f)) return;
-      for (final (from, g, own) in [...switchers[_tabBar[t]]]) {
+      for (final id in [...barSwitches[_tabBar[t]]]) {
+        final (_, g, own) = bound.switches[_Bound.switchAt(id)];
         if (own == t || !_guarded(_tabGuards[t], g)) continue;
         for (final x in shown(f, g)) {
-          add(from, x);
+          add(id, x);
         }
       }
     }
 
+    // A switch from [from], in its own tab (-1: a page over the bar): to
+    // the switch of the bar, the values and that tab, met once, whose moves
+    // are to each other tab as it can be found.
     void switches(int from, int own, int bar, int g) {
-      switchers[bar].add((from, g, own));
-      for (final t in _barTabs[bar]) {
-        if (t == own || !_guarded(_tabGuards[t], g)) continue;
-        for (final x in _unsaid(_tabRoots[t], g)) {
-          add(from, tab(t, [_frameOf(x)], g));
-        }
-        for (final history in [...left[t].values]) {
-          restore(from, t, history, g);
-        }
-        for (final f in [...leftDeep[t]]) {
-          for (final x in shown(f, g)) {
-            add(from, x);
+      final key = _Ints([bar, g, own]);
+      var id = switchIds[key];
+      if (id == null) {
+        id = switchIds[key] = _Bound.switchId(bound.switches.length);
+        bound.switches.add((bar, g, own));
+        barSwitches[bar].add(id);
+        reach(id);
+        for (final t in _barTabs[bar]) {
+          if (t == own || !_guarded(_tabGuards[t], g)) continue;
+          for (final x in _unsaid(_tabRoots[t], g)) {
+            add(id, tab(t, [_frameOf(x)], g));
+          }
+          for (final history in [...left[t].values]) {
+            restore(id, t, history, g);
+          }
+          for (final f in [...leftDeep[t]]) {
+            for (final x in shown(f, g)) {
+              add(id, x);
+            }
           }
         }
       }
+      add(from, id);
     }
 
     // The tab states by their history's top page, and the pages over the
@@ -1118,6 +1198,8 @@ class Router {
     // A node's moves, as it is reached; those the others reached later
     // give are added as they are.
     void own(int id) {
+      // A switch's moves are given as the tabs' histories are met.
+      if (_Bound.isSwitch(id)) return;
       final to = moves[id]!;
       if (id < _canonCount) {
         final f = _frameOf(id);
@@ -1251,30 +1333,44 @@ class Router {
   }
 
   /// For each node [bound] reaches, the fewest of its moves to one [done]
-  /// holds of (a tab state, as its history's top); -1 where none leads.
+  /// holds of (a tab state, as its history's top); -1 where none leads. A
+  /// move from a switch is no step: the move to it was the step.
   List<int> _towards(_Bound bound, bool Function(int node) done) {
     final dist = List.filled(_canonCount + bound.tabs.length, -1);
-    final back = <int, List<int>>{};
-    for (final MapEntry(key: from, value: tos) in bound.moves.entries) {
-      for (final to in tos) {
-        (back[to] ??= []).add(from);
-      }
-    }
-    final queue = [
+    final switched = List.filled(bound.switches.length, -1);
+    int at(int id) =>
+        _Bound.isSwitch(id) ? switched[_Bound.switchAt(id)] : dist[id];
+    final back = bound.back;
+    // Level by level: those a move from a switch reaches join the level.
+    var level = [
       for (final id in bound.moves.keys)
-        if (done(id < _canonCount ? id : bound.shown(id, _node))) id,
+        if (!_Bound.isSwitch(id) &&
+            done(id < _canonCount ? id : bound.shown(id, _node)))
+          id,
     ];
-    for (final id in queue) {
+    for (final id in level) {
       dist[id] = 0;
     }
-    for (var i = 0; i < queue.length; i++) {
-      final id = queue[i];
-      for (final from in back[id] ?? const <int>[]) {
-        if (dist[from] < 0) {
-          dist[from] = dist[id] + 1;
-          queue.add(from);
+    for (var d = 0; level.isNotEmpty; d++) {
+      final next = <int>[];
+      for (var i = 0; i < level.length; i++) {
+        final id = level[i];
+        if (at(id) != d) continue;
+        for (final from in back[id] ?? const <int>[]) {
+          final free = _Bound.isSwitch(from);
+          final steps = free ? d : d + 1;
+          final known = at(from);
+          if (known >= 0 && known <= steps) continue;
+          if (free) {
+            switched[_Bound.switchAt(from)] = steps;
+            level.add(from);
+          } else {
+            dist[from] = steps;
+            next.add(from);
+          }
         }
       }
+      level = next;
     }
     return dist;
   }
@@ -1295,8 +1391,10 @@ class Router {
   /// frame as its canonical node; null for a shell it does not have.
   int? _boundNode(_Bound bound, int node) {
     if (!_isShell(node)) return _plain(node);
-    final s = _shellAt(node);
-    return bound.find(s.active, s.stacks[_tabPos[s.active]], s.g);
+    return bound.shells.putIfAbsent(node, () {
+      final s = _shellAt(node);
+      return bound.find(s.active, s.stacks[_tabPos[s.active]], s.g);
+    });
   }
 
   late final _Summaries _summaries = _summarise();
@@ -1313,8 +1411,15 @@ class Router {
     for (var g = 0; g < n; g++) {
       if (_valid(g)) heap.push(0, (g, g, null));
     }
+    // The fewest steps a node at a level is in the heap with: one no fewer
+    // is not pushed again.
+    final best = List.generate(n, (_) => <int, int>{});
     void relax(int d, int g, int f, _Via via) {
-      if (!dist[g].containsKey(f)) heap.push(d, (g, f, via));
+      if (dist[g].containsKey(f)) return;
+      final b = best[g][f];
+      if (b != null && b <= d) return;
+      best[g][f] = d;
+      heap.push(d, (g, f, via));
     }
 
     // f, at g's level after d, pushed h by i; h's level left from x, after
@@ -1378,6 +1483,9 @@ class Router {
     int bound(int f) => toward == null ? 0 : toward(f);
     final heap = _Heap<(int, _At, _At?, _Hop?)>();
     final seen = <_At, (_At?, _Hop?)>{};
+    // The fewest steps a node is in the heap with: one no fewer is not
+    // pushed again.
+    final best = <_At, int>{};
     int? deep;
     // Whether [stack]'s first k frames hold one past a tab's bound.
     final pastUnder = [false];
@@ -1402,7 +1510,11 @@ class Router {
         deep = d + left;
       }
       final next = (f, k, ctx);
-      if (!seen.containsKey(next)) heap.push(d + left, (d, next, at, how));
+      if (seen.containsKey(next)) return;
+      final b = best[next];
+      if (b != null && b <= d) return;
+      best[next] = d;
+      heap.push(d + left, (d, next, at, how));
     }
 
     if (stack.isNotEmpty) {
@@ -2044,15 +2156,13 @@ class Router {
   ///
   /// With tab bars, every history would be too many: a page in a state the
   /// moves with the other tabs' histories left out reach (as [happening])
-  /// is shown where a route's search finds it, or cannot tell (stopped
-  /// short, or past a tab's bound).
+  /// is shown where one search from all the starts finds it, or cannot tell
+  /// (stopped short, or past a tab's bound where those moves lead to it).
   RouteShown shown(List<RouteEntry> entries) {
     final (:starts, :opened) = _origins(entries);
     final reached = _reached(starts);
     final found = {for (final n in reached) _canon[_frameOf(n)]};
-    if (tabBars.isNotEmpty) {
-      found.removeWhere((f) => !_shownFrom(starts, f));
-    }
+    if (tabBars.isNotEmpty) found.retainAll(_shownFrom(starts, found));
     final frames = found.toList()..sort();
     final states = <String, List<String>>{};
     for (final f in frames) {
@@ -2075,19 +2185,43 @@ class Router {
     );
   }
 
-  /// Whether the canonical frame [f] is shown on a history from one of
-  /// [starts], as a route's search finds it: found, or not told (the search
-  /// stopped short, or a switch from past a tab's bound might find it).
-  bool _shownFrom(Set<int> starts, int f) {
-    var unknown = false;
-    for (final s in starts) {
-      final (steps, deep, short, _) = _search([
-        s,
-      ], (n) => _canon[_frameOf(n)] == f);
-      if (steps != null) return true;
-      if (short || deep != null) unknown = true;
+  /// Of the canonical frames [candidates], those shown on a history from
+  /// [starts], as one search from all of them finds them (a route's, each
+  /// start a stack of its own, every frame looked for at once): found, or
+  /// not told (the search stopped short, or reached a page past a tab's
+  /// bound, from where a switch, not followed, might lead to the frame as
+  /// the moves with the other tabs' histories left out do).
+  Set<int> _shownFrom(Set<int> starts, Set<int> candidates) {
+    final left = {...candidates};
+    final past = <int>{};
+    final (_, _, _, short) = _explore(const [], (n) {
+      if (_frameTab[_frameOf(n)] != null) past.add(_plain(n));
+      left.remove(_canon[_frameOf(n)]);
+      return left.isEmpty;
+    }, alone: [...starts]);
+    if (left.isEmpty || short) return candidates;
+    if (past.isEmpty) return candidates.difference(left);
+    // What the moves reach from the pages past the bound.
+    final bound = _starting(starts);
+    final told = <int>{};
+    final queue = [
+      for (final n in past)
+        if (bound.moves.containsKey(n)) n,
+    ];
+    final met = {...queue};
+    for (var i = 0; i < queue.length; i++) {
+      final id = queue[i];
+      if (!_Bound.isSwitch(id)) {
+        told.add(_frameOf(id < _canonCount ? id : bound.shown(id, _node)));
+      }
+      for (final to in bound.moves[id]!) {
+        if (met.add(to)) queue.add(to);
+      }
     }
-    return unknown;
+    return {
+      for (final f in candidates)
+        if (!left.contains(f) || told.contains(f)) f,
+    };
   }
 
   /// Where the app's histories start, under the values held: its launch,
@@ -2125,14 +2259,10 @@ class Router {
   /// where they start (a node they reach may still not be shown).
   Set<int> _reached(Set<int> starts) {
     if (tabBars.isNotEmpty) {
+      final bound = _starting(starts);
       return {
-        for (final s in starts)
-          for (final (id, bound) in [
-            for (final b in [
-              _bound([s]),
-            ])
-              for (final id in b.moves.keys) (id, b),
-          ])
+        for (final id in bound.moves.keys)
+          if (!_Bound.isSwitch(id))
             id < _canonCount ? id : bound.shown(id, _node),
       };
     }
@@ -2202,47 +2332,58 @@ class _Via {
 }
 
 /// A binary heap on (d, then the order pushed): the same route each time.
+/// Only numbers move in it: the values stay where they were pushed, by the
+/// order (moving a value of a record type checks its type each time).
 class _Heap<T> {
-  final _items = <(int, int, T)>[];
-  var _count = 0;
+  final _d = <int>[];
+  final _order = <int>[];
+  final _values = <Object?>[];
 
-  bool get isNotEmpty => _items.isNotEmpty;
+  bool get isNotEmpty => _d.isNotEmpty;
 
-  static bool _less<T>((int, int, T) a, (int, int, T) b) =>
-      a.$1 < b.$1 || (a.$1 == b.$1 && a.$2 < b.$2);
+  bool _less(int i, int j) =>
+      _d[i] < _d[j] || (_d[i] == _d[j] && _order[i] < _order[j]);
 
   void push(int d, T value) {
-    final a = _items..add((d, _count++, value));
-    for (var i = a.length - 1; i > 0;) {
+    _d.add(d);
+    _order.add(_values.length);
+    _values.add(value);
+    for (var i = _d.length - 1; i > 0;) {
       final p = (i - 1) >> 1;
-      if (_less(a[p], a[i])) break;
+      if (_less(p, i)) break;
       _swap(p, i);
       i = p;
     }
   }
 
   (int, T) pop() {
-    final a = _items;
-    final top = a.first;
-    final last = a.removeLast();
-    if (a.isNotEmpty) {
-      a[0] = last;
-      for (var i = 0; ;) {
-        final l = 2 * i + 1, r = l + 1;
-        var m = i;
-        if (l < a.length && _less(a[l], a[m])) m = l;
-        if (r < a.length && _less(a[r], a[m])) m = r;
-        if (m == i) break;
-        _swap(m, i);
-        i = m;
-      }
+    final d = _d.first;
+    final o = _order.first;
+    final value = _values[o] as T;
+    _values[o] = null;
+    final last = _d.length - 1;
+    _swap(0, last);
+    _d.removeLast();
+    _order.removeLast();
+    final n = _d.length;
+    for (var i = 0; ;) {
+      final l = 2 * i + 1, r = l + 1;
+      var m = i;
+      if (l < n && _less(l, m)) m = l;
+      if (r < n && _less(r, m)) m = r;
+      if (m == i) break;
+      _swap(m, i);
+      i = m;
     }
-    return (top.$1, top.$3);
+    return (d, value);
   }
 
   void _swap(int i, int j) {
-    final t = _items[i];
-    _items[i] = _items[j];
-    _items[j] = t;
+    final d = _d[i];
+    _d[i] = _d[j];
+    _d[j] = d;
+    final o = _order[i];
+    _order[i] = _order[j];
+    _order[j] = o;
   }
 }

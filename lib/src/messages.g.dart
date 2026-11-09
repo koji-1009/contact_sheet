@@ -243,6 +243,8 @@ abstract class Messages {
   String get htmlHeldAny;
   String get htmlHeldAbout;
   String get htmlHeldNone;
+  String get htmlHeldBusy;
+  String get htmlRouteBusy;
 }
 
 class MessagesEn extends Messages {
@@ -1006,6 +1008,12 @@ class MessagesEn extends Messages {
 
   @override
   String get htmlHeldNone => "No page is shown with these values.";
+
+  @override
+  String get htmlHeldBusy => "Finding what the app shows…";
+
+  @override
+  String get htmlRouteBusy => "Finding the route…";
 }
 
 class MessagesJa extends Messages {
@@ -1741,4 +1749,10 @@ class MessagesJa extends Messages {
 
   @override
   String get htmlHeldNone => "この値で表示される画面はありません。";
+
+  @override
+  String get htmlHeldBusy => "アプリが表示するものを調べています…";
+
+  @override
+  String get htmlRouteBusy => "経路を調べています…";
 }

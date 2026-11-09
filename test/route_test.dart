@@ -966,6 +966,35 @@ entries:
     },
   );
 
+  test('a large app in a tab bar, many conditions: what it shows, and its '
+      'routes, are found in seconds, not minutes', () {
+    // Once, the search for each page held still a large app's page; its
+    // pieces were each as slow (a heap moving records, a switch to each
+    // tab's histories from each page): over a minute here, where it now
+    // takes about a second. A test's timeout cannot stop what never
+    // yields: the time is held to a bound of its own.
+    final watch = Stopwatch()..start();
+    final router = _large(Random(7));
+    for (final held in [
+      {'A': 'a0'},
+      {'A': 'a1', 'B': 'b2'},
+      {'C': 'c1'},
+    ]) {
+      final shown = Router(
+        router.pages,
+        router.edges,
+        conditions: router.conditions,
+        tabBars: router.tabBars,
+        held: held,
+      ).shown(const []);
+      expect(shown.states, isNotEmpty, reason: '$held');
+    }
+    for (final to in ['p40', 'p77', 'p99']) {
+      expect(router.route('p0', null, to).searched, isTrue);
+    }
+    expect(watch.elapsed, lessThan(const Duration(seconds: 20)));
+  });
+
   test('the JavaScript is compiled from the route as it is', () {
     final generated = File('lib/src/route_js.g.dart').readAsStringSync();
     expect(
@@ -977,6 +1006,76 @@ entries:
     expect(routeJs.toLowerCase(), isNot(contains('</script')));
     expect(routeJs, isNot(contains('<!--')));
   });
+}
+
+/// A large app: 100 pages in a bar of 3 tabs (some with a state for each
+/// value of A, some loading, some of a value of B), conditions of 2, 3 and
+/// 2 values, and 220 edges, most within a tab, some setting a condition.
+Router _large(Random r) {
+  const n = 100, tabs = 3;
+  final pages = <RoutePage>[
+    for (var i = 0; i < n; i++)
+      RoutePage('p$i', [
+        if (r.nextInt(3) == 0) ...[
+          const RouteState('out', conditions: {'A': 'a0'}),
+          const RouteState('in', conditions: {'A': 'a1'}),
+        ] else
+          const RouteState('plain'),
+        if (r.nextInt(6) == 0) const RouteState('loading', data: true),
+        if (r.nextInt(8) == 0)
+          const RouteState('full', conditions: {'B': 'b2'}),
+      ], tabs: i < tabs ? const [] : ['p${r.nextInt(tabs)}']),
+  ];
+  String tabOf(int i) => i < tabs ? 'p$i' : pages[i].tabs.first;
+  const moves = [
+    RouteMove.reset,
+    RouteMove.reset,
+    RouteMove.replace,
+    RouteMove.replace,
+    RouteMove.pop,
+    RouteMove.pop,
+  ];
+  final edges = <RouteEdge>[
+    for (var k = 0; k < 220; k++)
+      () {
+        final a = r.nextInt(n);
+        var b = r.nextInt(n);
+        while (r.nextInt(4) != 0 && tabOf(b) != tabOf(a)) {
+          b = r.nextInt(n);
+        }
+        final roll = r.nextInt(20);
+        return RouteEdge(
+          from: 'p$a',
+          to: 'p$b',
+          move: roll < moves.length ? moves[roll] : RouteMove.push,
+          guard: r.nextInt(6) == 0
+              ? const {
+                  'A': ['a1'],
+                }
+              : const {},
+          sets: switch (r.nextInt(10)) {
+            0 => {'B': 'b${r.nextInt(3)}'},
+            1 => {'C': 'c${r.nextInt(2)}'},
+            2 => {'A': 'a${r.nextInt(2)}'},
+            _ => const {},
+          },
+        );
+      }(),
+  ];
+  return Router(
+    pages,
+    edges,
+    conditions: const [
+      RouteCondition('A', ['a0', 'a1']),
+      RouteCondition('B', ['b0', 'b1', 'b2']),
+      RouteCondition('C', ['c0', 'c1']),
+    ],
+    tabBars: [
+      RouteTabBar([
+        for (var t = 0; t < tabs; t++) RouteTab('p$t'),
+      ], retapFirst: true),
+    ],
+  );
 }
 
 /// A sheet of one condition (C: u, at launch, or v), 10 pages of 2 states

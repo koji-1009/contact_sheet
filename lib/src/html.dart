@@ -106,6 +106,8 @@ Map<String, String> htmlStrings(Messages m) => {
   'heldAny': m.htmlHeldAny,
   'heldAbout': m.htmlHeldAbout,
   'heldNone': m.htmlHeldNone,
+  'heldBusy': m.htmlHeldBusy,
+  'routeBusy': m.htmlRouteBusy,
 };
 
 /// `index.html` of an export: one file that reads [sheet] (`sheet.json`)
@@ -278,7 +280,7 @@ path.edge, g.lbl, g.entry, g.bundle, g.blbl { transition: opacity .3s; }
 .levels label { display: inline-flex; align-items: center; gap: 4px; margin-right: 4px; }
 .levels select { font: inherit; padding: 1px 4px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--text); }
 .levels select.on { border-color: var(--accent); color: var(--accent); }
-#held-none { color: var(--muted); }
+#held-none, #held-busy { color: var(--muted); }
 /* What the app does not show while the conditions keep the values chosen:
    gone, where it is, unless a page chosen or a route brings it out. */
 #canvas .held-out:not(.near) { visibility: hidden; pointer-events: none; }
@@ -313,7 +315,7 @@ ul.says a:hover { background: var(--hover); }
 .card-states img { width: 40px; height: 64px; object-fit: cover; object-position: top; border-radius: 3px; }
 /* The route between two pages, beside the map. */
 #route { position: absolute; left: 12px; top: 12px; z-index: 3; width: 340px; max-height: calc(100% - 72px); overflow: auto; overscroll-behavior: contain; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 12px 16px; display: none; cursor: auto; }
-#route.on { display: block; }
+#route.on, #route.busy { display: block; }
 #route h3 { margin: 0 0 8px; font-size: 15px; }
 #route .close { float: right; }
 #route .pick { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
@@ -452,7 +454,7 @@ tr.group td { border-top: 2px solid var(--line); }
 <script id="sheet" type="application/json">__SHEET_JSON__</script>
 <script id="maps" type="application/json">__MAPS_JSON__</script>
 <script id="strings" type="application/json">__STRINGS_JSON__</script>
-<script>__ROUTE_JS__</script>
+<script id="route-js">__ROUTE_JS__</script>
 <script>
 const S = JSON.parse(document.getElementById('sheet').textContent);
 const W = JSON.parse(document.getElementById('strings').textContent);
@@ -678,8 +680,9 @@ const hitOf = (path) => {
 };
 const nodes = {};
 let islandChips = [];
-// A page's image on the map, loaded only once the map shows it
-// ([loadImages]); its name is under it.
+// A page's image on the map, loaded when the browser sees the map show it
+// (lazily: the transform the map is moved by is in what it sees); its name
+// is under it.
 // A page on the map or the tree, chosen from the keyboard too: Tab to it,
 // Enter or Space as a click.
 const pressable = (n, label) => {
@@ -694,7 +697,7 @@ const pressable = (n, label) => {
 };
 const nodeImage = (s) => {
   const d = drawn(s);
-  return d.image ? `<img data-src="${esc(d.image)}" alt="">`
+  return d.image ? `<img src="${esc(d.image)}" alt="" loading="lazy" decoding="async">`
     : s.preview == null ? `<span class="no-preview">${esc(T('noPreview'))}</span>` : '';
 };
 // The map drawn as [laid] lays it out: its arrows, its pages' boxes and its
@@ -971,7 +974,6 @@ const apply = () => {
   const isFar = islandChips.length >= 4 && view.k < far;
   canvas.classList.toggle('far', isFar);
   if (isFar) keepChips();
-  loadImages();
 };
 // The sections' names, far out, each at its island's top left; of an
 // island the map shows, kept inside the map's sides (a name is wider than a
@@ -994,32 +996,6 @@ function keepChips() {
     chip.style.left = (x - view.x) / view.k + 'px';
     chip.style.top = (y - view.y) / view.k + 'px';
   }
-}
-// The pages' images, loaded where the map shows them: on it, or a quarter
-// of the view off it (to be there when moved to); not far out, where they
-// are too small to make out, but for a page chosen and the pages next to
-// it, or a route's. Once loaded, kept.
-let loading = false;
-function loadImages() {
-  if (loading) return;
-  loading = true;
-  requestAnimationFrame(() => {
-    loading = false;
-    const m = map.getBoundingClientRect();
-    if (!m.width) return;
-    const mx = m.width / 4, my = m.height / 4;
-    const x0 = (-view.x - mx) / view.k, x1 = (-view.x + m.width + mx) / view.k;
-    const y0 = (-view.y - my) / view.k, y1 = (-view.y + m.height + my) / view.k;
-    for (const [id, n] of Object.entries(nodes)) {
-      const img = n.querySelector('img[data-src]');
-      if (!img || (view.k < far && !n.classList.contains('near'))) continue;
-      const b = boxOf(id);
-      if (b.x < x1 && b.x + b.width > x0 && b.y < y1 && b.y + b.height > y0) {
-        img.src = img.dataset.src;
-        img.removeAttribute('data-src');
-      }
-    }
-  });
 }
 // Whether the map has been moved to show something yet: until then, it
 // opens where the app starts ([showStart]).
@@ -1156,7 +1132,6 @@ function showState(id, i) {
   shownState[id] = i;
   const n = nodes[id];
   n.querySelector('.img').innerHTML = nodeImage(s);
-  loadImages();
   n.querySelector('.label small').textContent = i ? s.name : '';
   n.classList.toggle('other-state', i > 0);
   renderMark(p);
@@ -1221,7 +1196,7 @@ function focus(id, glide, { state } = {}) {
   focused = p ? id : null;
   routed = null;
   picked = null;
-  $('#route').classList.remove('on');
+  $('#route').classList.remove('on', 'busy');
   const card = $('#card');
   // Nothing chosen: the map stays where it is.
   if (!focused) { highlight(new Set(), () => false, () => false, null); card.classList.remove('on'); return; }
@@ -1274,7 +1249,7 @@ function pick(list, glide) {
   routed = null;
   picked = list;
   firstStates();
-  $('#route').classList.remove('on');
+  $('#route').classList.remove('on', 'busy');
   const ends = new Set(list.flatMap((i) => [edges[i].from, edges[i].to]));
   highlight(ends, (i) => list.includes(i), () => false, null);
   const card = $('#card');
@@ -1306,15 +1281,76 @@ function enlarge(id) {
 // --- the route between two pages, as the app's navigator goes (its back
 // included), from a state and the history the app's start reaches it with:
 // lib/src/route.dart, compiled to JavaScript and inlined above as
-// contactSheetRouter. Made once, when a route is first asked for ---
-let router = null;
+// contactSheetRouter ---
+// What it finds (a route, and what the app shows while conditions keep
+// values chosen) is found in a worker of its own, so that a large app's
+// search never holds the page still; where a worker cannot be made, here,
+// after the page has said it is looking. Each question answered in turn, by
+// a promise of the answer's JSON.
+const sheetText = document.getElementById('sheet').textContent;
+let router = null, shownOf = null;
+const answer = (kind, args) => kind === 'route'
+  ? (router ??= contactSheetRouter(sheetText))(...args)
+  : (shownOf ??= contactSheetShown(sheetText))(...args);
+// In the worker: the same, the sheet given first.
+function workerMain() {
+  let sheet, router, shown;
+  self.onmessage = (e) => {
+    const m = e.data;
+    if (m.sheet != null) { sheet = m.sheet; return; }
+    try {
+      const out = m.kind === 'route'
+        ? (router ??= contactSheetRouter(sheet))(...m.args)
+        : (shown ??= contactSheetShown(sheet))(...m.args);
+      self.postMessage({ id: m.id, out });
+    } catch (err) {
+      self.postMessage({ id: m.id, error: String(err) });
+    }
+  };
+}
+const asked = new Map();
+let askedCount = 0;
+const answerHere = (q) => setTimeout(() => {
+  try { q.resolve(answer(q.kind, q.args)); } catch (err) { q.reject(err); }
+}, 0);
+let worker = null;
+try {
+  const source = `${document.getElementById('route-js').textContent}\n(${workerMain})();`;
+  worker = new Worker(URL.createObjectURL(new Blob([source], { type: 'text/javascript' })));
+  worker.onmessage = (e) => {
+    const q = asked.get(e.data.id);
+    if (!q) return;
+    asked.delete(e.data.id);
+    if (e.data.error != null) q.reject(new Error(e.data.error)); else q.resolve(e.data.out);
+  };
+  // It could not run: what it was asked, answered here.
+  worker.onerror = (e) => {
+    e.preventDefault();
+    worker.terminate();
+    worker = null;
+    for (const q of asked.values()) answerHere(q);
+    asked.clear();
+  };
+  worker.postMessage({ sheet: sheetText });
+} catch {
+  worker = null;
+}
+const ask = (kind, args) => new Promise((resolve, reject) => {
+  const q = { kind, args, resolve, reject };
+  if (!worker) { answerHere(q); return; }
+  const id = ++askedCount;
+  asked.set(id, q);
+  worker.postMessage({ id, kind, args });
+});
 // The route: { start: [frame], valuation: { condition: value }, steps:
 // [{ edge, from, to, set }] or null }, a frame { page, state }, edge null
-// for the back.
-const routeOf = (from, state, to, valuation) => {
-  router ??= contactSheetRouter(document.getElementById('sheet').textContent);
-  return JSON.parse(router(from, state ?? null, to, valuation ? JSON.stringify(valuation) : null));
-};
+// for the back. Each asked for once, by its key, and kept once found.
+const routesAsked = {}, routesFound = {};
+const routeKey = (from, state, to, valuation) =>
+  JSON.stringify([from, state ?? null, to, valuation ? JSON.stringify(valuation) : null]);
+const routeOf = (key) => routesAsked[key] ??= ask('route', JSON.parse(key)).then(
+  (out) => routesFound[key] = JSON.parse(out),
+  (err) => { delete routesAsked[key]; throw err; });
 // The address of a route: #route/<from>[/<state>]/<to>, then a
 // /<condition>=<value> for each value chosen (an `=` is escaped in names).
 function goRoute(from, to, state, valuation) {
@@ -1329,9 +1365,24 @@ function showRoute(from, to, glide, state, valuation) {
   to = pageById[to] ? to : (S.pages.find((p) => p.id !== from) ?? S.pages[0]).id;
   focused = null;
   picked = null;
-  routed = [from, to, state, valuation];
+  const mine = routed = [from, to, state, valuation];
   $('#card').classList.remove('on');
-  const found = routeOf(from, state, to, valuation);
+  const key = routeKey(from, state, to, valuation);
+  if (routesFound[key]) { drawRoute(routesFound[key], from, to, glide, state); return; }
+  // Not found yet: the panel says it is looking, and the route is drawn
+  // when it is found, unless something else was chosen meanwhile.
+  const box = $('#route');
+  box.classList.remove('on');
+  box.innerHTML = `<button class="link close" id="routeClose">${esc(T('close'))}</button><h3>${esc(T('route'))}</h3><p class="meta" role="status">${esc(T('routeBusy'))}</p>`;
+  box.classList.add('busy');
+  $('#routeClose').onclick = () => go('map');
+  routeOf(key).then((found) => {
+    if (routed === mine) drawRoute(found, from, to, glide, state);
+  }, (err) => console.error(err));
+}
+// The route [found] from [from] (in [state]) to [to], in the panel and on
+// the map.
+function drawRoute(found, from, to, glide, state) {
   const stack = found.start;
   const start = stack[stack.length - 1];
   const steps = from === to ? null : found.steps;
@@ -1377,6 +1428,7 @@ function showRoute(from, to, glide, state, valuation) {
     <div class="pick"><span>${esc(T('routeFrom'))}</span><select id="routeFrom">${options(from)}</select>${states}${conditions}
     <span>${esc(T('routeTo'))}</span><select id="routeTo">${options(to)}</select></div>
     <div class="row-actions"><button class="link" id="routeSwap">${esc(T('routeSwap'))}</button></div>${under}${left}${result}${short}`;
+  box.classList.remove('busy');
   box.classList.add('on');
   $('#routeFrom').onchange = $('#routeTo').onchange = () => goRoute($('#routeFrom').value, $('#routeTo').value);
   if ($('#routeState')) $('#routeState').onchange = () => goRoute(from, to, $('#routeState').value);
@@ -1767,7 +1819,6 @@ function route() {
       if (ids.length > 2) showRoute(ids[0], ids[2], !first, ids[1], chosen); else showRoute(ids[0], ids[1], !first, undefined, chosen);
     } else focus(ids[0] ?? null, !first, { state: ids[1] });
     if (!placed) showStart(false);
-    loadImages();
   });
   if (name === 'tree') requestAnimationFrame(() => {
     if (!treeFitted && treeView.clientWidth) { fitTree(); treeFitted = true; }
@@ -1857,7 +1908,8 @@ if (variants.length > 1) {
 // places, to compare one choice with another. As the address says
 // (?if=<condition>=<value>, once for each, an `=` escaped in names); none,
 // the whole map. lib/src/route.dart finds it (contactSheetShown), as it
-// finds a route ---
+// finds a route, in the worker: until it is found, the map stays as it was,
+// and the choices say it is being looked for ---
 const held = {};
 for (const v of query().getAll('if')) {
   const [c, x] = v.split('=', 2).map((r) => { try { return decodeURIComponent(r); } catch { return r; } });
@@ -1865,16 +1917,12 @@ for (const v of query().getAll('if')) {
 }
 // What the app shows so, null for the whole map: { states: { page: [state] },
 // edges: [place], entries: [place] }, each choice found once.
-let shownOf = null;
 const heldFound = {};
 let heldShown = null;
 let heldEdges = new Set(), heldEntries = new Set();
-const findHeld = () => {
-  if (!Object.keys(held).length) return null;
-  const key = JSON.stringify((S.conditions ?? []).map((c) => held[c.name] ?? null));
-  shownOf ??= contactSheetShown(document.getElementById('sheet').textContent);
-  return heldFound[key] ??= JSON.parse(shownOf(JSON.stringify(held)));
-};
+// The choice's key; null for none.
+const heldKey = () => Object.keys(held).length
+  ? JSON.stringify((S.conditions ?? []).map((c) => held[c.name] ?? null)) : null;
 // Whether the edge [e], or the deep link at [i], is shown: an edge from
 // every page, drawn once, when it is from any.
 const heldEdge = (e) => !heldShown || (e.anywhere
@@ -1905,15 +1953,38 @@ function holdMap() {
   const tabPages = (S.tabs ?? []).flatMap((bar) => bar.pages.map((t) => t.page));
   canvas.querySelectorAll('g.tabbar').forEach((g, i) => g.classList.toggle('held-out', out(heldShown?.states[tabPages[i]])));
 }
+// The map as the values chosen say: at once where what they show is found
+// already; else once it is, if they are still those chosen, the map shown
+// again as it then is.
+let holding = 0;
 function hold() {
-  heldShown = findHeld();
-  heldEdges = new Set(heldShown?.edges ?? []);
-  heldEntries = new Set(heldShown?.entries ?? []);
-  holdMap();
-  firstStates();
-  const none = $('#held-none');
-  if (none) none.hidden = !heldShown || Object.keys(heldShown.states).length > 0;
+  const mine = ++holding;
+  const key = heldKey();
   for (const sel of document.querySelectorAll('[data-held]')) sel.classList.toggle('on', sel.value !== '');
+  const busy = (on) => {
+    $('#held').setAttribute('aria-busy', on ? 'true' : 'false');
+    const says = $('#held-busy');
+    if (says) says.hidden = !on;
+  };
+  const show = (found) => {
+    busy(false);
+    heldShown = found;
+    heldEdges = new Set(heldShown?.edges ?? []);
+    heldEntries = new Set(heldShown?.entries ?? []);
+    holdMap();
+    firstStates();
+    const none = $('#held-none');
+    if (none) none.hidden = !heldShown || Object.keys(heldShown.states).length > 0;
+  };
+  if (key == null || heldFound[key]) { show(key == null ? null : heldFound[key]); return; }
+  busy(true);
+  ask('shown', [JSON.stringify(held)]).then((out) => {
+    heldFound[key] = JSON.parse(out);
+    if (mine !== holding) return;
+    show(heldFound[key]);
+    requestAnimationFrame(fitBar);
+    if (current === 'map') route();
+  }, (err) => console.error(err));
 }
 // The values chosen, in the address.
 function keepHeld() {
@@ -1931,7 +2002,7 @@ if ((S.conditions ?? []).length) {
   box.setAttribute('aria-label', T('held'));
   box.title = T('heldAbout');
   box.innerHTML = `<span>${esc(T('held'))}</span>${S.conditions.map((c, i) => `<label>${esc(c.name)}<select data-held="${i}"><option value="">${esc(T('heldAny'))}</option>${
-    c.values.map((v, k) => `<option value="${k}"${held[c.name] === v ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select></label>`).join('')}<span id="held-none" hidden>${esc(T('heldNone'))}</span>`;
+    c.values.map((v, k) => `<option value="${k}"${held[c.name] === v ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select></label>`).join('')}<span id="held-none" hidden>${esc(T('heldNone'))}</span><span id="held-busy" role="status" hidden>${esc(T('heldBusy'))}</span>`;
   box.addEventListener('change', (e) => {
     const sel = e.target.closest('[data-held]');
     if (!sel) return;
