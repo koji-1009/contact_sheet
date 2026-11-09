@@ -780,6 +780,80 @@ entries:
     });
   });
 
+  test('a tab left at a page, and values only another tab comes to while it '
+      'is left elsewhere: that page is not shown in their state', () {
+    // P, in tab a, is pushed only while C: u, and sets D: d0; it pushes Z
+    // only while C: v. C: v is set only at q, in tab b, while D: d1, which
+    // only the go from r (in tab a) to q sets: whenever C: v is set, tab a
+    // was left at r, never at P. No history shows P in y, nor Z.
+    const x = RouteState('x', conditions: {'C': 'u'});
+    const y = RouteState('y', conditions: {'C': 'v'});
+    const plain = [RouteState('plain')];
+    final router = Router(
+      [
+        const RoutePage('a', plain),
+        const RoutePage('b', plain),
+        const RoutePage('P', [x, y], tabs: ['a']),
+        const RoutePage('r', plain, tabs: ['a']),
+        const RoutePage('q', plain, tabs: ['b']),
+        const RoutePage('q2', plain, tabs: ['b']),
+        const RoutePage('Z', plain, tabs: ['a']),
+      ],
+      const [
+        RouteEdge(
+          from: 'a',
+          to: 'P',
+          move: RouteMove.push,
+          guard: {
+            'C': ['u'],
+          },
+          sets: {'D': 'd0'},
+        ),
+        RouteEdge(from: 'a', to: 'r', move: RouteMove.push),
+        RouteEdge(from: 'r', to: 'q', move: RouteMove.reset, sets: {'D': 'd1'}),
+        RouteEdge(
+          from: 'q',
+          to: 'q2',
+          move: RouteMove.push,
+          guard: {
+            'D': ['d1'],
+          },
+          sets: {'C': 'v'},
+        ),
+        RouteEdge(
+          from: 'P',
+          to: 'Z',
+          move: RouteMove.push,
+          guard: {
+            'C': ['v'],
+          },
+        ),
+      ],
+      conditions: const [
+        RouteCondition('C', ['u', 'v']),
+        RouteCondition('D', ['d0', 'd1']),
+      ],
+      tabBars: [
+        const RouteTabBar([RouteTab('a'), RouteTab('b')]),
+      ],
+    );
+    final route = router.route('a', null, 'Z');
+    expect(route.steps, isNull);
+    expect(route.searched, isTrue);
+    expect(route.bounded, isFalse);
+    final shown = router.shown(const []);
+    expect(shown.states, {
+      'a': ['plain'],
+      'b': ['plain'],
+      'P': ['x'],
+      'r': ['plain'],
+      'q': ['plain'],
+      'q2': ['plain'],
+    });
+    // P to Z never happens.
+    expect(shown.edges, isNot(contains(4)));
+  });
+
   test('with values held, the pages shown are those every history keeps '
       'them on, searched in full', () {
     // Random sheets, against a search over every stack up to [limit] steps
