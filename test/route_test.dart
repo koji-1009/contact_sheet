@@ -601,12 +601,75 @@ edges:
         'switch => c',
         'back => b',
       ]);
-      // The switch back shows c, not b: past the bound, none is found, and
-      // the route says one might be.
+      // Past the bound (3), the switch back would show c, not b: none is
+      // found there, so it is searched for once more, within three pages
+      // more, where it is.
       final past = Router(pages, edges, tabBars: bars);
       final route = past.route('sheet', null, 'b');
+      expect(said(route), said(within.route('sheet', null, 'b')));
+      expect((route.bounded, route.atLeast), (false, null));
+    });
+
+    test('none found within the bound nor three pages past it: the route '
+        'says one might be, and how many steps it takes at least', () {
+      // Signing in is on p7, eight pages deep in the feed tab; only then
+      // does the search tab push t. The back of each page asks first: none
+      // goes back.
+      final router = Router(
+        [
+          page('feed'),
+          page('search'),
+          for (var i = 1; i <= 7; i++) page('p$i', tabs: ['feed']),
+          page('t', tabs: ['search']),
+        ],
+        [
+          const RouteEdge(from: 'feed', to: 'p1', move: RouteMove.push),
+          for (var i = 1; i < 7; i++)
+            RouteEdge(from: 'p$i', to: 'p${i + 1}', move: RouteMove.push),
+          for (var i = 1; i <= 7; i++)
+            RouteEdge(
+              from: 'p$i',
+              to: 'p$i',
+              move: RouteMove.replace,
+              back: true,
+            ),
+          const RouteEdge(
+            from: 'p7',
+            to: 'p7',
+            move: RouteMove.replace,
+            sets: {'Login': 'Member'},
+          ),
+          const RouteEdge(
+            from: 'search',
+            to: 't',
+            move: RouteMove.push,
+            guard: {
+              'Login': ['Member'],
+            },
+          ),
+        ],
+        tabBars: bars,
+        conditions: const [
+          RouteCondition('Login', ['Guest', 'Member']),
+        ],
+      );
+      final route = router.route('feed', null, 't');
       expect(route.steps, isNull);
-      expect(route.bounded, isTrue);
+      expect((route.bounded, route.searched), (true, true));
+      // Seven pushes, signing in, the switch and the push: ten. It says no
+      // more, and no less than what putting a page past six pages takes
+      // (six pushes) with the step from there.
+      expect(route.atLeast, inInclusiveRange(7, 10));
+      expect(route.toJson()['atLeast'], route.atLeast);
+      final deeper = Router(
+        router.pages,
+        router.edges,
+        tabBars: bars,
+        conditions: router.conditions,
+        tabDepth: 4,
+      ).route('feed', null, 't');
+      expect(deeper.steps, hasLength(10));
+      expect((deeper.bounded, deeper.atLeast), (false, null));
     });
 
     test('a replace by a page not in the tab puts it over the bar, the '
@@ -646,7 +709,8 @@ edges:
     });
 
     test('a start the app\'s launch reaches only past the bound says so', () {
-      final router = Router(
+      Router router([int tabDepth = 3]) => Router(
+        tabDepth: tabDepth,
         [
           ...pages.take(5),
           page('t', tabs: ['search']),
@@ -675,9 +739,17 @@ edges:
           RouteCondition('Login', ['Guest', 'Member']),
         ],
       );
-      // Signing in is past the bound: within it, t starts alone.
-      expect(router.route('t', null, 'feed').bounded, isTrue);
-      expect(router.route('t', null, 'search').bounded, isTrue);
+      // Signing in is on c, four pages deep: past a bound of one, and of
+      // one more, t starts alone.
+      expect(router(1).route('t', null, 'feed').bounded, isTrue);
+      expect(router(1).route('t', null, 'search').bounded, isTrue);
+      expect(router(1).route('t', null, 'feed').start.map((f) => f.page), [
+        't',
+      ]);
+      // Past a bound of three, within three more: the launch reaches it.
+      final found = router().route('t', null, 'search');
+      expect((found.bounded, found.searched), (false, true));
+      expect(found.start.map((f) => f.page), ['search', 't']);
     });
   });
 
@@ -1069,6 +1141,95 @@ entries:
     expect(watch.elapsed, lessThan(const Duration(seconds: 20)));
   });
 
+  test('the bound the search is pruned by holds on each step it takes: on '
+      'random sheets, in a tab bar or not, at each tab bound', () {
+    // Each node the search reaches is one of the bound's, which is 0 on the
+    // page, and no step lowers it by more than the step's own: so A* takes
+    // each node at its fewest, and none it prunes leads to the page.
+    for (final tabs in [false, true]) {
+      for (var seed = 1; seed <= 30; seed++) {
+        final sheet = _random(Random(seed), tabs: tabs);
+        for (final depth in tabs ? [1, 2, 3] : [3]) {
+          for (final held in [
+            const <String, String>{},
+            const {'C': 'u'},
+          ]) {
+            final router = Router(
+              sheet.router.pages,
+              sheet.router.edges,
+              conditions: sheet.router.conditions,
+              tabBars: sheet.router.tabBars,
+              tabDepth: depth,
+              searchLimit: 3000,
+              held: held,
+            );
+            for (final from in sheet.pages) {
+              for (final state in [null, from.states.last.name]) {
+                expect(
+                  router.boundBroken(from.id, state),
+                  isEmpty,
+                  reason:
+                      'seed $seed${tabs ? ', tabs' : ''}, depth $depth, '
+                      'held $held, from ${from.id} ($state)',
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  test('the bound holds on the examples\' sheets', () {
+    for (final app in _examples) {
+      final sheet = _example(app);
+      for (final from in sheet.pages) {
+        expect(
+          sheet.router.boundBroken(from.id, null),
+          isEmpty,
+          reason: '$app, from ${from.id}',
+        );
+      }
+    }
+  });
+
+  test('the pages a page can be put over are those the sheet draws a pop '
+      'back to the page under it to', () {
+    for (final sheet in [
+      for (final app in _examples) _example(app),
+      for (var seed = 1; seed <= 30; seed++) ...[
+        _random(Random(seed)),
+        _random(Random(seed), tabs: true),
+      ],
+    ]) {
+      final drawn = <String, Set<String>>{};
+      for (final e in sheet.edges) {
+        if (e.under) (drawn[e.from] ??= {}).add(e.to);
+      }
+      for (final MapEntry(key: page, value: under) in drawn.entries) {
+        expect(sheet.router.under(page), under, reason: page);
+      }
+    }
+  });
+
+  test('of the histories the fewest steps from the launch reach a page '
+      'with, the start is the one with the most pages', () {
+    // A go and a push reach b in one step each, the go first: from b, its
+    // back goes to home.
+    final sheet = Sheet.parse('''
+pages:
+  - {id: home, label: Home, states: [{name: s, preview: a.dart#a}]}
+  - {id: b, label: B, states: [{name: s, preview: b.dart#b}]}
+edges:
+  - {from: home, to: b, trigger: text:Go, kind: go}
+  - {from: home, to: b, trigger: text:Push}
+''', _m);
+    expect(_said(sheet, sheet.router.route('b', null, 'home')), [
+      'home:s b:s',
+      'back => home:s',
+    ]);
+  });
+
   test('the JavaScript is compiled from the route as it is', () {
     final generated = File('lib/src/route_js.g.dart').readAsStringSync();
     expect(
@@ -1081,6 +1242,15 @@ entries:
     expect(routeJs, isNot(contains('<!--')));
   });
 }
+
+/// The example apps, by their folders.
+const _examples = ['shop_app', 'tabs_app', 'trips_app', 'notes_app'];
+
+/// The sheet of the example app [app].
+Sheet _example(String app) => Sheet.parse(
+  File('example/$app/contact_sheet/sheet.yaml').readAsStringSync(),
+  _m,
+);
 
 /// A large app: 100 pages in a bar of 3 tabs (some with a state for each
 /// value of A, some loading, some of a value of B), conditions of 2, 3 and

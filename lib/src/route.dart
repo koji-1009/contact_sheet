@@ -32,19 +32,24 @@
 /// route stays exact within the bound (with two histories kept and the
 /// conditions shared, whether a page can be reached at all could not be
 /// decided); a page pushed past it, in the tab shown, goes on the stack,
-/// from where the bar is not switched. [Route.bounded] tells a route a
-/// switch from deeper might have made shorter.
+/// from where the bar is not switched. Where none is found within it, it is
+/// searched for once more within [Router.tabDepth] pages more. [Route.bounded]
+/// tells a route a switch from deeper might have made shorter, or found, and
+/// [Route.atLeast] the fewest steps that one would take.
 ///
 /// The fewest steps are a shortest path in this pushdown system, its stack
 /// the frames and its control the conditions' values and the shell, exact,
 /// with no bound on the stack (a shortest route can need a page twice on
 /// it): each frame entered under each value of the conditions is
-/// summarised once, the fewest steps from it to each frame and value at its
-/// level through the pages pushed and popped above it, in one Dijkstra over
-/// all levels (Knuth's: a step out of a pushed page costs more than the
-/// steps it is made of); the route is then searched from a stack over those
-/// summaries, the shell's moves among them. The shell is never pushed: no
-/// summary holds it.
+/// summarised once, when the search first enters it, the fewest steps from
+/// it to each frame and value at its level through the pages pushed and
+/// popped above it, in one Dijkstra over all levels (Knuth's: a step out of
+/// a pushed page costs more than the steps it is made of); the route is
+/// then searched from a stack over those summaries, the shell's moves among
+/// them, by A*: the bound below the steps left is the fewest moves to the
+/// page in what the app shows with the histories not followed (as
+/// [Router.shown] has it), each step of the search one of those moves. The
+/// shell is never pushed: no summary holds it.
 ///
 /// Some conditions can be held at a value ([Router.held]): the app launches
 /// with them, and nothing that would change them happens. What the app shows
@@ -267,6 +272,7 @@ class Route {
     this.pastBound = 0,
     this.tabs = const [],
     this.bounded = false,
+    this.atLeast,
     this.searched = true,
   });
 
@@ -290,6 +296,11 @@ class Route {
   /// is not followed, might have made it shorter (or found one).
   final bool bounded;
 
+  /// Where none is found but one might be past the bound ([bounded]): the
+  /// fewest steps that one would take, as the search, gone to the end
+  /// within the bound, proves; null otherwise.
+  final int? atLeast;
+
   Map<String, Object?> toJson() => {
     'start': [for (final f in start) _frameJson(f)],
     'valuation': valuation,
@@ -304,6 +315,7 @@ class Route {
         },
     ],
     'bounded': bounded,
+    'atLeast': atLeast,
     'searched': searched,
     'steps': steps == null ? null : [for (final s in steps!) s.toJson()],
   };
@@ -329,57 +341,6 @@ Map<String, String> _frameJson(RouteFrame f) => {
 /// A condition's value, as the router keeps it: their places.
 typedef _Value = (int, int);
 
-/// The moves a search's bound below is the fewest of ([Router._boundOf]):
-/// canonical nodes, numbered as the router does, and tab states after them;
-/// and switches, numbered below 0.
-class _Bound {
-  _Bound(this.base);
-
-  final int base;
-  final moves = <int, Set<int>>{};
-  final tabs = <_TabState>[];
-
-  /// A switch to another tab: from each node switching in a bar, under some
-  /// values, from its own tab (-1: from a page over the bar), the one move
-  /// to this node; and from it, in no step, to each tab it can find so (as
-  /// many moves as the tabs' histories, not those for each node).
-  final switches = <(int, int, int)>[];
-
-  /// The moves backwards: for each node, those that move to it.
-  late final Map<int, List<int>> back = () {
-    final back = <int, List<int>>{};
-    for (final MapEntry(key: from, value: tos) in moves.entries) {
-      for (final to in tos) {
-        (back[to] ??= []).add(from);
-      }
-    }
-    return back;
-  }();
-
-  static int switchId(int i) => -1 - i;
-  static int switchAt(int id) => -1 - id;
-  static bool isSwitch(int id) => id < 0;
-  final _ids = <_Ints, int>{};
-
-  /// The router's shells, as the tab states they are ([Router._boundNode]).
-  final shells = <int, int?>{};
-
-  /// The tab state of [t] showing [history] under [g], numbered as met.
-  int tab(int bar, int t, List<int> history, int g) =>
-      _ids[_Ints([t, g, ...history])] ??= () {
-        tabs.add(_TabState(bar, t, history, g));
-        return base + tabs.length - 1;
-      }();
-
-  int? find(int t, List<int> history, int g) => _ids[_Ints([t, g, ...history])];
-
-  /// The canonical node the tab state [id] shows, by [node].
-  int shown(int id, int Function(int frame, int g) node) {
-    final a = tabs[id - base];
-    return node(a.history.last, a.g);
-  }
-}
-
 /// Numbers, as a key: equal when they are, in order.
 class _Ints {
   _Ints(this.values) : hashCode = Object.hashAll(values);
@@ -401,16 +362,6 @@ class _Ints {
   }
 }
 
-/// A bar showing [tab], its history [history], under [g].
-class _TabState {
-  _TabState(this.bar, this.tab, this.history, this.g);
-
-  final int bar;
-  final int tab;
-  final List<int> history;
-  final int g;
-}
-
 /// The shell of a tab bar: the tab shown (its place among all bars' tabs),
 /// each of the bar's tabs' history (canonical frames, empty for one not
 /// opened yet), and the conditions' values.
@@ -422,6 +373,35 @@ class _Shell {
   final List<List<int>> stacks;
   final int g;
 }
+
+/// What a transition does to the history, from where the page shown is
+/// ([Router._effect]): the one place each move's effect is told, which the
+/// search, its summaries and what the app shows ([_Unfollowed]) each read,
+/// each switching over all of them.
+enum _Effect {
+  /// Its page goes over the one shown, in the same tab's history if that
+  /// is in one.
+  push,
+
+  /// Its page goes over the bar, the tab's page kept under it: from a tab's
+  /// history, a page not shown in that tab, pushed or in its place.
+  overBar,
+
+  /// Its page takes the place of the one shown.
+  replace,
+
+  /// Its page starts the history again ([Router._startAt]).
+  reset,
+
+  /// The page shown is taken off: what is under it says where it lands
+  /// ([Router._landOn]), else [Router._alone].
+  pop,
+}
+
+/// Where a page with nothing under it goes by a pop or its back
+/// ([Router._alone]): [node] alone in the tab's history it was in, where it
+/// [stays] in it; else [node] as all the history (a frame, or a shell).
+typedef _Alone = ({int node, bool stays});
 
 /// The routes between the pages of a sheet.
 ///
@@ -488,7 +468,6 @@ class Router {
         if (landed.contains(page))
           for (var t = 0; t < _tabRoots.length; t++) t,
       };
-      _deepTabs.add(tabs.toList());
       for (final t in tabs) {
         _deep[(f, t)] = _frames.length;
         _addFrame(_frames[f], t, f);
@@ -621,9 +600,6 @@ class Router {
   final _frameTab = <int?>[];
   final _canon = <int>[];
   final _deep = <(int, int), int>{};
-
-  /// For each canonical frame, the tabs it has a frame in past the bound.
-  final _deepTabs = <List<int>>[];
   final _ids = <String, Map<String, int>>{};
   final _pageFrames = <String, List<int>>{};
 
@@ -762,9 +738,6 @@ class Router {
   bool _guarded(List<(int, Set<int>)> guard, int g) =>
       guard.every((cv) => cv.$2.contains(_value(g, cv.$1)));
 
-  bool _valid(int node) =>
-      _holds(_requires[_frameOf(node)], _gOf(node)) && _keeps(node);
-
   Map<String, String> _named(int g) => {
     for (final (c, condition) in conditions.indexed)
       condition.name: condition.values[_value(g, c)],
@@ -842,24 +815,22 @@ class Router {
     return _unsaid(e.to, g);
   }
 
-  /// [h], of a canonical frame, put where [like]'s frame is (not a shell):
-  /// in the same tab's history past the bound when [like] is and [h]'s page
-  /// is shown in that tab, or [landing] in [like]'s place (as a pop lands
-  /// in the tab's history within the bound, whatever the page); else over
-  /// the bar.
-  int _keep(int like, int h, {bool landing = false}) {
-    final t = _frameTab[_frameOf(like)];
-    final f = _frameOf(h);
-    if (t == null || (!landing && !_inTab(_frames[f].page, t))) return h;
-    final deep = _deep[(f, t)];
-    return deep == null ? h : _node(deep, _gOf(h));
-  }
+  /// What the transition [move], arriving at [h], does from a page in the
+  /// tab [tab]'s history (null: in none, over a bar or out of one).
+  _Effect _effect(RouteMove move, int? tab, int h) => switch (move) {
+    RouteMove.reset => _Effect.reset,
+    RouteMove.pop => _Effect.pop,
+    _ when tab != null && !_inTab(_frames[_frameOf(h)].page, tab) =>
+      _Effect.overBar,
+    RouteMove.push => _Effect.push,
+    RouteMove.replace => _Effect.replace,
+  };
 
-  /// Whether a replace from [f] by which [h] arrives puts [h] over the bar
-  /// instead: [f] in a tab's history past the bound, [h] not shown in it
-  /// (as within the bound, the tab's top stays).
-  bool _overBar(int f, int h) =>
-      _frameTab[_frameOf(f)] != null && _frameTab[_frameOf(h)] == null;
+  /// [h], of a canonical frame, put in the tab [tab]'s history past the
+  /// bound, as a push or a replace by a page shown in it puts it there from
+  /// a page in it; null, where it is.
+  int _put(int h, int? tab) =>
+      tab == null ? h : _node(_deep[(_frameOf(h), tab)]!, _gOf(h));
 
   /// The nodes that take [below]'s place (its frame read; the conditions
   /// are the top's) when [top] is taken off by the pop [j] (null: the
@@ -886,9 +857,12 @@ class Router {
           ], _gOf(l)),
       ];
     }
+    // In a tab's history past the bound, whatever the page (as within the
+    // bound): each page a pop lands on has a frame in each tab.
+    final t = _frameTab[_frameOf(below)];
     return [
       for (final l in _landOn(_frameOf(below), top, j))
-        _keep(below, l, landing: true),
+        t == null ? l : _node(_deep[(_frameOf(l), t)] ?? _frameOf(l), _gOf(l)),
     ];
   }
 
@@ -939,13 +913,47 @@ class Router {
     return _unsaid(parent, g);
   }
 
-  /// Whether tapping the tab [t] shown again, its history [stack], goes
-  /// back to its first page: the bar says so, the conditions let the tab be
-  /// switched to, and the history is not that page alone.
-  bool _retaps(int t, List<int> stack, int g) =>
+  /// Where [top], with nothing under it, goes by its pop [j] (null: its
+  /// back), from the tab [tab]'s history (null: from none): a written pop
+  /// where it names (none for one back to the page under it), the back to
+  /// the page's parent, as go_router builds it under it. Alone in that
+  /// tab's history where its page is shown in the tab; else a pop's page
+  /// out of any bar, and the parent as a go from nowhere puts it.
+  List<_Alone> _alone(int top, int? j, int? tab) {
+    bool stays(int h) => tab != null && _inTab(_frames[_frameOf(h)].page, tab);
+    if (j != null) {
+      if (edges[j].under) return const [];
+      return [for (final h in _arrive(j, top)) (node: h, stays: stays(h))];
+    }
+    return [
+      for (final h in _toParent(top))
+        stays(h)
+            ? (node: h, stays: true)
+            : (node: _startAt(h, -1), stays: false),
+    ];
+  }
+
+  /// The nodes the tab [t] shows first under [g]: its first page, as
+  /// nothing says.
+  List<int> _tabFirst(int t, int g) => _unsaid(_tabRoots[t], g);
+
+  /// The nodes a switch to the tab [t] lands on under [g], the tab left at
+  /// [frame] (null: not opened yet, its first page): that page, in its
+  /// state if [g] allows it, else as nothing says.
+  List<int> _switchTo(int t, int? frame, int g) {
+    if (frame == null) return _tabFirst(t, g);
+    if (_holds(_requires[frame], g)) return [_node(frame, g)];
+    return _unsaid(_frames[frame].page, g);
+  }
+
+  /// Whether tapping the tab [t] shown again, under [g], goes back to its
+  /// first page: the bar says so, the conditions let the tab be switched
+  /// to, and [top] is not that page with nothing under it in the tab
+  /// ([alone]).
+  bool _retaps(int t, int g, {required int top, required bool alone}) =>
       tabBars[_tabBar[t]].retapFirst &&
       _guarded(_tabGuards[t], g) &&
-      (stack.length >= 2 || _frames[stack.single].page != _tabRoots[t]);
+      (!alone || _frames[_frameOf(top)].page != _tabRoots[t]);
 
   /// Where the app launches: its first page, in the first state its first
   /// values (and those held) allow, in its tab if it is in one.
@@ -959,521 +967,76 @@ class Router {
     );
   }
 
-  /// The pages each page can be put over: those that push it; those the
-  /// pages it takes the place of can be put over (and those, where a tab's
-  /// page puts it over the bar instead); and, for a pop to it from a page,
-  /// those the pages under that page can be put over, whose place it takes.
-  late final Map<String, Set<String>> _over = () {
-    final over = <String, Set<String>>{};
-    for (var grew = true; grew;) {
-      grew = false;
-      for (final e in edges) {
-        final under = switch (e.move) {
-          RouteMove.push => {e.from},
-          RouteMove.replace => {e.from, ...?over[e.from]},
-          RouteMove.pop when !e.under => {
-            for (final b in over[e.from] ?? const <String>{}) ...?over[b],
-          },
-          _ => const <String>{},
-        };
-        final known = over[e.to] ??= {};
-        for (final p in under) {
-          if (known.add(p)) grew = true;
-        }
-      }
-    }
-    return over;
-  }();
-
   /// The canonical nodes: the canonical frames come first.
   late final int _canonCount =
       _pageFrames.values.fold(0, (s, f) => s + f.length) * _valuations;
 
-  /// Each canonical node's edges' arrivals: its moves with the history left
-  /// out, but its pops and a switch.
-  late final List<List<int>> _loose = () {
-    final next = List.generate(_canonCount, (_) => <int>{});
-    for (var node = 0; node < _canonCount; node++) {
-      if (!_valid(node)) continue;
-      for (final i in _outs(node)) {
-        next[node].addAll(_arrive(i, node));
-      }
+  /// What the app shows with the histories not followed ([_Unfollowed]),
+  /// its moves kept, from each stack searched from that has nothing under
+  /// it (the launch, a page alone): the bound the search is pruned by.
+  late final _Unfollowed _bound = _Unfollowed(this, recording: true);
+
+  /// The bound's distances to each page, and the [_Unfollowed.version]
+  /// they are of.
+  final _towardPage = <String, (int, List<int>)>{};
+
+  /// A bound below the steps from a search's node (its top, and the shell
+  /// at the bottom, or -1) to one [done] holds of, as the search from
+  /// [stack] ([alone]: a stack with nothing under it, which the bound then
+  /// starts from too) reaches them: the fewest moves of [_bound] to one;
+  /// -1 where none leads. Every step of the search is one of its moves, so
+  /// that no step lowers it by more than its own (pinned by [boundBroken]),
+  /// and it holds whatever the tabs' bound. [to], the page [done] is of.
+  int Function(int node, int shell) _toward(
+    List<int> stack,
+    bool Function(int node) done, {
+    bool alone = false,
+    String? to,
+  }) {
+    final bound = _bound;
+    if (alone) bound.addStarts(stack);
+    final List<int> dist;
+    final known = to == null ? null : _towardPage[to];
+    if (known != null && known.$1 == bound.version) {
+      dist = known.$2;
+    } else {
+      dist = bound.distances(done);
+      if (to != null) _towardPage[to] = (bound.version, dist);
     }
-    return [for (final s in next) s.toList()];
-  }();
-
-  /// The moves from [stack] with the other tabs' histories left out ([_Bound]),
-  /// once for each start: a route's searches from one start share it. They
-  /// keep tabs' histories within [tabDepth] even while a route is searched
-  /// again past it: what goes deeper is a page over the bar there, which
-  /// switches too (raised, the tab states would be too many), so the bound
-  /// stays below the steps past it.
-  _Bound _bound(List<int> stack) => _bounds[stack.join(',')] ??= () {
-    final depth = _depth;
-    _depth = tabDepth;
-    try {
-      return _boundOf(stack);
-    } finally {
-      _depth = depth;
-    }
-  }();
-
-  final _bounds = <String, _Bound>{};
-
-  /// The moves reached from [stack], over two kinds of node: a canonical
-  /// node (a page over the bar, or out of it, with no history under it but
-  /// what [_over] says can be), and a tab's state (a bar showing one tab,
-  /// that tab's history exactly, the values), with each other tab's history
-  /// one of those it can have been left with (a set for each tab, which
-  /// grows as tab states are reached). Every step of a route from [stack]
-  /// is one of these moves between nodes they reach, so the fewest of them
-  /// to a page are a bound below the route's that no step lowers by more
-  /// than its own; and as the tabs are each on their own, the nodes are as
-  /// many as the tabs' histories added up, not multiplied.
-  _Bound _boundOf(List<int> stack) {
-    final bound = _Bound(_canonCount);
-    final moves = bound.moves;
-    final queue = <int>[];
-    void reach(int id) {
-      if (moves.containsKey(id)) return;
-      moves[id] = {};
-      queue.add(id);
-    }
-
-    int tab(int t, List<int> history, int g) {
-      final id = bound.tab(_tabBar[t], t, history, g);
-      reach(id);
-      return id;
-    }
-
-    void add(int from, int to) {
-      moves[from]!.add(to);
-      reach(to);
-    }
-
-    List<int> shown(int top, int g) => _holds(_requires[top], g)
-        ? [_node(top, g)]
-        : _unsaid(_frames[top].page, g);
-
-    // The histories each tab can have been left with; the pages of a tab
-    // it can have been left at deeper than that, as a page over the bar (a
-    // route past the bound switches from there, and back to it); and the
-    // switches in each bar ([_Bound.switches]). Each grows, and the moves
-    // with it.
-    final left = List.generate(_tabRoots.length, (_) => <_Ints, List<int>>{});
-    final leftDeep = List.generate(_tabRoots.length, (_) => <int>{});
-    final barSwitches = List.generate(_barTabs.length, (_) => <int>[]);
-    final switchIds = <_Ints, int>{};
-    void restore(int from, int t, List<int> history, int g) {
-      for (final x in shown(history.last, g)) {
-        add(
-          from,
-          tab(t, [...history.take(history.length - 1), _frameOf(x)], g),
-        );
-      }
-    }
-
-    void leave(int t, List<int> history) {
-      if (left[t].putIfAbsent(_Ints(history), () => history) != history) {
-        return;
-      }
-      for (final id in [...barSwitches[_tabBar[t]]]) {
-        final (_, g, own) = bound.switches[_Bound.switchAt(id)];
-        if (own != t && _guarded(_tabGuards[t], g)) {
-          restore(id, t, history, g);
-        }
-      }
-    }
-
-    void leaveDeep(int t, int f) {
-      if (!leftDeep[t].add(f)) return;
-      for (final id in [...barSwitches[_tabBar[t]]]) {
-        final (_, g, own) = bound.switches[_Bound.switchAt(id)];
-        if (own == t || !_guarded(_tabGuards[t], g)) continue;
-        for (final x in shown(f, g)) {
-          add(id, x);
-        }
-      }
-    }
-
-    // A switch from [from], in its own tab (-1: a page over the bar): to
-    // the switch of the bar, the values and that tab, met once, whose moves
-    // are to each other tab as it can be found.
-    void switches(int from, int own, int bar, int g) {
-      final key = _Ints([bar, g, own]);
-      var id = switchIds[key];
-      if (id == null) {
-        id = switchIds[key] = _Bound.switchId(bound.switches.length);
-        bound.switches.add((bar, g, own));
-        barSwitches[bar].add(id);
-        reach(id);
-        for (final t in _barTabs[bar]) {
-          if (t == own || !_guarded(_tabGuards[t], g)) continue;
-          for (final x in _unsaid(_tabRoots[t], g)) {
-            add(id, tab(t, [_frameOf(x)], g));
-          }
-          for (final history in [...left[t].values]) {
-            restore(id, t, history, g);
-          }
-          for (final f in [...leftDeep[t]]) {
-            for (final x in shown(f, g)) {
-              add(id, x);
-            }
-          }
-        }
-      }
-      add(from, id);
-    }
-
-    // The tab states by their history's top page, and the pages over the
-    // bar by the pages that can be under them: a pop from such a page lands
-    // on such a tab state.
-    final byTop = <String, List<int>>{};
-    final byUnder = <String, List<int>>{};
-    void land(int canon, int tabState) {
-      final a = bound.tabs[tabState - _canonCount];
-      for (final j in _pops(canon)) {
-        for (final l in _landOn(a.history.last, canon, j)) {
-          add(
-            canon,
-            tab(a.tab, [
-              ...a.history.take(a.history.length - 1),
-              _frameOf(l),
-            ], _gOf(l)),
-          );
-        }
-      }
-    }
-
-    // The pages shown so far: only one of them can be under a page, so a
-    // pop lands only on those; a page over the bar waits for the pages it
-    // can be over to be shown.
-    final shownPages = <String>{};
-    final waiting = <String, List<int>>{};
-    void landOn(int canon, String under) {
-      for (final j in _pops(canon)) {
-        for (final u in _pageFrames[under]!) {
-          for (final l in _landOn(u, canon, j)) {
-            add(canon, l);
-          }
-        }
-      }
-    }
-
-    void show(String page) {
-      if (!shownPages.add(page)) return;
-      for (final canon in [...?waiting[page]]) {
-        landOn(canon, page);
-      }
-    }
-
-    for (final n in stack) {
-      if (!_isShell(n)) {
-        show(_frames[_frameOf(n)].page);
-        reach(_plain(n));
-        continue;
-      }
-      final s = _shellAt(n);
-      for (final t in _barTabs[s.bar]) {
-        final history = s.stacks[_tabPos[t]];
-        for (final f in history) {
-          show(_frames[f].page);
-        }
-        if (history.isEmpty) continue;
-        if (t == s.active) {
-          tab(t, history, s.g);
-        } else {
-          leave(t, history);
-        }
-      }
-    }
-
-    // A node's moves, as it is reached; those the others reached later
-    // give are added as they are.
-    void own(int id) {
-      // A switch's moves are given as the tabs' histories are met.
-      if (_Bound.isSwitch(id)) return;
-      final to = moves[id]!;
-      if (id < _canonCount) {
-        final f = _frameOf(id);
-        final page = _frames[f].page;
-        final g = _gOf(id);
-        for (final x in _loose[id]) {
-          add(id, x);
-        }
-        show(page);
-        for (final under in _over[page] ?? const <String>{}) {
-          if (shownPages.contains(under)) {
-            landOn(id, under);
-          } else {
-            (waiting[under] ??= []).add(id);
-          }
-        }
-        for (final i in _outs(id)) {
-          if (edges[i].move != RouteMove.reset) continue;
-          for (final h in _arrive(i, id)) {
-            final t = _goTab(_frames[_frameOf(h)].page, null, edges[i].tab);
-            if (t != null) add(id, tab(t, [_frameOf(h)], _gOf(h)));
-          }
-        }
-        // Nothing under it: its back to its parent.
-        for (final h in _toParent(id)) {
-          add(id, h);
-          final t = _goTab(_frames[_frameOf(h)].page, null, null);
-          if (t != null) add(id, tab(t, [_frameOf(h)], _gOf(h)));
-        }
-        // A page of a tab, past the bound in it: tapping it again, and a
-        // switch, from here and back to here.
-        final tabs = _deepTabs[f];
-        for (final t in tabs) {
-          if (tabBars[_tabBar[t]].retapFirst && _guarded(_tabGuards[t], g)) {
-            for (final x in _unsaid(_tabRoots[t], g)) {
-              add(id, tab(t, [_frameOf(x)], g));
-            }
-          }
-          leaveDeep(t, f);
-        }
-        for (final bar in {for (final t in tabs) _tabBar[t]}) {
-          switches(id, -1, bar, g);
-        }
-        // Its pops landing on the tab states under it.
-        for (final under in _over[page] ?? const <String>{}) {
-          (byUnder[under] ??= []).add(id);
-          for (final a in [...?byTop[under]]) {
-            land(id, a);
-          }
-        }
-        return;
-      }
-      final a = bound.tabs[id - _canonCount];
-      final history = a.history;
-      final n = _node(history.last, a.g);
-      for (final f in history) {
-        show(_frames[f].page);
-      }
-      leave(a.tab, history);
-      switches(id, a.tab, a.bar, a.g);
-      final top = _frames[history.last].page;
-      (byTop[top] ??= []).add(id);
-      for (final canon in [...?byUnder[top]]) {
-        land(canon, id);
-      }
-      for (final i in _outs(n)) {
-        final move = edges[i].move;
-        if (move == RouteMove.pop) continue;
-        for (final h in _arrive(i, n)) {
-          final f = _frameOf(h);
-          final page = _frames[f].page;
-          final inTab = _inTab(page, a.tab);
-          switch (move) {
-            case RouteMove.reset:
-              final t = _goTab(page, a.tab, edges[i].tab);
-              to.add(t == null ? h : tab(t, [f], _gOf(h)));
-            case RouteMove.replace when inTab:
-              to.add(
-                tab(a.tab, [...history.take(history.length - 1), f], _gOf(h)),
-              );
-            case _
-                when inTab && move == RouteMove.push && history.length < _depth:
-              to.add(tab(a.tab, [...history, f], _gOf(h)));
-            case _:
-              to.add(h);
-          }
-        }
-      }
-      for (final j in _pops(n)) {
-        if (history.length >= 2) {
-          for (final l in _landOn(history[history.length - 2], n, j)) {
-            to.add(
-              tab(a.tab, [
-                ...history.take(history.length - 2),
-                _frameOf(l),
-              ], _gOf(l)),
-            );
-          }
-        } else if (j != null && !edges[j].under) {
-          for (final h in _arrive(j, n)) {
-            to.add(
-              _inTab(_frames[_frameOf(h)].page, a.tab)
-                  ? tab(a.tab, [_frameOf(h)], _gOf(h))
-                  : h,
-            );
-          }
-        }
-      }
-      if (history.length == 1) {
-        for (final h in _toParent(n)) {
-          final f = _frameOf(h);
-          final t = _inTab(_frames[f].page, a.tab)
-              ? a.tab
-              : _goTab(_frames[f].page, null, null);
-          to.add(h);
-          if (t != null) to.add(tab(t, [f], _gOf(h)));
-        }
-      }
-      if (_retaps(a.tab, history, a.g)) {
-        for (final x in _unsaid(_tabRoots[a.tab], a.g)) {
-          to.add(tab(a.tab, [_frameOf(x)], a.g));
-        }
-      }
-      to.forEach(reach);
-    }
-
-    while (queue.isNotEmpty) {
-      own(queue.removeLast());
-    }
-    return bound;
-  }
-
-  /// For each node [bound] reaches, the fewest of its moves to one [done]
-  /// holds of (a tab state, as its history's top); -1 where none leads. A
-  /// move from a switch is no step: the move to it was the step.
-  List<int> _towards(_Bound bound, bool Function(int node) done) {
-    final dist = List.filled(_canonCount + bound.tabs.length, -1);
-    final switched = List.filled(bound.switches.length, -1);
-    int at(int id) =>
-        _Bound.isSwitch(id) ? switched[_Bound.switchAt(id)] : dist[id];
-    final back = bound.back;
-    // Level by level: those a move from a switch reaches join the level.
-    var level = [
-      for (final id in bound.moves.keys)
-        if (!_Bound.isSwitch(id) &&
-            done(id < _canonCount ? id : bound.shown(id, _node)))
-          id,
-    ];
-    for (final id in level) {
-      dist[id] = 0;
-    }
-    for (var d = 0; level.isNotEmpty; d++) {
-      final next = <int>[];
-      for (var i = 0; i < level.length; i++) {
-        final id = level[i];
-        if (at(id) != d) continue;
-        for (final from in back[id] ?? const <int>[]) {
-          final free = _Bound.isSwitch(from);
-          final steps = free ? d : d + 1;
-          final known = at(from);
-          if (known >= 0 && known <= steps) continue;
-          if (free) {
-            switched[_Bound.switchAt(from)] = steps;
-            level.add(from);
-          } else {
-            dist[from] = steps;
-            next.add(from);
-          }
-        }
-      }
-      level = next;
-    }
-    return dist;
-  }
-
-  /// A bound below the steps from a search's node to one [done] holds of,
-  /// from [stack]; -1 where none leads. A shell [_bound] has not met (none
-  /// should be), 0.
-  int Function(int node) _toward(List<int> stack, bool Function(int) done) {
-    final bound = _bound(stack);
-    final dist = _towards(bound, done);
-    return (node) {
-      final id = _boundNode(bound, node);
+    return (node, shell) {
+      final id = bound.find(node, shell);
       return id == null ? 0 : dist[id];
     };
   }
 
-  /// The node of [bound] a search's [node] is: a shell as its tab state, a
-  /// frame as its canonical node; null for a shell it does not have.
-  int? _boundNode(_Bound bound, int node) {
-    if (!_isShell(node)) return _plain(node);
-    return bound.shells.putIfAbsent(node, () {
-      final s = _shellAt(node);
-      return bound.find(s.active, s.stacks[_tabPos[s.active]], s.g);
-    });
-  }
-
-  late final _Summaries _summaries = _summarise();
-
-  /// For each node g entered (a frame, never a shell): the fewest steps to
-  /// each node at its level, and the step into each.
-  _Summaries _summarise() {
-    final n = _nodeCount;
-    final dist = List.generate(n, (_) => <int, int>{});
-    final pred = List.generate(n, (_) => <int, _Via?>{});
-    // At g's level, after d, f pushed the node by the edge i.
-    final callers = List.generate(n, (_) => <(int, int, int, int)>[]);
-    final heap = _Heap<(int, int, _Via?)>();
-    for (var g = 0; g < n; g++) {
-      if (_valid(g)) heap.push(0, (g, g, null));
-    }
-    // The fewest steps a node at a level is in the heap with: one no fewer
-    // is not pushed again.
-    final best = List.generate(n, (_) => <int, int>{});
-    void relax(int d, int g, int f, _Via via) {
-      if (dist[g].containsKey(f)) return;
-      final b = best[g][f];
-      if (b != null && b <= d) return;
-      best[g][f] = d;
-      heap.push(d, (g, f, via));
-    }
-
-    // f, at g's level after d, pushed h by i; h's level left from x, after
-    // dh, by the pop j.
-    void back(int g, int f, int d, int i, int h, int x, int dh, int? j) {
-      for (final f2 in _land(f, x, j)) {
-        relax(d + dh + 2, g, f2, _Via(f, summary: _Summary(i, h, x, j)));
-      }
-    }
-
-    while (heap.isNotEmpty) {
-      final (d, (g, f, via)) = heap.pop();
-      if (dist[g].containsKey(f)) continue;
-      dist[g][f] = d;
-      pred[g][f] = via;
-      for (final i in _outs(f)) {
-        final move = edges[i].move;
-        if (move == RouteMove.pop || move == RouteMove.reset) continue;
-        for (final arrived in _arrive(i, f)) {
-          final h = _keep(f, arrived);
-          if (move == RouteMove.replace && !_overBar(f, h)) {
-            relax(d + 1, g, h, _Via(f, edge: i));
-            continue;
-          }
-          callers[h].add((g, f, d, i));
-          for (final MapEntry(key: x, value: dh) in dist[h].entries) {
-            for (final j in _pops(x)) {
-              back(g, f, d, i, h, x, dh, j);
-            }
-          }
-        }
-      }
-      for (final j in _pops(f)) {
-        for (final (g0, f0, d0, i0) in callers[g]) {
-          back(g0, f0, d0, i0, g, f, d, j);
-        }
-      }
-    }
-    return (dist: dist, pred: pred);
-  }
+  /// The levels the search enters, summarised as first needed.
+  late final _Summaries _summaries = _Summaries(this);
 
   /// The search from [stack] (its top last) and from each of [alone] (a
   /// node with nothing under it): over (the top, how many of the stack's
   /// frames are under it, and the shell at the bottom or -1), and over the
-  /// levels pushed above it that are not left again (-1). It stops at the
-  /// first node [done] holds of, and gives what it reached, each with what
-  /// it was reached from and by, that node, the fewest steps after which a
-  /// page went past a tab's bound, and whether it stopped short, at
-  /// [searchLimit] nodes taken.
-  (Map<_At, (_At?, _Hop?)>, _At?, int?, bool) _explore(
+  /// levels pushed above it that are not left again ([_pushedLevel]). It
+  /// stops at the first node [done] holds of ([ties]: once it has taken
+  /// every node [done] holds of in as few steps), and gives what it
+  /// reached, each with what it was reached from and by, those nodes, the
+  /// fewest steps after which a page went past a tab's bound, and whether
+  /// it stopped short, at [searchLimit] nodes taken. Each step it relaxes is
+  /// told to [onStep] (the steps it takes).
+  ({Map<_At, (_At?, _Hop?)> seen, List<_At> ends, int? deep, bool short})
+  _explore(
     List<int> stack,
     bool Function(int node) done, {
     List<int> alone = const [],
-    int Function(int node)? toward,
+    int Function(int node, int shell)? toward,
     bool limited = true,
     int? below,
+    bool ties = false,
+    void Function(_At from, int steps, _At to)? onStep,
   }) {
     // A*: the fewest steps so far and, from [toward], a bound below those
     // left, which no step lowers by more than its own (so a node is first
     // taken at its fewest); a node from which none leads is not taken.
-    int bound(int f) => toward == null ? 0 : toward(f);
+    int bound(int top, int shell) => toward == null ? 0 : toward(top, shell);
     final heap = _Heap<(int, _At, _At?, _Hop?)>();
     final seen = <_At, (_At?, _Hop?)>{};
     // The fewest steps a node is in the heap with: one no fewer is not
@@ -1485,147 +1048,175 @@ class Router {
     for (final n in stack) {
       pastUnder.add(pastUnder.last || _frameTab[_frameOf(n)] != null);
     }
-    // Whether the tab shown's history goes on past the bound at [f], at k:
-    // [f] is in it, or is over a frame that is.
-    bool past(int f, int k) =>
-        _frameTab[_frameOf(f)] != null ||
-        k == _abovePast ||
-        (k > 0 && pastUnder[k]);
-    void relax(int d, int f, int k, int ctx, _At at, _Hop how) {
-      if (_isShell(f)) ctx = f;
-      final left = bound(f);
+    // Whether the tab shown's history goes on past the bound at [top],
+    // [under] of the stack's frames under it: [top] is in it, or is over a
+    // frame that is.
+    bool past(int top, int under) =>
+        _frameTab[_frameOf(top)] != null ||
+        under == _abovePast ||
+        (under > 0 && pastUnder[under]);
+    // The steps to the node being taken.
+    var taken = 0;
+    void relax(int d, int top, int under, int shell, _At from, _Hop how) {
+      if (_isShell(top)) shell = top;
+      final next = (top: top, under: under, shell: shell);
+      onStep?.call(from, d - taken, next);
+      final left = bound(top, shell);
       // None leads on, or none in fewer than [below] steps.
       if (left < 0 || (below != null && d + left >= below)) return;
       // Past a tab's bound: a switch from here, which is not followed,
       // might lead on in no fewer steps than the bound says.
-      if (_frameTab[_frameOf(f)] != null &&
+      if (_frameTab[_frameOf(top)] != null &&
           (deep == null || d + left < deep!)) {
         deep = d + left;
       }
-      final next = (f, k, ctx);
       if (seen.containsKey(next)) return;
       final b = best[next];
       if (b != null && b <= d) return;
       best[next] = d;
-      heap.push(d + left, (d, next, at, how));
+      heap.push(d + left, (d, next, from, how));
     }
 
     if (stack.isNotEmpty) {
       final bottom = _isShell(stack.first) ? stack.first : -1;
-      final left = bound(stack.last);
+      final left = bound(stack.last, bottom);
       if (stack.any((n) => _frameTab[_frameOf(n)] != null) && left >= 0) {
         deep = left;
       }
       if (left >= 0) {
         heap.push(left, (
           0,
-          (stack.last, stack.length - 1, bottom),
+          (top: stack.last, under: stack.length - 1, shell: bottom),
           null,
           null,
         ));
       }
     }
     for (final node in alone) {
-      final left = bound(node);
+      final shell = _isShell(node) ? node : -1;
+      final left = bound(node, shell);
       if (left < 0) continue;
-      heap.push(left, (0, (node, 0, _isShell(node) ? node : -1), null, null));
+      heap.push(left, (0, (top: node, under: 0, shell: shell), null, null));
     }
+    final ends = <_At>[];
+    // The steps to the first node [done] holds of.
+    int? fewest;
     while (heap.isNotEmpty) {
-      final (_, (d, at, from, how)) = heap.pop();
+      final (key, (d, at, from, how)) = heap.pop();
+      // Each node [done] holds of in as few steps as the first is taken by
+      // now: the bound is no more than the steps left.
+      if (fewest != null && key > fewest) break;
       if (seen.containsKey(at)) continue;
       seen[at] = (from, how);
-      final (f, k, ctx) = at;
-      if (done(f)) return (seen, at, deep, false);
-      if (limited && seen.length >= searchLimit) {
-        return (seen, null, deep, true);
+      final (:top, :under, :shell) = at;
+      if (done(top)) {
+        ends.add(at);
+        if (!ties) break;
+        fewest = d;
+        continue;
       }
-      if (_isShell(f)) {
+      if (limited && seen.length >= searchLimit) {
+        return (seen: seen, ends: ends, deep: deep, short: ends.isEmpty);
+      }
+      taken = d;
+      if (_isShell(top)) {
         _shellMoves(d, at, relax);
         continue;
       }
-      final tab = _frameTab[_frameOf(f)];
-      final isPast = past(f, k);
-      for (final i in _outs(f)) {
-        final move = edges[i].move;
-        if (move == RouteMove.pop) continue;
-        for (final arrived in _arrive(i, f)) {
-          if (move == RouteMove.reset) {
-            // Past the bound, the tab shown is not left by a go to another
-            // tab of its bar, from a page in its history or over it: that
-            // history would have to be kept.
-            final to = _startAt(arrived, ctx, named: edges[i].tab);
-            if (isPast &&
-                _isShell(to) &&
-                _shellAt(to).bar == _shellAt(ctx).bar &&
-                _shellAt(to).active != _shellAt(ctx).active) {
+      final g = _gOf(top);
+      final tab = _frameTab[_frameOf(top)];
+      final isPast = past(top, under);
+      for (final i in _outs(top)) {
+        final e = edges[i];
+        for (final h in _arrive(i, top)) {
+          switch (_effect(e.move, tab, h)) {
+            case _Effect.pop:
               continue;
-            }
-            // Out of the bar, its histories are gone.
-            relax(d + 1, to, 0, -1, at, _Step(_Op.reset, i, to));
-            continue;
-          }
-          final h = _keep(f, arrived);
-          if (move == RouteMove.replace && !_overBar(f, h)) {
-            relax(d + 1, h, k, ctx, at, _Step(_Op.replace, i, h));
-          } else {
-            _push(d, at, i, h, relax, past: isPast);
+            case _Effect.reset:
+              // Past the bound, the tab shown is not left by a go to another
+              // tab of its bar, from a page in its history or over it: that
+              // history would have to be kept.
+              final to = _startAt(h, shell, named: e.tab);
+              if (isPast &&
+                  _isShell(to) &&
+                  _shellAt(to).bar == _shellAt(shell).bar &&
+                  _shellAt(to).active != _shellAt(shell).active) {
+                continue;
+              }
+              // Out of the bar, its histories are gone.
+              relax(d + 1, to, 0, -1, at, _Step(_Op.reset, i, to));
+            case _Effect.replace:
+              final to = _put(h, tab);
+              relax(d + 1, to, under, shell, at, _Step(_Op.replace, i, to));
+            case _Effect.push:
+              _push(d, at, i, _put(h, tab), relax, past: isPast);
+            case _Effect.overBar:
+              _push(d, at, i, h, relax, past: isPast);
           }
         }
       }
       // Past the bound in the tab shown, tapping it again.
-      if (tab != null && ctx >= 0) {
-        final s = _shellAt(ctx);
-        if (tab == s.active &&
-            tabBars[s.bar].retapFirst &&
-            _guarded(_tabGuards[tab], _gOf(f))) {
-          for (final x in _unsaid(_tabRoots[tab], _gOf(f))) {
+      if (tab != null && shell >= 0) {
+        final s = _shellAt(shell);
+        if (tab == s.active && _retaps(tab, g, top: top, alone: false)) {
+          for (final x in _tabFirst(tab, g)) {
             final to = _withStack(s, [_frameOf(x)], _gOf(x));
-            relax(d + 1, to, 0, ctx, at, _Step(_Op.reset, null, to, _Do.retap));
+            relax(
+              d + 1,
+              to,
+              0,
+              shell,
+              at,
+              _Step(_Op.reset, null, to, _Do.retap),
+            );
           }
         }
       }
-      if (k > 0) {
-        for (final j in _pops(f)) {
-          for (final f2 in _land(stack[k - 1], f, j)) {
-            relax(d + 1, f2, k - 1, ctx, at, _Step(_Op.pop, j, f2));
+      if (under > 0) {
+        for (final j in _pops(top)) {
+          for (final l in _land(stack[under - 1], top, j)) {
+            relax(d + 1, l, under - 1, shell, at, _Step(_Op.pop, j, l));
           }
         }
-      } else if (k == 0) {
-        // Nothing under it: a written pop is the sheet's word; the back goes
-        // to its parent, where it has one.
-        for (final j in _pops(f)) {
-          if (j == null || edges[j].under) continue;
-          for (final h in _arrive(j, f)) {
-            relax(d + 1, h, 0, ctx, at, _Step(_Op.pop, j, h));
+      } else if (under == 0) {
+        // Nothing under it, out of any bar.
+        for (final j in _pops(top)) {
+          for (final (:node, stays: _) in _alone(top, j, null)) {
+            relax(
+              d + 1,
+              node,
+              0,
+              -1,
+              at,
+              j == null
+                  ? _Step(_Op.reset, null, node, _Do.back)
+                  : _Step(_Op.pop, j, node),
+            );
           }
-        }
-        for (final h in _toParent(f)) {
-          final to = _startAt(h, -1);
-          relax(d + 1, to, 0, -1, at, _Step(_Op.reset, null, to, _Do.back));
         }
       }
     }
-    return (seen, null, deep, false);
+    return (seen: seen, ends: ends, deep: deep, short: false);
   }
 
   /// From [at] after [d]: the push by [i] of [h], and each summary of it
   /// left again; [past]: from a page in a tab's history past the bound, or
   /// over one.
-  void _push(
-    int d,
-    _At at,
-    int i,
-    int h,
-    void Function(int, int, int, int, _At, _Hop) relax, {
-    bool past = false,
-  }) {
-    final (f, k, ctx) = at;
-    final dist = _summaries.dist;
-    relax(d + 1, h, past ? _abovePast : -1, ctx, at, _Step(_Op.push, i, h));
-    for (final MapEntry(key: x, value: dh) in dist[h].entries) {
-      for (final j in _pops(x)) {
-        for (final f2 in _land(f, x, j)) {
-          relax(d + dh + 2, f2, k, ctx, at, _Summary(i, h, x, j, f2));
+  void _push(int d, _At at, int i, int h, _Relax relax, {bool past = false}) {
+    final (:top, :under, :shell) = at;
+    relax(
+      d + 1,
+      h,
+      past ? _abovePast : _pushedLevel,
+      shell,
+      at,
+      _Step(_Op.push, i, h),
+    );
+    for (final MapEntry(key: left, value: steps)
+        in _summaries.dist(h).entries) {
+      for (final j in _pops(left)) {
+        for (final l in _land(top, left, j)) {
+          relax(d + steps + 2, l, under, shell, at, _Summary(i, h, left, j, l));
         }
       }
     }
@@ -1634,109 +1225,82 @@ class Router {
   /// The moves of the shell [at] shows (its tab's top): what the page does,
   /// in the tab's history within the bound, its back, a switch to another
   /// tab, and tapping it again.
-  void _shellMoves(
-    int d,
-    _At at,
-    void Function(int, int, int, int, _At, _Hop) relax,
-  ) {
-    final (f, _, ctx) = at;
-    final s = _shellAt(f);
-    final stack = s.stacks[_tabPos[s.active]];
+  void _shellMoves(int d, _At at, _Relax relax) {
+    final shell = at.top;
+    final s = _shellAt(shell);
+    final tab = s.active;
+    final history = s.stacks[_tabPos[tab]];
     final g = s.g;
     void become(int to, int? edge, [_Do does = _Do.edge]) =>
-        relax(d + 1, to, 0, ctx, at, _Step(_Op.replace, edge, to, does));
-    for (final i in _outs(f)) {
-      final move = edges[i].move;
-      if (move == RouteMove.pop) continue;
-      for (final h in _arrive(i, f)) {
-        final page = _frames[_frameOf(h)].page;
-        switch (move) {
-          case RouteMove.reset:
-            final to = _startAt(h, f, named: edges[i].tab);
+        relax(d + 1, to, 0, shell, at, _Step(_Op.replace, edge, to, does));
+    for (final i in _outs(shell)) {
+      final e = edges[i];
+      for (final h in _arrive(i, shell)) {
+        switch (_effect(e.move, tab, h)) {
+          case _Effect.pop:
+            continue;
+          case _Effect.reset:
+            final to = _startAt(h, shell, named: e.tab);
             relax(d + 1, to, 0, -1, at, _Step(_Op.reset, i, to));
-          // A page not in the tab, in place of its top: over the bar.
-          case RouteMove.replace when !_inTab(page, s.active):
+          case _Effect.overBar:
             _push(d, at, i, h, relax);
-          case RouteMove.replace:
+          case _Effect.replace:
             become(
               _withStack(s, [
-                ...stack.take(stack.length - 1),
+                ...history.take(history.length - 1),
                 _frameOf(h),
               ], _gOf(h)),
               i,
             );
-          case _ when !_inTab(page, s.active):
-            _push(d, at, i, h, relax);
-          case _ when stack.length < _depth:
-            become(_withStack(s, [...stack, _frameOf(h)], _gOf(h)), i);
-          case _:
-            final deep = _node(_deep[(_frameOf(h), s.active)]!, _gOf(h));
-            _push(d, at, i, deep, relax);
+          case _Effect.push when history.length < _depth:
+            become(_withStack(s, [...history, _frameOf(h)], _gOf(h)), i);
+          case _Effect.push:
+            _push(d, at, i, _put(h, tab), relax);
         }
       }
     }
-    for (final j in _pops(f)) {
-      if (stack.length >= 2) {
-        for (final l in _landOn(stack[stack.length - 2], f, j)) {
+    for (final j in _pops(shell)) {
+      final does = j == null ? _Do.back : _Do.edge;
+      if (history.length >= 2) {
+        for (final l in _landOn(history[history.length - 2], shell, j)) {
           become(
             _withStack(s, [
-              ...stack.take(stack.length - 2),
+              ...history.take(history.length - 2),
               _frameOf(l),
             ], _gOf(l)),
             j,
-            j == null ? _Do.back : _Do.edge,
+            does,
           );
         }
-      } else if (j != null && !edges[j].under) {
-        // Nothing under the tab's first page: a written pop is the
-        // sheet's word, in the tab if its page is.
-        for (final h in _arrive(j, f)) {
-          if (_inTab(_frames[_frameOf(h)].page, s.active)) {
-            become(_withStack(s, [_frameOf(h)], _gOf(h)), j);
-          } else {
-            relax(d + 1, h, 0, -1, at, _Step(_Op.reset, j, h));
-          }
-        }
+        continue;
       }
-    }
-    // A page alone in the tab's history (after a go): its back goes to its
-    // parent, where it has one.
-    if (stack.length == 1) {
-      for (final h in _toParent(f)) {
-        if (_inTab(_frames[_frameOf(h)].page, s.active)) {
-          become(_withStack(s, [_frameOf(h)], _gOf(h)), null, _Do.back);
+      // Nothing under the tab's page: in the tab if its page is in it.
+      for (final (:node, :stays) in _alone(shell, j, tab)) {
+        if (stays) {
+          become(_withStack(s, [_frameOf(node)], _gOf(node)), j, does);
         } else {
-          final to = _startAt(h, -1);
-          relax(d + 1, to, 0, -1, at, _Step(_Op.reset, null, to, _Do.back));
+          relax(d + 1, node, 0, -1, at, _Step(_Op.reset, j, node, does));
         }
       }
     }
     for (final t in _barTabs[s.bar]) {
-      if (t == s.active || !_guarded(_tabGuards[t], g)) continue;
-      final other = s.stacks[_tabPos[t]];
-      if (other.isEmpty) {
-        for (final x in _unsaid(_tabRoots[t], g)) {
-          become(_withStack(s, [_frameOf(x)], g, active: t), null, _Do.tab);
-        }
-      } else if (_holds(_requires[other.last], g)) {
-        become(_withStack(s, other, g, active: t), null, _Do.tab);
-      } else {
-        for (final x in _unsaid(_frames[other.last].page, g)) {
-          become(
-            _withStack(
-              s,
-              [...other.take(other.length - 1), _frameOf(x)],
-              g,
-              active: t,
-            ),
-            null,
-            _Do.tab,
-          );
-        }
+      if (t == tab || !_guarded(_tabGuards[t], g)) continue;
+      final left = s.stacks[_tabPos[t]];
+      for (final x in _switchTo(t, left.isEmpty ? null : left.last, g)) {
+        become(
+          _withStack(
+            s,
+            [if (left.isNotEmpty) ...left.take(left.length - 1), _frameOf(x)],
+            g,
+            active: t,
+          ),
+          null,
+          _Do.tab,
+        );
       }
     }
-    if (_retaps(s.active, stack, g)) {
-      for (final x in _unsaid(_tabRoots[s.active], g)) {
+    if (_retaps(tab, g, top: shell, alone: history.length == 1)) {
+      for (final x in _tabFirst(tab, g)) {
         become(_withStack(s, [_frameOf(x)], g), null, _Do.retap);
       }
     }
@@ -1744,51 +1308,151 @@ class Router {
 
   /// The fewest steps from [stack] (its top last) to a node [done] holds
   /// of; null when none reaches one; the fewest steps after which a page
-  /// went past a tab's bound; and whether the search stopped short.
+  /// went past a tab's bound (none found: one might be past it); whether
+  /// the search stopped short; the stack searched from; and, none found but
+  /// one might be, the fewest steps that one would take. [alone] and [to]
+  /// as [_toward] has them; [fullest]: of the routes of the fewest steps,
+  /// the one that ends with the most frames on the stack (a page reached
+  /// over the pages it is pushed from, its back theirs, rather than gone
+  /// to), whatever order the search takes them in; else the first.
   ///
-  /// A route found within the bound is the fewest of all: when a switch
-  /// past it might have been shorter, it is searched again among routes of
-  /// fewer steps, with the bound raised to the deepest history at the start
-  /// and the steps found (none of fewer steps puts more pages in a tab than
-  /// that), from [stack] with the pages past the bound in the tab shown
-  /// taken into it; the stack searched from is given too.
-  (List<_Step>?, int?, bool, List<int>) _search(
+  /// None found within the bound, but one might be past it: it is searched
+  /// for once more, the bound raised by [tabDepth] over the deepest history
+  /// at the start. A route found is the fewest of all: when a switch past
+  /// the bound might have been shorter, it is searched again among routes
+  /// of fewer steps, with the bound raised to the deepest history at the
+  /// start and the steps found (none of fewer steps puts more pages in a
+  /// tab than that); each from [stack] with the pages past the bound in the
+  /// tab shown taken into it, the stack searched from given too.
+  ({List<_Step>? steps, int? deep, bool short, List<int> stack, int? atLeast})
+  _search(
     List<int> stack,
-    bool Function(int node) done,
-  ) {
-    final (seen, end, deep, short) = _explore(
-      stack,
-      done,
-      toward: _toward(stack, done),
-    );
-    if (end == null) return (null, deep, short, stack);
-    final steps = _path(seen, end);
-    if (deep == null || deep >= steps.length) {
-      return (steps, null, false, stack);
-    }
+    bool Function(int node) done, {
+    bool alone = false,
+    String? to,
+    bool fullest = false,
+  }) {
+    final toward = _toward(stack, done, alone: alone, to: to);
     final deepest = _deepest(stack);
-    _depth = (deepest > tabDepth ? deepest : tabDepth) + steps.length;
+    final base = deepest > tabDepth ? deepest : tabDepth;
+    // The steps of the route found from [from], as [fullest] says.
+    List<_Step> pathOf(
+      ({Map<_At, (_At?, _Hop?)> seen, List<_At> ends, int? deep, bool short})
+      found,
+      List<int> from,
+    ) {
+      List<_Step>? best;
+      var most = -1;
+      for (final end in found.ends) {
+        final steps = _path(found.seen, end);
+        final frames = _flat(_replay(from, steps).$1).length;
+        if (frames > most) (best, most) = (steps, frames);
+      }
+      return best!;
+    }
+
+    var found = _explore(stack, done, toward: toward, ties: fullest);
+    var searched = stack;
+    if (found.ends.isEmpty) {
+      final deep = found.deep;
+      // Stopped short; or none at all, past the bound neither.
+      if (found.short || deep == null) {
+        return (
+          steps: null,
+          deep: deep,
+          short: found.short,
+          stack: stack,
+          atLeast: null,
+        );
+      }
+      final atLeast = _atLeast(deep, deepest);
+      _depth = base + tabDepth;
+      try {
+        searched = _deepen(stack);
+        found = _explore(searched, done, toward: toward, ties: fullest);
+        if (found.ends.isEmpty) {
+          // Still none: what this search proves, if it went to the end; if
+          // it found none past its bound either, there is none at all.
+          final deeper = found.deep;
+          if (found.short) {
+            return (
+              steps: null,
+              deep: deep,
+              short: false,
+              stack: stack,
+              atLeast: atLeast,
+            );
+          }
+          final more = deeper == null ? 0 : _atLeast(deeper, deepest);
+          return (
+            steps: null,
+            deep: deeper,
+            short: false,
+            stack: stack,
+            atLeast: deeper == null ? null : (more > atLeast ? more : atLeast),
+          );
+        }
+      } finally {
+        _depth = tabDepth;
+      }
+    }
+    final steps = pathOf(found, searched);
+    if (found.deep == null || found.deep! >= steps.length) {
+      return (
+        steps: steps,
+        deep: null,
+        short: false,
+        stack: searched,
+        atLeast: null,
+      );
+    }
+    _depth = base + steps.length;
     try {
       final deeper = _deepen(stack);
-      final (seen2, end2, _, short2) = _explore(
+      final again = _explore(
         deeper,
         done,
-        toward: _toward(deeper, done),
+        toward: toward,
         below: steps.length,
+        ties: fullest,
       );
-      if (end2 != null) return (_path(seen2, end2), null, false, deeper);
-      return (steps, null, short2, stack);
+      if (again.ends.isNotEmpty) {
+        return (
+          steps: pathOf(again, deeper),
+          deep: null,
+          short: false,
+          stack: deeper,
+          atLeast: null,
+        );
+      }
+      return (
+        steps: steps,
+        deep: null,
+        short: again.short,
+        stack: searched,
+        atLeast: null,
+      );
     } finally {
       _depth = tabDepth;
     }
   }
 
+  /// The fewest steps a route past the bound [_depth] takes, the search
+  /// within it from a stack whose deepest history holds [deepest] pages
+  /// having gone to the end with none found and said [deep]: no fewer than
+  /// that (a step it does not follow is from a page past the bound, which
+  /// it says leads on in no fewer); nor than the pushes that put a page
+  /// past the bound, each a step, and the step from there.
+  int _atLeast(int deep, int deepest) {
+    final pushes = _depth + 2 - deepest;
+    return deep > pushes ? deep : pushes;
+  }
+
   /// The steps to [end] in [seen].
   List<_Step> _path(Map<_At, (_At?, _Hop?)> seen, _At end) {
-    final pred = _summaries.pred;
     final steps = <_Step>[];
     for (var at = end; seen[at]!.$1 != null; at = seen[at]!.$1!) {
-      steps.insertAll(0, _open(seen[at]!.$2!, pred));
+      steps.insertAll(0, _open(seen[at]!.$2!));
     }
     return steps;
   }
@@ -1833,26 +1497,26 @@ class Router {
   late int _depth = tabDepth;
 
   /// A summary opened into its push, the steps above it, and its pop.
-  List<_Step> _open(_Hop hop, List<Map<int, _Via?>> pred) => switch (hop) {
+  List<_Step> _open(_Hop hop) => switch (hop) {
     final _Step step => [step],
     final _Summary s => [
       _Step(_Op.push, s.edge, s.entered),
-      ..._within(s.entered, s.left, pred),
+      ..._within(s.entered, s.left),
       _Step(_Op.pop, s.pop, s.landed!),
     ],
   };
 
-  /// The steps at the level [g] entered from it to [x].
-  List<_Step> _within(int g, int x, List<Map<int, _Via?>> pred) {
+  /// The steps at the level [level] entered from it to [node].
+  List<_Step> _within(int level, int node) {
     final out = <_Step>[];
-    for (var at = x; at != g;) {
-      final via = pred[g][at]!;
+    for (var at = node; at != level;) {
+      final via = _summaries.via(level, at)!;
       final summary = via.summary;
       out.insertAll(
         0,
         summary == null
             ? [_Step(_Op.replace, via.edge, at)]
-            : _open(summary.landing(at), pred),
+            : _open(summary.landing(at)),
       );
       at = via.from;
     }
@@ -1891,13 +1555,10 @@ class Router {
   /// that name, under the conditions' values [chosen] names; a page the
   /// launch does not reach so, alone (in its tab, if it is in one), under
   /// the launch's values but those [chosen] and its state name. With it,
-  /// whether the search stopped short, and whether a switch from past a
-  /// tab's bound might have reached it.
-  (List<int>, bool, bool) _start(
-    String from,
-    String? state,
-    Map<String, String> chosen,
-  ) =>
+  /// whether the search stopped short, whether a switch from past a tab's
+  /// bound might have reached it, and whether it is alone. Of the stacks
+  /// the fewest steps reach it with, the one with the most frames.
+  _Start _start(String from, String? state, Map<String, String> chosen) =>
       _starts[[
         from,
         '$state',
@@ -1908,47 +1569,46 @@ class Router {
         chosen,
       );
 
-  /// The starts found, by page, state and values, whether their search
-  /// stopped short, and whether it went past a tab's bound: one for every
-  /// route from them.
-  final _starts = <String, (List<int>, bool, bool)>{};
+  /// The starts found, by page, state and values: one for every route from
+  /// them.
+  final _starts = <String, _Start>{};
 
-  (List<int>, bool, bool) _startOf(
-    String from,
-    String? state,
-    Map<String, String> chosen,
-  ) {
+  _Start _startOf(String from, String? state, Map<String, String> chosen) {
     final named = state == null ? null : _frame(from, state);
     // The state's own values win over those chosen.
     final want = [
       for (final v in _values(chosen))
         if (named == null || !_requires[named].any((r) => r.$1 == v.$1)) v,
     ];
-    final launch = [_launch];
-    final (steps, deep, short, searched) = _search(launch, (n) {
+    final found = _search([_launch], alone: true, fullest: true, (n) {
       final f = _canon[_frameOf(n)];
       return _frames[f].page == from &&
           (named == null || f == named) &&
           _holds(want, _gOf(n));
     });
-    if (steps != null) return (_replay(searched, steps).$1, false, false);
-    // Not reached within the bound: alone, unless a switch from past it
-    // might have reached it.
-    final bounded = deep != null;
-    final g = _apply(want, _first);
-    if (named != null) {
+    if (found.steps case final steps?) {
       return (
-        [_startAt(_node(named, _apply(_requires[named], g)), -1)],
-        short,
-        bounded,
+        stack: _replay(found.stack, steps).$1,
+        short: false,
+        bounded: false,
+        alone: false,
       );
     }
+    // Not reached within the bound: alone, unless a switch from past it
+    // might have reached it.
+    final bounded = found.deep != null;
+    final g = _apply(want, _first);
+    _Start alone(int node) => (
+      stack: [_startAt(node, -1)],
+      short: found.short,
+      bounded: bounded,
+      alone: true,
+    );
+    if (named != null) return alone(_node(named, _apply(_requires[named], g)));
     final unsaid = _unsaid(from, g);
-    if (unsaid.isNotEmpty) {
-      return ([_startAt(unsaid.first, -1)], short, bounded);
-    }
+    if (unsaid.isNotEmpty) return alone(unsaid.first);
     final f = _pageFrames[from]!.first;
-    return ([_startAt(_node(f, _apply(_requires[f], g)), -1)], short, bounded);
+    return alone(_node(f, _apply(_requires[f], g)));
   }
 
   /// The frames [stack] holds, bottom first: a shell's tab shown's history.
@@ -1977,11 +1637,23 @@ class Router {
     String to, [
     Map<String, String> valuation = const {},
   ]) {
-    final (started, startShort, startBounded) = _start(from, state, valuation);
-    final (steps, deep, short, stack) = from == to
-        ? (<_Step>[], null, false, started)
-        : _search(started, (n) => _frames[_frameOf(n)].page == to);
-    final searched = !short && !startShort;
+    final started = _start(from, state, valuation);
+    final found = from == to
+        ? (
+            steps: <_Step>[],
+            deep: null,
+            short: false,
+            stack: started.stack,
+            atLeast: null,
+          )
+        : _search(
+            started.stack,
+            alone: started.alone,
+            to: to,
+            (n) => _frames[_frameOf(n)].page == to,
+          );
+    final (:steps, :deep, :short, :stack, :atLeast) = found;
+    final searched = !short && !started.short;
     final shell = _isShell(stack.first) ? _shellAt(stack.first) : null;
     final start = _flat(stack);
     final values = _named(_gOf(stack.last));
@@ -2005,7 +1677,7 @@ class Router {
     // Past a tab's bound, a switch might have made it shorter, or have
     // reached the start some other way.
     final bounded =
-        startBounded ||
+        started.bounded ||
         (deep != null && (steps == null || deep < steps.length));
     if (steps == null) {
       return Route(
@@ -2017,6 +1689,7 @@ class Router {
         pastBound: pastBound,
         tabs: tabs,
         bounded: bounded,
+        atLeast: atLeast,
         searched: searched,
       );
     }
@@ -2048,6 +1721,79 @@ class Router {
           ),
       ],
     );
+  }
+
+  /// For the tests: whether the bound the search is pruned by ([_toward])
+  /// holds on the search from [from] (in [state]) as [route] starts it, as
+  /// far as [searchLimit] nodes, unpruned. It holds when each node the
+  /// search reaches has a node in [_bound]; and, for each page, the bound to
+  /// it is 0 where the page is, and no step the search takes lowers it by
+  /// more than the step's own (none from a node it says none leads on from
+  /// to one it says some does). Then the search, pruned by it, takes each
+  /// node at its fewest, and drops none a route goes through. What fails,
+  /// said; empty when it holds.
+  List<String> boundBroken(String from, String? state) {
+    final started = _start(from, state, const {});
+    final stack = started.stack;
+    final towards = [
+      for (final p in pages)
+        (
+          page: p.id,
+          bound: _toward(
+            stack,
+            (n) => _frames[_frameOf(n)].page == p.id,
+            alone: started.alone,
+            to: p.id,
+          ),
+        ),
+    ];
+    final broken = <String>[];
+    String said(_At at) {
+      final f = _frames[_frameOf(at.top)];
+      final tab = _frameTab[_frameOf(at.top)];
+      final where = _isShell(at.top)
+          ? 'in tab ${_tabRoots[_shellAt(at.top).active]}'
+          : tab != null
+          ? 'in tab ${_tabRoots[tab]} past the bound'
+          : at.shell >= 0
+          ? 'over the bar'
+          : 'in no bar';
+      return '${f.page}:${f.state} ${_named(_gOf(at.top))} $where '
+          '(${at.under})';
+    }
+
+    void check(_At at) {
+      if (_bound.find(at.top, at.shell) == null) {
+        broken.add('no node for ${said(at)}');
+      }
+      final page = _frames[_frameOf(at.top)].page;
+      for (final t in towards) {
+        if (t.page == page && t.bound(at.top, at.shell) != 0) {
+          broken.add('to ${t.page}: not 0 at ${said(at)}');
+        }
+      }
+    }
+
+    final bottom = _isShell(stack.first) ? stack.first : -1;
+    check((top: stack.last, under: stack.length - 1, shell: bottom));
+    _explore(
+      stack,
+      (_) => false,
+      onStep: (from, steps, to) {
+        check(to);
+        for (final t in towards) {
+          final before = t.bound(from.top, from.shell);
+          final after = t.bound(to.top, to.shell);
+          if (after >= 0 && (before < 0 || before > steps + after)) {
+            broken.add(
+              'to ${t.page}: ${said(from)} at $before, by $steps step(s) '
+              'to ${said(to)} at $after',
+            );
+          }
+        }
+      },
+    );
+    return broken;
   }
 
   /// The states of the edge [i]'s `to` it can arrive in, by the state of
@@ -2084,8 +1830,26 @@ class Router {
     ];
   }
 
-  /// The frames each page can be put over, as [_over] has their pages: of
-  /// a push's, the states it happens in.
+  /// The pages [page] can be put over, as the sheet has them: a pop back to
+  /// the page under it, written from [page], goes to each.
+  Set<String> under(String page) => {
+    for (final f in _overFrames[page] ?? const <int>{}) _frames[f].page,
+  };
+
+  /// Whether the edge [e], a replace, puts its page over the bar instead of
+  /// in its `from`'s place, its `from` kept under it: from a tab's page, a
+  /// page shown in none of its tabs.
+  bool _replacesOverBar(RouteEdge e) {
+    final tabs = [?_rootTab[e.from], ..._inTabs[e.from]!];
+    return tabs.isNotEmpty && !tabs.any((t) => _inTab(e.to, t));
+  }
+
+  /// The frames each page can be put over, by the rule the sheet draws a
+  /// pop back to the page under it by: those a push to it is from (in the
+  /// states it happens in); those the page it takes the place of can be
+  /// put over (and that page, where a tab's page puts it over the bar
+  /// instead, [_replacesOverBar]); for a pop to it, those the pages under
+  /// the page popped can be put over.
   late final Map<String, Set<int>> _overFrames = () {
     final over = <String, Set<int>>{};
     List<int> leaving(RouteEdge e) => [
@@ -2097,7 +1861,10 @@ class Router {
       for (final e in edges) {
         final under = switch (e.move) {
           RouteMove.push => {...leaving(e)},
-          RouteMove.replace => {...leaving(e), ...?over[e.from]},
+          RouteMove.replace => {
+            if (_replacesOverBar(e)) ...leaving(e),
+            ...?over[e.from],
+          },
           RouteMove.pop when !e.under => {
             for (final b in over[e.from] ?? const <int>{})
               ...?over[_frames[b].page],
@@ -2147,16 +1914,16 @@ class Router {
   /// they are so; the edges that happen between them, arriving without
   /// changing those values; and those deep links.
   ///
-  /// The histories are not followed ([_unfollowed]): a back takes back the
+  /// The histories are not followed ([_Unfollowed]): a back takes back the
   /// transition that put the page there, a switch to a tab finds it as it
   /// was left (each tab, on its own, where it can be left under the values
-  /// meanwhile), so neither
-  /// shows a page not shown already, only its state as the values then
-  /// give. An edge happens from a node it can happen at, where it arrives;
-  /// a pop, where it lands.
+  /// meanwhile), so neither shows a page not shown already, only its state
+  /// as the values then give. An edge happens from a node it can happen at,
+  /// where it arrives; a pop, where it lands.
   RouteShown shown(List<RouteEntry> entries) {
     final (:starts, :opened) = _origins(entries);
-    final (nodes: reached, :pops) = _unfollowed(starts);
+    final unfollowed = _Unfollowed(this)..addStarts(starts);
+    final reached = {...unfollowed.nodeOf};
     final found = {for (final n in reached) _canon[_frameOf(n)]};
     final frames = found.toList()..sort();
     final states = <String, List<String>>{};
@@ -2164,7 +1931,7 @@ class Router {
       (states[_frames[f].page] ??= []).add(_frames[f].state);
     }
     final happens = {
-      ...pops,
+      ...unfollowed.pops,
       for (final n in reached)
         for (final i in _outs(n))
           if (edges[i].move != RouteMove.pop && _arrive(i, n).isNotEmpty) i,
@@ -2205,312 +1972,47 @@ class Router {
     return (starts: starts, opened: opened);
   }
 
-  /// The canonical nodes shown from [starts], the histories not followed:
-  /// a back is the transition it takes back, a switch finds a tab as it
-  /// was left, so neither shows a page not shown already; only its state
-  /// can be another, the one the values give when it is gone back to.
-  ///
-  /// A node is a page in a state under values, and where it is: in no bar,
-  /// in a tab's history (the bar shown), or over the bar with a tab under
-  /// it. Each node keeps what can be under it: the nodes whose transition
-  /// put it there (a push; a replace keeps what was under the page it
-  /// replaces; a page gone back to keeps what was under it), or nothing
-  /// ([nothing], where it was put: a go, a deep link, the launch, a tab
-  /// opened or tapped again, whose back is the go to its parent that
-  /// go_router builds under it). A back, or a pop back to the page under
-  /// it, lands only on what is under the page left. On one stack this is
-  /// exact: what happens over a page depends on the page and the values,
-  /// never on what is under it.
-  ///
-  /// Each tab, on its own: the nodes it can be left at (or not opened
-  /// yet), each with the values there can be while it is left so, and the
-  /// changes of the values made while it is left. A switch to it lands on
-  /// a node it is left at under the values now, in the state they give: a
-  /// tab left as it was while another changed the values, as one history
-  /// has it. The tabs are added up, never multiplied together. It shows
-  /// more than the app only where what one tab's history holds and what
-  /// another's holds go together with no condition saying so. With the
-  /// nodes, the pops that land somewhere.
-  ({Set<int> nodes, Set<int> pops}) _unfollowed(Set<int> starts) {
-    final tabs = _tabRoots.length;
-    // Where a node is: in no bar, in the tab t's history (t), over the bar
-    // with the tab t under it (tabs + t).
-    const noBar = -1;
-    int tabOf(int ctx) => ctx < 0 ? -1 : ctx % tabs;
-    bool inTab(int ctx) => ctx >= 0 && ctx < tabs;
-    int over(int t) => tabs + t;
-    // Nothing under, where it was put: in no bar, or in a tab's history.
-    int nothing(int ctx) => -ctx - 2;
-    // A tab not opened yet, as where it is left.
-    const empty = -1;
-    final ids = <int, int>{};
-    final nodeOf = <int>[];
-    final ctxOf = <int>[];
-    final under = <Set<int>>[];
-    // Each tab: the values there can be while it is left at each node (or
-    // [empty]); the nodes it can be left at under each values; the changes
-    // of the values made while it is left.
-    final leftValues = List.generate(tabs, (_) => <int, Set<int>>{});
-    final leftAt = List.generate(tabs, (_) => <int, Set<int>>{});
-    final steps = List.generate(tabs, (_) => <int, Set<int>>{});
-    final pops = <int>{};
-    var grew = true;
-
-    // [node], of a canonical frame, where [ctx] says, over what [below]
-    // has and what is under [from].
-    void reach(int node, int ctx, {Iterable<int> below = const [], int? from}) {
-      final key = node * (2 * tabs + 1) + ctx + 1;
-      var id = ids[key];
-      if (id == null) {
-        id = ids[key] = nodeOf.length;
-        nodeOf.add(node);
-        ctxOf.add(ctx);
-        under.add({});
-        grew = true;
-      }
-      final mine = under[id];
-      for (final u in [...below, if (from != null) ...under[from]]) {
-        if (mine.add(u)) grew = true;
-      }
-    }
-
-    // The tab [s] left at [at] while the values are [g], and so while the
-    // values change as they can while it is left.
-    void leave(int s, int at, int g) {
-      if (!(leftValues[s][at] ??= {}).add(g)) return;
-      (leftAt[s][g] ??= {}).add(at);
-      grew = true;
-      for (final g2 in [...?steps[s][g]]) {
-        leave(s, at, g2);
-      }
-    }
-
-    // The values changing from [g] to [g2] while the tab [s] is left.
-    void step(int s, int g, int g2) {
-      if (g == g2 || !(steps[s][g] ??= {}).add(g2)) return;
-      grew = true;
-      for (final at in [...?leftAt[s][g]]) {
-        leave(s, at, g2);
-      }
-    }
-
-    // A move where [ctx] says changing the values from [g] to [g2]: each
-    // other tab of the bar is left while they do (but [to], opened by it).
-    void changed(int ctx, int g, int g2, {int? to}) {
-      if (ctx == noBar || g == g2) return;
-      final t = tabOf(ctx);
-      for (final s in _barTabs[_tabBar[t]]) {
-        if (s != t && s != to) step(s, g, g2);
-      }
-    }
-
-    // The tab's top under [id]: itself, in a tab's history; over the bar,
-    // the nodes in the tab's history under it.
-    Set<int> tops(int id) {
-      final found = <int>{};
-      final met = <int>{id};
-      final queue = [id];
-      for (var k = 0; k < queue.length; k++) {
-        final y = queue[k];
-        if (inTab(ctxOf[y])) {
-          found.add(y);
-          continue;
-        }
-        if (ctxOf[y] < 0) continue;
-        for (final u in under[y]) {
-          if (u >= 0 && met.add(u)) queue.add(u);
-        }
-      }
-      return found;
-    }
-
-    // A bar opened anew at [h], in the tab [t]: its other tabs not opened.
-    void newShell(int h, int t) {
-      for (final s in _barTabs[_tabBar[t]]) {
-        if (s != t) leave(s, empty, _gOf(h));
-      }
-      reach(h, t, below: [nothing(t)]);
-    }
-
-    // A go from [id] to [h] (naming [named]): in the same bar, the other
-    // tabs kept, the tab shown left at its top; else a bar anew, or none.
-    void goTo(int id, int h, String? named) {
-      final ctx = ctxOf[id];
-      final g = _gOf(nodeOf[id]), g2 = _gOf(h);
-      final a = ctx < 0 ? null : tabOf(ctx);
-      final t = _goTab(_frames[_frameOf(h)].page, a, named);
-      if (t == null) {
-        reach(h, noBar, below: [nothing(noBar)]);
-        return;
-      }
-      if (a != null && _tabBar[t] == _tabBar[a]) {
-        if (t != a) {
-          for (final top in tops(id)) {
-            leave(a, top, g2);
-          }
-        }
-        changed(ctx, g, g2, to: t);
-        reach(h, t, below: [nothing(t)]);
-        return;
-      }
-      newShell(h, t);
-    }
-
-    // A switch to the tab [s] left at [at], while [g]: as left, in the
-    // state [g] gives, with what was under it; not opened, its first page.
-    void land(int s, int at, int g) {
-      if (at == empty) {
-        for (final x in _unsaid(_tabRoots[s], g)) {
-          reach(x, s, below: [nothing(s)]);
-        }
-        return;
-      }
-      final p = _frameOf(nodeOf[at]);
-      final lands = _holds(_requires[p], g)
-          ? [_node(p, g)]
-          : _unsaid(_frames[p].page, g);
-      for (final x in lands) {
-        if (_keeps(x)) reach(x, s, from: at);
-      }
-    }
-
-    void take(int id) {
-      final ctx = ctxOf[id];
-      final n = nodeOf[id];
-      final f = _frameOf(n);
-      final g = _gOf(n);
-      final t = tabOf(ctx);
-      final below = under[id];
-      bool outOfTab(int h) =>
-          inTab(ctx) && !_inTab(_frames[_frameOf(h)].page, t);
-      for (final i in _outs(n)) {
-        final e = edges[i];
-        switch (e.move) {
-          case RouteMove.pop:
-            // Named, with nothing under it: it goes there, in the tab if
-            // its page is in it, else out of the bar (over a page, it
-            // lands in its place: below).
-            if (e.under) break;
-            final marks = [...below.where((u) => u < 0)];
-            if (marks.isEmpty) break;
-            for (final h in _arrive(i, n)) {
-              pops.add(i);
-              for (final m in marks) {
-                if (inTab(ctx) && m == nothing(ctx) && !outOfTab(h)) {
-                  reach(h, ctx, below: [nothing(ctx)]);
-                  changed(ctx, g, _gOf(h));
-                } else {
-                  reach(h, noBar, below: [nothing(noBar)]);
-                }
-              }
-            }
-          case RouteMove.reset:
-            for (final h in _arrive(i, n)) {
-              goTo(id, h, e.tab);
-            }
-          case RouteMove.replace:
-            for (final h in _arrive(i, n)) {
-              // A page not in the tab, in place of its top: over the bar,
-              // the top kept under it.
-              if (outOfTab(h)) {
-                reach(h, over(t), below: [id]);
-              } else {
-                reach(h, ctx, from: id);
-              }
-              changed(ctx, g, _gOf(h));
-            }
-          case RouteMove.push:
-            for (final h in _arrive(i, n)) {
-              reach(h, outOfTab(h) ? over(t) : ctx, below: [id]);
-              changed(ctx, g, _gOf(h));
-            }
-        }
-      }
-      // A back, or a pop back to the page under it: the transition that
-      // put it there taken back, onto what is under it, in the state the
-      // values give now; with nothing under it, the go to its parent that
-      // go_router built under it, taken back.
-      for (final j in _pops(n)) {
-        for (final u in [...below]) {
-          if (u >= 0) {
-            for (final l in _landOn(_frameOf(nodeOf[u]), n, j)) {
-              if (j != null) pops.add(j);
-              reach(l, ctxOf[u], from: u);
-              changed(ctx, g, _gOf(l));
-            }
-          } else if (j == null) {
-            for (final h in _toParent(n)) {
-              final page = _frames[_frameOf(h)].page;
-              if (inTab(ctx) && u == nothing(ctx) && _inTab(page, t)) {
-                reach(h, ctx, below: [nothing(ctx)]);
-              } else if (_goTab(page, null, null) case final t2?) {
-                newShell(h, t2);
-              } else {
-                reach(h, noBar, below: [nothing(noBar)]);
-              }
-            }
-          }
-        }
-      }
-      if (!inTab(ctx)) return;
-      // In a tab, the bar shown: tapping it again, and a switch to another
-      // tab, this one left here.
-      final root = _tabRoots[t];
-      if (tabBars[_tabBar[t]].retapFirst &&
-          _guarded(_tabGuards[t], g) &&
-          (below.any((u) => u >= 0) || _frames[f].page != root)) {
-        for (final x in _unsaid(root, g)) {
-          reach(x, ctx, below: [nothing(ctx)]);
-        }
-      }
-      for (final s in _barTabs[_tabBar[t]]) {
-        if (s == t || !_guarded(_tabGuards[s], g)) continue;
-        final lefts = leftAt[s][g];
-        if (lefts == null || lefts.isEmpty) continue;
-        leave(t, id, g);
-        for (final at in [...lefts]) {
-          land(s, at, g);
-        }
-      }
-    }
-
-    for (final s in starts) {
-      if (_isShell(s)) {
-        newShell(_plain(s), _shellAt(s).active);
-      } else {
-        reach(_plain(s), noBar, below: [nothing(noBar)]);
-      }
-    }
-    while (grew) {
-      grew = false;
-      for (var k = 0; k < nodeOf.length; k++) {
-        take(k);
-      }
-    }
-    return (nodes: {...nodeOf}, pops: pops);
-  }
-
   /// The canonical nodes shown on some history from [starts]. With tab
-  /// bars, [_unfollowed]: the histories are not followed (see [shown]).
+  /// bars, [_Unfollowed]: the histories are not followed (see [shown]).
   Set<int> _reached(Set<int> starts) {
-    if (tabBars.isNotEmpty) return _unfollowed(starts).nodes;
-    final (seen, _, _, _) = _explore(
+    if (tabBars.isNotEmpty) {
+      return {...(_Unfollowed(this)..addStarts(starts)).nodeOf};
+    }
+    final found = _explore(
       const [],
       (_) => false,
       alone: [...starts],
       limited: false,
     );
-    return {for (final (f, _, _) in seen.keys) _plain(f)};
+    return {for (final at in found.seen.keys) _plain(at.top)};
   }
 }
 
-typedef _Summaries = ({List<Map<int, int>> dist, List<Map<int, _Via?>> pred});
+/// A route's start ([Router._start]): its stack, whether its search stopped
+/// short, whether one past a tab's bound might have reached it, and whether
+/// it is alone, nothing under it, as the launch does not reach it.
+typedef _Start = ({List<int> stack, bool short, bool bounded, bool alone});
 
-/// A node of the search: the top, how many of the start's frames are under
-/// it (-1: a level pushed and not left again; [_abovePast], such a level
-/// over a page in a tab's history past the bound), and the shell at the
-/// bottom (-1 for none).
-typedef _At = (int, int, int);
+/// What the search takes a step by ([Router._explore]): its steps so far,
+/// the node it reaches, how many of the start's frames are under it, the
+/// shell at the bottom (-1 for none), what it is from, and by.
+typedef _Relax = void Function(
+  int steps,
+  int top,
+  int under,
+  int shell,
+  _At from,
+  _Hop how,
+);
+
+/// A node of the search: the [top]; [under], how many of the start's frames
+/// are under it ([_pushedLevel]: a level pushed and not left again;
+/// [_abovePast], such a level over a page in a tab's history past the
+/// bound); and the [shell] at the bottom (-1 for none).
+typedef _At = ({int top, int under, int shell});
+
+/// A level pushed and not left again (see [_At]).
+const _pushedLevel = -1;
 
 /// A level pushed and not left again over a page in a tab's history past
 /// the bound: the tab shown is not left from it for another (see [_At]).
@@ -2557,6 +2059,734 @@ class _Via {
   final int from;
   final int? edge;
   final _Summary? summary;
+}
+
+/// A node at a level that pushed the node entering another: its [level],
+/// the [node], the [steps] to it there, and the [edge] it pushed by.
+typedef _Caller = ({int level, int node, int steps, int edge});
+
+/// The summaries of the levels the search enters ([Router._push]): for each
+/// node entered (a frame, never a shell), the fewest steps from it to each
+/// node at its level, through the pages pushed and popped above it, and the
+/// step into each.
+///
+/// One Dijkstra over all levels (Knuth's: a step out of a pushed page costs
+/// more than the steps it is made of), each level put in it when first
+/// needed, at the cost it has reached: a level pushed from one starts no
+/// earlier than the node that pushed it was taken, so each step still costs
+/// more than what it is made of, and each level is exact. A level is needed
+/// only with all those it pushes, and goes to the end with them: a level
+/// never needed is never summarised.
+class _Summaries {
+  _Summaries(this.r)
+    : _dist = List.filled(r._nodeCount, null),
+      _via = List.filled(r._nodeCount, null),
+      _best = List.filled(r._nodeCount, null),
+      _callers = List.filled(r._nodeCount, null),
+      _from = List.filled(r._nodeCount, 0);
+
+  final Router r;
+
+  /// For each level entered: the fewest steps to each node at it, the step
+  /// into each, the fewest it is in the heap with (one no fewer is not
+  /// pushed again), the nodes that pushed it, and the cost it was put in
+  /// the Dijkstra at.
+  final List<Map<int, int>?> _dist;
+  final List<Map<int, _Via?>?> _via;
+  final List<Map<int, int>?> _best;
+  final List<List<_Caller>?> _callers;
+  final List<int> _from;
+
+  /// By the cost so far: each level's node, its level, and the step into it.
+  final _heap = _Heap<(int, int, _Via?)>();
+
+  /// The cost the Dijkstra has reached.
+  var _reached = 0;
+
+  /// The fewest steps from [level] to each node at its level.
+  Map<int, int> dist(int level) {
+    if (_dist[level] == null) {
+      _enter(level);
+      _run();
+    }
+    return _dist[level]!;
+  }
+
+  /// The step into [node] at [level], summarised.
+  _Via? via(int level, int node) => _via[level]![node];
+
+  void _enter(int level) {
+    _dist[level] = {};
+    _via[level] = {};
+    _best[level] = {};
+    _callers[level] = [];
+    _from[level] = _reached;
+    _relax(0, level, level, null);
+  }
+
+  void _relax(int d, int level, int node, _Via? via) {
+    if (_dist[level]!.containsKey(node)) return;
+    final best = _best[level]!;
+    final b = best[node];
+    if (b != null && b <= d) return;
+    best[node] = d;
+    _heap.push(_from[level] + d, (level, node, via));
+  }
+
+  void _run() {
+    while (_heap.isNotEmpty) {
+      final (cost, (level, node, via)) = _heap.pop();
+      final dist = _dist[level]!;
+      if (dist.containsKey(node)) continue;
+      _reached = cost;
+      final d = cost - _from[level];
+      dist[node] = d;
+      _via[level]![node] = via;
+      final tab = r._frameTab[r._frameOf(node)];
+      for (final i in r._outs(node)) {
+        final move = r.edges[i].move;
+        final caller = (level: level, node: node, steps: d, edge: i);
+        for (final h in r._arrive(i, node)) {
+          switch (r._effect(move, tab, h)) {
+            // Out of the level: not in its summary.
+            case _Effect.pop || _Effect.reset:
+              continue;
+            case _Effect.replace:
+              _relax(d + 1, level, r._put(h, tab), _Via(node, edge: i));
+            case _Effect.push:
+              _pushed(caller, r._put(h, tab));
+            case _Effect.overBar:
+              _pushed(caller, h);
+          }
+        }
+      }
+      for (final j in r._pops(node)) {
+        for (final caller in _callers[level]!) {
+          _left(caller, level, node, d, j);
+        }
+      }
+    }
+  }
+
+  /// [caller] pushing [h]: each node its level is left from, as met.
+  void _pushed(_Caller caller, int h) {
+    if (_dist[h] == null) _enter(h);
+    _callers[h]!.add(caller);
+    for (final MapEntry(key: left, value: steps) in _dist[h]!.entries) {
+      for (final j in r._pops(left)) {
+        _left(caller, h, left, steps, j);
+      }
+    }
+  }
+
+  /// The level [h] [caller] pushed, left from [left] after [steps] by the
+  /// pop [j] (null: the back): onto the frame of the caller's node.
+  void _left(_Caller caller, int h, int left, int steps, int? j) {
+    for (final l in r._land(caller.node, left, j)) {
+      _relax(
+        caller.steps + steps + 2,
+        caller.level,
+        l,
+        _Via(caller.node, summary: _Summary(caller.edge, h, left, j)),
+      );
+    }
+  }
+}
+
+/// What the app shows from some starts, the histories not followed
+/// ([Router.shown]); and, its moves kept ([recording]), the bound the
+/// route's search is pruned by ([Router._toward]).
+///
+/// A back is the transition it takes back, a switch finds a tab as it was
+/// left, so neither shows a page not shown already; only its state can be
+/// another, the one the values give when it is gone back to.
+///
+/// A node is a page in a state under values, and where it is: in no bar,
+/// in a tab's history (the bar shown), or over the bar with a tab under
+/// it. Each node keeps what can be under it: the nodes whose transition
+/// put it there (a push; a replace keeps what was under the page it
+/// replaces; a page gone back to keeps what was under it), or [nothing],
+/// where it was put (a go, a deep link, the launch, a tab opened or tapped
+/// again, whose back is the go to its parent that go_router builds under
+/// it). A back, or a pop back to the page under it, lands only on what is
+/// under the page left. On one stack this is exact: what happens over a
+/// page depends on the page and the values, never on what is under it.
+///
+/// Each tab, on its own: the nodes it can be left at (or not opened yet),
+/// each with the values there can be while it is left so, and the changes
+/// of the values made while it is left. A switch to it lands on a node it
+/// is left at under the values now, in the state they give: a tab left as
+/// it was while another changed the values, as one history has it. The
+/// tabs are added up, never multiplied together. It shows more than the
+/// app only where what one tab's history holds and what another's holds go
+/// together with no condition saying so. With the nodes, the pops that
+/// land somewhere.
+///
+/// Each is taken once: a node's moves when it is met; what lands on what is
+/// under it, as each comes to be under it; a switch to a tab, as each node
+/// it can be left at comes to be. What is under a node is passed on to the
+/// nodes that keep it, each once, those that keep each other's, round, one
+/// group with one set; no search, no limit.
+class _Unfollowed {
+  _Unfollowed(this.r, {this.recording = false})
+    : tabs = r._tabRoots.length,
+      _leftValues = List.generate(r._tabRoots.length, (_) => {}),
+      _leftAt = List.generate(r._tabRoots.length, (_) => {}),
+      _changes = List.generate(r._tabRoots.length, (_) => {});
+
+  final Router r;
+
+  /// Whether each node's moves are kept, for [distances].
+  final bool recording;
+  final int tabs;
+
+  /// Where a node is: out of any bar ([noBar]), in the tab t's history (t),
+  /// or over the bar with the tab t under it ([overBar]).
+  static const noBar = -1;
+  int overBar(int t) => tabs + t;
+  bool inTab(int where) => where >= 0 && where < tabs;
+  int tabOf(int where) => where < 0 ? -1 : where % tabs;
+
+  /// What can be under a node besides nodes: nothing, where it was put.
+  static const nothing = -1;
+
+  /// Where a tab is left besides nodes: not opened yet.
+  static const unopened = -1;
+
+  final _ids = <int, int>{};
+
+  /// For each node: its canonical node, where it is, and the nodes its moves
+  /// reach ([recording]).
+  final nodeOf = <int>[];
+  final whereOf = <int>[];
+  final _moves = <Set<int>>[];
+
+  /// What can be under the nodes (nodes, or [nothing]), kept by groups: the
+  /// nodes that keep what is under each other, round, have the same, and
+  /// are one group, its set one ([_group], [_merge]). For each node, the
+  /// node it is grouped under (itself, for a group's own); for each group,
+  /// what can be under its nodes, its nodes, and the groups that keep what
+  /// is under them.
+  final _groupOf = <int>[];
+  final _under = <Set<int>>[];
+  final _members = <List<int>>[];
+  final _keptBy = <Set<int>>[];
+
+  /// The groups' keeps, made so far and when they were last merged.
+  var _keeps = 0;
+  var _keepsMerged = 0;
+
+  /// For each node over the bar: the nodes of the tab's history under it
+  /// (its top, under the pages over the bar), the nodes over the bar whose
+  /// tops those are too, and the tabs a go from it to another tab leaves at
+  /// them, with the values after it.
+  final _tops = <Set<int>?>[];
+  final _topsAbove = <Set<int>?>[];
+  final _goneWith = <Set<(int, int)>?>[];
+
+  /// Whether tapping the tab shown again is taken from each node.
+  final _retapped = <bool>[];
+
+  /// The edges written as pops that land somewhere.
+  final pops = <int>{};
+
+  /// Each tab: the values there can be while it is left at each node (or
+  /// [unopened]); the nodes it can be left at under each values; the
+  /// changes of the values made while it is left.
+  final List<Map<int, Set<int>>> _leftValues;
+  final List<Map<int, Set<int>>> _leftAt;
+  final List<Map<int, Set<int>>> _changes;
+
+  /// The nodes that can switch to a tab under values, by both.
+  final _switching = <int, List<int>>{};
+
+  /// What is still to be taken: the nodes met; a node and what came to be
+  /// under it; a tab, the node it came to be left at, and the values; a
+  /// node over the bar and a top that came to be under it. Each in a row
+  /// of numbers, its parts one after another: as many as nodes under nodes
+  /// can be, they are not made objects.
+  final _met = <int>[];
+  final _cameUnder = <int>[];
+  final _cameLeft = <int>[];
+  final _cameTop = <int>[];
+
+  /// A group and what came to be under its nodes, to be passed on to the
+  /// groups that keep it.
+  final _passing = <int>[];
+
+  /// What has been met so far: it grows with each node, each move, and each
+  /// node under another or a tab left at.
+  var version = 0;
+
+  int _key(int node, int where) => node * (2 * tabs + 1) + where + 1;
+
+  /// The node of a search's [node] (a shell, or a frame over [shell], the
+  /// shell at the bottom or -1): null if it is not met.
+  int? find(int node, int shell) {
+    final where = r._isShell(node)
+        ? r._shellAt(node).active
+        : r._frameTab[r._frameOf(node)] ??
+              (shell >= 0 ? overBar(r._shellAt(shell).active) : noBar);
+    return _ids[_key(r._plain(node), where)];
+  }
+
+  /// [starts], each a search's node with nothing under it (a frame, or a
+  /// shell of one tab opened), and all they lead to.
+  void addStarts(Iterable<int> starts) {
+    for (final s in starts) {
+      _start(s);
+    }
+    _run();
+  }
+
+  void _start(int start, {int? from}) {
+    if (r._isShell(start)) {
+      _newShell(r._plain(start), r._shellAt(start).active, from: from);
+    } else {
+      _reach(r._plain(start), noBar, below: nothing, from: from);
+    }
+  }
+
+  /// [node], of a canonical frame, where [where] says, over [below], and
+  /// keeping what is under [keeps]; a move from [from] to it.
+  void _reach(int node, int where, {int? below, int? keeps, int? from}) {
+    final key = _key(node, where);
+    var id = _ids[key];
+    if (id == null) {
+      id = _ids[key] = nodeOf.length;
+      nodeOf.add(node);
+      whereOf.add(where);
+      _groupOf.add(id);
+      _under.add({});
+      _members.add([id]);
+      _keptBy.add({});
+      if (recording) _moves.add({});
+      final over = where >= tabs;
+      _tops.add(over ? {} : null);
+      _topsAbove.add(over ? {} : null);
+      _goneWith.add(over ? {} : null);
+      _retapped.add(false);
+      _met.add(id);
+      version++;
+    }
+    if (recording && from != null && from != id && _moves[from].add(id)) {
+      version++;
+    }
+    if (below != null) _addUnder(id, below);
+    if (keeps != null) _keep(keeps, id);
+  }
+
+  /// The group of the node [id].
+  int _group(int id) {
+    var g = id;
+    while (_groupOf[g] != g) {
+      g = _groupOf[g] = _groupOf[_groupOf[g]];
+    }
+    return g;
+  }
+
+  void _addUnder(int id, int u) => _addToGroup(_group(id), u);
+
+  /// [u] under each node of the group [g]: each to land on, and passed on.
+  void _addToGroup(int g, int u) {
+    if (!_under[g].add(u)) return;
+    for (final m in _members[g]) {
+      _cameUnder
+        ..add(m)
+        ..add(u);
+    }
+    _passing
+      ..add(g)
+      ..add(u);
+    version++;
+  }
+
+  /// [to] keeps what is under [from], and what comes to be.
+  void _keep(int from, int to) {
+    final a = _group(from), b = _group(to);
+    if (a == b || !_keptBy[a].add(b)) return;
+    _keeps++;
+    for (final u in _under[a]) {
+      _addToGroup(b, u);
+    }
+  }
+
+  /// [u], come to be under the group [g]'s nodes, under those of the groups
+  /// that keep it.
+  void _pass(int g, int u) {
+    final from = _group(g);
+    for (final to in _keptBy[from]) {
+      final b = _group(to);
+      if (b != from) _addToGroup(b, u);
+    }
+  }
+
+  /// The groups that keep what is under each other, round, made one (each
+  /// a strongly connected component of the keeps, Tarjan's): what is under
+  /// their nodes comes to be the same, and is passed on once, not round.
+  void _merge() {
+    _keepsMerged = _keeps;
+    final n = nodeOf.length;
+    final out = List<List<int>>.filled(n, const []);
+    for (var a = 0; a < n; a++) {
+      if (_groupOf[a] != a) continue;
+      final to = {
+        for (final b in _keptBy[a])
+          if (_group(b) != a) _group(b),
+      };
+      _keptBy[a] = to;
+      out[a] = to.toList();
+    }
+    final index = List.filled(n, -1), low = List.filled(n, 0);
+    final onStack = List.filled(n, false);
+    final stack = <int>[];
+    var counter = 0;
+    for (var s = 0; s < n; s++) {
+      if (_groupOf[s] != s || index[s] >= 0) continue;
+      final path = [s], next = [0];
+      index[s] = low[s] = counter++;
+      stack.add(s);
+      onStack[s] = true;
+      while (path.isNotEmpty) {
+        final v = path.last, i = next.last;
+        if (i < out[v].length) {
+          next.last = i + 1;
+          final w = out[v][i];
+          if (index[w] < 0) {
+            index[w] = low[w] = counter++;
+            stack.add(w);
+            onStack[w] = true;
+            path.add(w);
+            next.add(0);
+          } else if (onStack[w] && index[w] < low[v]) {
+            low[v] = index[w];
+          }
+          continue;
+        }
+        path.removeLast();
+        next.removeLast();
+        if (path.isNotEmpty && low[v] < low[path.last]) low[path.last] = low[v];
+        if (low[v] != index[v]) continue;
+        final component = <int>[];
+        int w;
+        do {
+          w = stack.removeLast();
+          onStack[w] = false;
+          component.add(w);
+        } while (w != v);
+        if (component.length > 1) _join(component);
+      }
+    }
+  }
+
+  /// The groups [component] made one: each node lands on what it did not
+  /// have under it, and that is passed on.
+  void _join(List<int> component) {
+    final all = <int>{for (final g in component) ..._under[g]};
+    var into = component.first;
+    for (final g in component) {
+      if (_under[g].length > _under[into].length) into = g;
+    }
+    final passed = <int>{};
+    final keptBy = <int>{};
+    for (final g in component) {
+      final had = _under[g];
+      for (final u in all) {
+        if (had.contains(u)) continue;
+        passed.add(u);
+        for (final m in _members[g]) {
+          _cameUnder
+            ..add(m)
+            ..add(u);
+        }
+      }
+      keptBy.addAll(_keptBy[g]);
+      if (g == into) continue;
+      _groupOf[g] = into;
+      _members[into].addAll(_members[g]);
+      _members[g] = const [];
+      _under[g] = const {};
+      _keptBy[g] = const {};
+    }
+    _under[into] = all;
+    _keptBy[into] = keptBy..removeAll(component);
+    for (final u in passed) {
+      _passing
+        ..add(into)
+        ..add(u);
+    }
+    version++;
+  }
+
+  void _run() {
+    while (true) {
+      if (_keeps >= _keepsMerged + (_keepsMerged >> 3) + 64) _merge();
+      if (_cameLeft.isNotEmpty) {
+        final g = _cameLeft.removeLast(), at = _cameLeft.removeLast();
+        _left(_cameLeft.removeLast(), at, g);
+      } else if (_cameTop.isNotEmpty) {
+        final top = _cameTop.removeLast();
+        _topped(_cameTop.removeLast(), top);
+      } else if (_passing.isNotEmpty) {
+        final u = _passing.removeLast();
+        _pass(_passing.removeLast(), u);
+      } else if (_cameUnder.isNotEmpty) {
+        final u = _cameUnder.removeLast();
+        _takeUnder(_cameUnder.removeLast(), u);
+      } else if (_met.isNotEmpty) {
+        _take(_met.removeLast());
+      } else {
+        return;
+      }
+    }
+  }
+
+  /// The moves of the node [id] that what is under it does not decide: its
+  /// transitions but its pops; in a tab, tapping it again from another page
+  /// than its first, and a switch to each tab it can switch to, as each
+  /// node that tab can be left at comes to be.
+  void _take(int id) {
+    final n = nodeOf[id], where = whereOf[id];
+    final g = r._gOf(n);
+    final tab = inTab(where) ? where : null;
+    for (final i in r._outs(n)) {
+      final e = r.edges[i];
+      for (final h in r._arrive(i, n)) {
+        switch (r._effect(e.move, tab, h)) {
+          case _Effect.pop:
+            continue;
+          case _Effect.reset:
+            _goTo(id, h, e.tab);
+          case _Effect.replace:
+            _reach(h, where, keeps: id, from: id);
+            _changed(where, g, r._gOf(h));
+          case _Effect.push:
+            _reach(h, where, below: id, from: id);
+            _changed(where, g, r._gOf(h));
+          case _Effect.overBar:
+            _reach(h, overBar(tab!), below: id, from: id);
+            _changed(where, g, r._gOf(h));
+        }
+      }
+    }
+    if (tab == null) return;
+    _retap(id, alone: true);
+    for (final s in r._barTabs[r._tabBar[tab]]) {
+      if (s == tab || !r._guarded(r._tabGuards[s], g)) continue;
+      (_switching[s * r._valuations + g] ??= []).add(id);
+      for (final at in _leftAt[s][g] ?? const <int>{}) {
+        _switch(id, s, at);
+      }
+    }
+  }
+
+  /// What lands on [u], come to be under the node [id]: a back, or a pop,
+  /// the transition that put it there taken back, onto [u], in the state
+  /// the values give now; with [nothing] under it, a pop where it names,
+  /// the back to the parent go_router built under it ([Router._alone]).
+  void _takeUnder(int id, int u) {
+    final n = nodeOf[id], where = whereOf[id];
+    final g = r._gOf(n);
+    final tab = inTab(where) ? where : null;
+    for (final j in r._pops(n)) {
+      if (u != nothing) {
+        // Of u's frame alone (a canonical node's: [Router._landOn]).
+        for (final l in r._land(nodeOf[u], n, j)) {
+          if (j != null) pops.add(j);
+          _reach(l, whereOf[u], keeps: u, from: id);
+          _changed(where, g, r._gOf(l));
+        }
+        continue;
+      }
+      for (final (:node, :stays) in r._alone(n, j, tab)) {
+        if (j != null) pops.add(j);
+        if (stays) {
+          _reach(node, where, below: nothing, from: id);
+          _changed(where, g, r._gOf(node));
+        } else {
+          _start(node, from: id);
+        }
+      }
+    }
+    if (u == nothing) return;
+    if (tab != null) _retap(id, alone: false);
+    // Over the bar: the tab's tops under it.
+    if (_tops[id] != null && u != id) {
+      if (inTab(whereOf[u])) {
+        _addTop(id, u);
+      } else if (_tops[u] case final tops?) {
+        _topsAbove[u]!.add(id);
+        for (final top in tops) {
+          _addTop(id, top);
+        }
+      }
+    }
+  }
+
+  void _addTop(int id, int top) {
+    if (_tops[id]!.add(top)) {
+      _cameTop
+        ..add(id)
+        ..add(top);
+    }
+  }
+
+  /// [top], come to be the tab's top under [id], over the bar: each tab a
+  /// go from [id] left is left at it too, and it is a top of the nodes over
+  /// the bar above [id].
+  void _topped(int id, int top) {
+    for (final (a, g) in _goneWith[id]!) {
+      _leave(a, top, g);
+    }
+    for (final above in _topsAbove[id]!) {
+      _addTop(above, top);
+    }
+  }
+
+  /// Tapping the tab shown again from [id], in its history: its first page,
+  /// unless [id] is it with nothing under it ([alone]: nothing yet).
+  void _retap(int id, {required bool alone}) {
+    if (_retapped[id]) return;
+    final n = nodeOf[id], t = whereOf[id];
+    final g = r._gOf(n);
+    if (!r._retaps(t, g, top: n, alone: alone)) return;
+    _retapped[id] = true;
+    for (final x in r._tabFirst(t, g)) {
+      _reach(x, t, below: nothing, from: id);
+    }
+  }
+
+  /// A switch from [id], in a tab, to the tab [s] left at [at]: as left, in
+  /// the state the values give, with what was under it; not opened, its
+  /// first page. The tab [id] is in is left at it.
+  void _switch(int id, int s, int at) {
+    final g = r._gOf(nodeOf[id]);
+    _leave(whereOf[id], id, g);
+    final opened = at != unopened;
+    // Under the values now: those held, but where a start names others.
+    for (final x in r._switchTo(s, opened ? r._frameOf(nodeOf[at]) : null, g)) {
+      if (opened) {
+        _reach(x, s, keeps: at, from: id);
+      } else {
+        _reach(x, s, below: nothing, from: id);
+      }
+    }
+  }
+
+  /// A go from [id] to [h] (naming [named]): in the same bar, the other
+  /// tabs kept, the tab shown left at its top; else a bar anew, or none.
+  void _goTo(int id, int h, String? named) {
+    final where = whereOf[id];
+    final g = r._gOf(nodeOf[id]), g2 = r._gOf(h);
+    final a = where < 0 ? null : tabOf(where);
+    final t = r._goTab(r._frames[r._frameOf(h)].page, a, named);
+    if (t == null) {
+      _reach(h, noBar, below: nothing, from: id);
+      return;
+    }
+    if (a == null || r._tabBar[t] != r._tabBar[a]) {
+      _newShell(h, t, from: id);
+      return;
+    }
+    if (t != a) {
+      if (inTab(where)) {
+        _leave(a, id, g2);
+      } else if (_goneWith[id]!.add((a, g2))) {
+        for (final top in _tops[id]!) {
+          _leave(a, top, g2);
+        }
+      }
+    }
+    _changed(where, g, g2, to: t);
+    _reach(h, t, below: nothing, from: id);
+  }
+
+  /// A bar opened anew at [h], in the tab [t]: its other tabs not opened.
+  void _newShell(int h, int t, {int? from}) {
+    for (final s in r._barTabs[r._tabBar[t]]) {
+      if (s != t) _leave(s, unopened, r._gOf(h));
+    }
+    _reach(h, t, below: nothing, from: from);
+  }
+
+  /// A move where [where] says changing the values from [g] to [g2]: each
+  /// other tab of the bar is left while they do (but [to], opened by it).
+  void _changed(int where, int g, int g2, {int? to}) {
+    if (where == noBar || g == g2) return;
+    final t = tabOf(where);
+    for (final s in r._barTabs[r._tabBar[t]]) {
+      if (s != t && s != to) _change(s, g, g2);
+    }
+  }
+
+  /// The tab [s] left at [at] while the values are [g].
+  void _leave(int s, int at, int g) {
+    if (!(_leftValues[s][at] ??= {}).add(g)) return;
+    _cameLeft
+      ..add(s)
+      ..add(at)
+      ..add(g);
+    version++;
+  }
+
+  /// [s] come to be left at [at] while [g]: each node that switches to it
+  /// then does, and it is left so while the values change as they can
+  /// while it is left.
+  void _left(int s, int at, int g) {
+    (_leftAt[s][g] ??= {}).add(at);
+    for (final id in _switching[s * r._valuations + g] ?? const <int>[]) {
+      _switch(id, s, at);
+    }
+    for (final g2 in _changes[s][g] ?? const <int>{}) {
+      _leave(s, at, g2);
+    }
+  }
+
+  /// The values changing from [g] to [g2] while the tab [s] is left.
+  void _change(int s, int g, int g2) {
+    if (g == g2 || !(_changes[s][g] ??= {}).add(g2)) return;
+    for (final at in _leftAt[s][g] ?? const <int>{}) {
+      _leave(s, at, g2);
+    }
+  }
+
+  /// The moves backwards, as of [version].
+  List<List<int>> get _back {
+    if (_backOf?.$1 == version) return _backOf!.$2;
+    final back = List.generate(nodeOf.length, (_) => <int>[]);
+    for (final (from, tos) in _moves.indexed) {
+      for (final to in tos) {
+        back[to].add(from);
+      }
+    }
+    _backOf = (version, back);
+    return back;
+  }
+
+  (int, List<List<int>>)? _backOf;
+
+  /// For each node, the fewest moves from it to one whose canonical node
+  /// [done] holds of; -1 where none leads.
+  List<int> distances(bool Function(int node) done) {
+    final back = _back;
+    final dist = List.filled(nodeOf.length, -1);
+    final queue = <int>[];
+    for (var id = 0; id < nodeOf.length; id++) {
+      if (done(nodeOf[id])) {
+        dist[id] = 0;
+        queue.add(id);
+      }
+    }
+    for (var k = 0; k < queue.length; k++) {
+      final id = queue[k];
+      for (final from in back[id]) {
+        if (dist[from] >= 0) continue;
+        dist[from] = dist[id] + 1;
+        queue.add(from);
+      }
+    }
+    return dist;
+  }
 }
 
 /// A binary heap on (d, then the order pushed): the same route each time.

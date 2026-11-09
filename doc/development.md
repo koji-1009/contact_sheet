@@ -13,7 +13,7 @@
 | `lib/src/l10n/` | The words (ARB): the command speaks English; the map, English or Japanese |
 | `doc/` | The playbook and the reference for AI agents, as `agent` and `manual` print them; this page; `images/`, the README's and pub.dev's pictures (`flow.png` drawn from `flow.svg`) |
 | `example/` | The example apps and their sheet packages |
-| `test/`, `tool/` | The tests; the generators of the command's words from the ARB files, and of the HTML's route from `lib/src/route.dart`, compiled to JavaScript |
+| `test/`, `tool/` | The tests; the generators of the command's words from the ARB files, of the documents it prints from `doc/`, and of the HTML's route from `lib/src/route.dart`, compiled to JavaScript |
 | `AGENTS.md` | For AI agents working on this repository |
 | `CHANGELOG.md` | What each version changed |
 
@@ -34,6 +34,8 @@ Run the generator after changing what it is made from; CI fails while a generate
 | After changing | Run |
 | --- | --- |
 | `lib/src/l10n/*.arb` | `dart run tool/gen_messages.dart` |
+| `doc/agent.md` or `doc/manual.md` | `dart run tool/gen_docs.dart` |
+| `lib/src/html/app.js` or `lib/src/html/app.css` | `dart run tool/gen_html.dart` |
 | The pubspec's `version` | `dart run build_runner build` |
 | `lib/src/route.dart` or `tool/route_js.dart` | `dart run tool/gen_route_js.dart` |
 

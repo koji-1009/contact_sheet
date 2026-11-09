@@ -13,7 +13,7 @@ Do not add previews, or anything else, to the app: whether the app keeps preview
 
 ## The steps
 
-Run the commands in the app's directory.
+Run the commands in the app's directory. `sheet` is the command; run as `dart run contact_sheet` (from a clone of Contact Sheet, the app's directory given last), it is the same.
 
 1. `sheet init`: writes an empty `contact_sheet/sheet.yaml`.
 2. Look into what tells how the app works, such as its code (its router, its pages, and its `@Preview`s: search for `@Preview(`; a `@MultiPreview` subclass counts too) and its specifications.
@@ -104,7 +104,7 @@ pages:
         uses: {AuthRepository: guest}            # for developers: what each fake holds
       - name: Logged in
         if: {Login: Logged in}
-        preview: lib/features/home_page_preview.dart#home@1      # its 2nd @Preview
+        preview: lib/features/home_page_preview.dart#home@1      # its 2nd annotation
         uses: {AuthRepository: logged in}
         tags: {Analytics: home_member}   # its own value, in place of the page's
       - name: Loading
@@ -121,13 +121,13 @@ pages:
     label: Product
     path: /products/:id
     params: {id: p1}                     # the product its preview shows: fills {path}
-    states: [{name: Standard, preview: contact_sheet/lib/preview/product.dart#product}]
+    states: [{name: Product, preview: contact_sheet/lib/preview/product.dart#product}]
   - id: cart
     label: Cart
-    states: [{name: Standard, preview: contact_sheet/lib/preview/cart.dart#cart}]
+    states: [{name: Full, preview: contact_sheet/lib/preview/cart.dart#cart}]
   - id: checkout
     label: Checkout
-    states: [{name: Standard, preview: contact_sheet/lib/preview/checkout.dart#checkout}]
+    states: [{name: Full, preview: contact_sheet/lib/preview/checkout.dart#checkout}]
 edges:
   - from: home
     to: product_detail
@@ -158,6 +158,13 @@ edges:
     set: {Login: Logged in}      # the values it gives: home shows Logged in from then on
     kind: go
     source: lib/features/login_page.dart
+  - from: login
+    to: home
+    trigger: text:Log in
+    when: From home
+    set: {Login: Logged in}      # no then: home arrives in Logged in, by its if
+    kind: go
+    source: lib/features/login_page.dart
 entries:                         # deep links into a page, from outside the app
   - to: product_detail
     via: /products/:id
@@ -172,7 +179,15 @@ Each field, and how `preview` names a `@Preview`: `sheet manual`, "The sheet".
 - Name a `trigger` by the words on the screen: `text:` what a button says, `label:` the semantics label or tooltip of an icon button. A row of a list, or a text that changes (it has a name or an amount in it): `other:` and how a person would say it (`other:Tap a product`), not the data the state happens to show. `key:` and `type:` only when nothing on the screen says it: they are shown to developers only.
 - Write one edge per outcome: if a guest is redirected, that is a separate edge with its own `if` (or `when`) and `kind: redirect`. One that happens in several states of its page names them all: `when: [Guest, Member]`; arriving in another state by the state it leaves, it is still one edge: `then: {Guest: A, Member: B}`. The same transition from several pages (the bottom tabs, a button in each page's app bar) is one edge: `from: [feed, search]`.
 - What the app keeps across its pages (logged in, what is in the cart) is a `condition`, kept while pages that do not show it come between: a page whose look changes with it has a state of each value (`if: {Login: Guest}`), an edge that only happens for some values says them (`if:`), whatever its `from` shows, and an edge whose code changes it says what it gives (`set: {Login: Logged in}`, `set: {Cart: Empty}`). Do not give a page states that look the same only to carry a condition: write the condition. What several pages show alike is a condition; what one page loads (empty, loading, an error) is `data: true`.
-- Where an edge arrives: its `then`; without it, in the state of `to` of the name it leaves (Full stays Full), if the conditions allow it; else in the state of `to` of the conditions' values, its first, or a `data` state. So a page of the conditions needs no `then`: home after logging in shows Logged in by its `if`. Write `then` where the code decides the state another way: a redirect that carries where the user came from, a page opened with an argument. The map shows the state an arrow arrives in at its end, and a route between two pages follows it and the conditions. `lint` tells a state nothing arrives in, a condition's value nothing gives, a page of the conditions with no state for some of their values, and an `if` no way through the app meets. A state's name says what it is across pages: arriving, or landing by a back, on a page that has a state of the name left, the page shows that one. So give states of two pages one name only where they are the same (Full on the cart and on checkout), not a generic name (Default, Standard) that another page's state of that name would be taken for. A page that goes on to where it was sent from (`/login?from=...`) has a state for each place it is sent from, each with its own edges out; they may name one preview.
+- Where an edge arrives:
+  1. the state its `then` names;
+  2. else the state of `to` of the name it leaves (Full stays Full), if the conditions allow it;
+  3. else the state of `to` of the conditions' values, its first, or a `data` state.
+
+  So a page of the conditions needs no `then`: home after logging in shows Logged in by its `if`. Write `then` where the code decides the state another way: a redirect that carries where the user came from, a page opened with an argument. The map shows the state an arrow arrives in at its end. A route between two pages follows it and the conditions.
+- `lint` tells a state nothing arrives in, a condition's value nothing gives, a page of the conditions with no state for some of their values, and an `if` no way through the app meets.
+- A state's name says what it is across pages. Arriving, or landing by a back, on a page that has a state of the name left, the page shows that one. So give states of two pages one name only where they are the same (Full on the cart and on checkout). Do not give them a generic name (Default, Standard): another page's state of that name would be taken for it.
+- A page that goes on to where it was sent from (`/login?from=...`) has a state for each place it is sent from, each with its own edges out. They may name one preview.
 - A condition that changes without leaving the page (signing out in place) is an edge from the page to itself, with `set` and `kind: replace`: it is listed, not drawn, and the route takes it.
 - A `MultiPreview` gives several `Preview`s from one annotation: a state names one by its place, `#notesPage@0.1` for the second the first annotation gives.
 - `variants` (top level, optional): the ways every state is shot, switched between in the HTML, the first the map's. `{name: Android, platform: android}` shoots as Android (the default is iOS); `{name: Tablet, preview: Tablet}` takes, for each state, the `Preview` named `Tablet` that the state's annotation gives besides (a `MultiPreview` of devices the app has, or one you write in the sheet package). A state with no such `Preview` has no image in that variant.

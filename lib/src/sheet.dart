@@ -691,13 +691,46 @@ class _Parser {
 
   final Messages m;
 
+  /// The sheet as YAML read it: where in the text each thing is.
+  YamlNode? _root;
+
   Never _fail(String where, String problem) =>
-      throw SheetException(m.sheetInvalid(where, problem));
+      throw SheetException(switch (_lineOf(where)) {
+        final line? => m.sheetInvalidAt(line, where, problem),
+        null => m.sheetInvalid(where, problem),
+      });
+
+  /// The line (from 1) [where] is on: the node of the path it names
+  /// (`edges[3].then`), or of as much of it as the sheet has (the map a key
+  /// is missing from); null without the text.
+  int? _lineOf(String where) {
+    var node = _root;
+    if (node == null) return null;
+    final path = where.startsWith('sheet.yaml')
+        ? where.substring('sheet.yaml'.length)
+        : where;
+    for (final step in _step.allMatches(path)) {
+      final next = switch ((node, step[1], step[2])) {
+        (final YamlMap map, final String key, _) => map.nodes[key],
+        (final YamlList list, _, final String index)
+            when int.parse(index) < list.length =>
+          list.nodes[int.parse(index)],
+        _ => null,
+      };
+      if (next == null) break;
+      node = next;
+    }
+    return node!.span.start.line + 1;
+  }
+
+  /// A step of a path: `.key`, or `[index]`.
+  static final _step = RegExp(r'\.?([^.\[\]]+)|\[(\d+)\]');
 
   Sheet sheet(String text) {
     final Object? yaml;
     try {
-      yaml = loadYaml(text);
+      _root = loadYamlNode(text);
+      yaml = _root!.value;
     } on YamlException catch (e) {
       throw SheetException(switch (e.span) {
         final span? => m.sheetNotYamlAt(
@@ -720,39 +753,72 @@ class _Parser {
       'locale',
       'checked',
     });
-    final locale = _optional(root, 'locale', 'sheet.yaml');
-    if (locale != null && !Messages.locales.contains(locale)) {
-      _fail(
-        'sheet.yaml.locale',
-        m.sheetBadLocale(locale, Messages.locales.join(', ')),
-      );
+    // What stands on its own (the locale, the hints checked, the tags, the
+    // dependencies, the conditions, the variants) is read whole, each
+    // mistake in it told at once; what names them, after them.
+    final mistakes = <String>[];
+    T? told<T>(T Function() read) {
+      try {
+        return read();
+      } on SheetException catch (e) {
+        mistakes.add(e.message);
+        return null;
+      }
     }
-    final checked = _strings(root, 'checked', 'sheet.yaml');
+
+    final locale = told(() {
+      final locale = _optional(root, 'locale', 'sheet.yaml');
+      if (locale != null && !Messages.locales.contains(locale)) {
+        _fail(
+          'sheet.yaml.locale',
+          m.sheetBadLocale(locale, Messages.locales.join(', ')),
+        );
+      }
+      return locale;
+    });
+    final checked = told(() => _strings(root, 'checked', 'sheet.yaml')) ?? [];
     final tags = [
-      for (final (i, t) in _list(root, 'tags', 'sheet.yaml').indexed)
-        _tag(t, 'tags[$i]'),
+      for (final (i, t)
+          in (told(() => _list(root, 'tags', 'sheet.yaml')) ?? []).indexed)
+        ?told(() => _tag(t, 'tags[$i]')),
     ];
     final tagByName = <String, SheetTag>{};
     for (final (i, t) in tags.indexed) {
       if (tagByName.putIfAbsent(t.name, () => t) != t) {
-        _fail('tags[$i]', m.sheetDuplicateTag(t.name));
+        told(() => _fail('tags[$i]', m.sheetDuplicateTag(t.name)));
       }
     }
     final dependencies = [
-      for (final (i, d) in _list(root, 'dependencies', 'sheet.yaml').indexed)
-        _dependency(d, 'dependencies[$i]'),
+      for (final (i, d)
+          in (told(() => _list(root, 'dependencies', 'sheet.yaml')) ?? [])
+              .indexed)
+        ?told(() => _dependency(d, 'dependencies[$i]')),
     ];
     final names = {for (final d in dependencies) d.name};
     final conditions = [
-      for (final (i, c) in _list(root, 'conditions', 'sheet.yaml').indexed)
-        _condition(c, 'conditions[$i]'),
+      for (final (i, c)
+          in (told(() => _list(root, 'conditions', 'sheet.yaml')) ?? [])
+              .indexed)
+        ?told(() => _condition(c, 'conditions[$i]')),
     ];
     final byName = <String, SheetCondition>{};
     for (final (i, c) in conditions.indexed) {
       if (byName.putIfAbsent(c.name, () => c) != c) {
-        _fail('conditions[$i]', m.sheetDuplicateCondition(c.name));
+        told(() => _fail('conditions[$i]', m.sheetDuplicateCondition(c.name)));
       }
     }
+    final variants = [
+      for (final (i, v)
+          in (told(() => _list(root, 'variants', 'sheet.yaml')) ?? []).indexed)
+        ?told(() => _variant(v, 'variants[$i]')),
+    ];
+    final variantNames = <String>{};
+    for (final (i, v) in variants.indexed) {
+      if (!variantNames.add(v.name)) {
+        told(() => _fail('variants[$i]', m.sheetDuplicateVariant(v.name)));
+      }
+    }
+    if (mistakes.isNotEmpty) throw SheetException(mistakes.join('\n'));
     // Each condition named, and each value one of its.
     void known(Map<String, Iterable<String>> values, String where) {
       for (final MapEntry(key: name, value: given) in values.entries) {
@@ -954,16 +1020,6 @@ class _Parser {
         if (!inTab(to.id, tab)) {
           _fail('entries[$i].tab', m.sheetTabNotOf(tab, to.id));
         }
-      }
-    }
-    final variants = [
-      for (final (i, v) in _list(root, 'variants', 'sheet.yaml').indexed)
-        _variant(v, 'variants[$i]'),
-    ];
-    final variantNames = <String>{};
-    for (final (i, v) in variants.indexed) {
-      if (!variantNames.add(v.name)) {
-        _fail('variants[$i]', m.sheetDuplicateVariant(v.name));
       }
     }
     return Sheet(

@@ -158,7 +158,7 @@ class SheetExport {
         throw ExportException(m.exportUnknownPage(id), ExitCode.usage.code);
       }
     }
-    lintLines(sheet, m).forEach(log);
+    lintLines(lintHints(sheet, m, exists: repo.hasFile), m).forEach(log);
     final out = folder == null ? repo.mapDir : dirIn(folder);
     final runs = ExportRuns(repo);
     final kept = Directory.systemTemp.createTempSync('contact_sheet_');

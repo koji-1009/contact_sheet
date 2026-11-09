@@ -854,7 +854,7 @@ pages:
           isA<ExportException>().having(
             (e) => e.message,
             'message',
-            startsWith('contact_sheet/sheet.yaml, pages[0]'),
+            startsWith('contact_sheet/sheet.yaml, line 1, pages[0]'),
           ),
         ),
       );

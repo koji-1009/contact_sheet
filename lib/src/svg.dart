@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:contact_sheet/src/layout.dart';
 import 'package:contact_sheet/src/map.dart';
@@ -13,6 +14,8 @@ const mapPalette = {
   'muted': '#5f6672',
   'line': '#d9dde3',
   'accent': '#0a84ff',
+  // Under white words (a button pressed, a mark): dark enough to read them.
+  'accent-fill': '#0064d2',
   'hover': '#eef5ff',
   'island': '#eceff3',
   'e-sheet': '#6b7280',
@@ -29,6 +32,7 @@ const mapPaletteDark = {
   'muted': '#a0a7b2',
   'line': '#363b42',
   'accent': '#3d9bff',
+  'accent-fill': '#0064d2',
   'hover': '#1d2a3a',
   'island': '#24282d',
   'e-sheet': '#9aa3ae',
@@ -68,6 +72,7 @@ a.page-link:hover .page { stroke: var(--accent); stroke-width: 2; }
 .edge-label .l-to { fill: var(--accent); }
 .entry .edge-label { fill: var(--e-entry); }
 .edge-bg { fill: var(--surface); }
+path.leader { fill: none; stroke: var(--e-sheet); stroke-width: 1; stroke-dasharray: 1 2; }
 .tabbar rect { fill: var(--line); }
 .tabbar rect.on { fill: var(--accent); }
 ''';
@@ -87,7 +92,10 @@ const mapDefs =
 /// tab's first page (`g.tabbar`), the arrows (`path.edge`,
 /// `data-i` the edge's place in the sheet; `pop` dashed), the deep links
 /// (`g.entry`, `data-i` the entry's) and the bundles of arrows from other
-/// sections (`g.bundle`, `data-i` the bundle's).
+/// sections (`g.bundle`, `data-i` the bundle's). Each line's ends where it
+/// meets a page, with the point it leaves that end towards (`data-ends`,
+/// `x,y,towardX,towardY`, `;` between two): where the HTML keeps its marks
+/// clear of.
 String mapUnder(SheetMap map) {
   final layout = map.layout;
   final sheet = map.sheet;
@@ -125,6 +133,7 @@ String mapUnder(SheetMap map) {
     out.write(
       '<path class="edge${edge.kind == NavigationKind.pop ? ' pop' : ''}" '
       'data-i="$i" d="M${_p(s)} C${_p(c1)} ${_p(c2)} ${_p(e)}" '
+      'data-ends="${_p(s)},${_p(c1)};${_p(e)},${_p(c2)}" '
       'marker-end="url(#arrow-sheet)"><title>'
       '${_esc('${label(edge.from)} → ${label(edge.to)}${plain == null ? '' : ': $plain'}')}'
       '</title></path>',
@@ -134,7 +143,8 @@ String mapUnder(SheetMap map) {
     final (s, e) = layout.entryOf(entry);
     out.write(
       '<g class="entry" data-i="$i"><circle cx="${_n(s.x)}" cy="${_n(s.y)}" '
-      'r="3"/><path d="M${_p(s)} L${_p(e)}" marker-end="url(#arrow-entry)"/>'
+      'r="3"/><path d="M${_p(s)} L${_p(e)}" data-ends="${_p(e)},${_p(s)}" '
+      'marker-end="url(#arrow-entry)"/>'
       '<title>${_esc('${entry.via} → ${label(entry.to)}')}</title></g>',
     );
   }
@@ -145,7 +155,7 @@ String mapUnder(SheetMap map) {
     out.write(
       '<g class="bundle${pop ? ' pop' : ''}" data-i="$i"><circle cx="${_n(s.x)}" '
       'cy="${_n(s.y)}" r="3"/><path d="M${_p(s)} L${_p(e)}" '
-      'marker-end="url(#arrow-sheet)"/>'
+      'data-ends="${_p(e)},${_p(s)}" marker-end="url(#arrow-sheet)"/>'
       '<title>${_esc('${from.join(', ')} → ${label(bundle.to)}')}</title></g>',
     );
   }
@@ -187,16 +197,25 @@ String? _labelText(SheetMap map, SheetEdge edge, {required bool plain}) {
 String mapOver(SheetMap map, {bool plain = false}) {
   final out = StringBuffer();
   // With [start], the text from the box's left on (a jump's, after its
-  // arrow): measured again wider, it grows away from the arrow.
-  void label(String cls, int i, Box box, String text, {bool start = false}) =>
-      out.write(
-        '<g class="$cls" data-i="$i"><rect class="edge-bg" '
-        'x="${_n(box.left)}" y="${_n(box.top)}" width="${_n(box.width)}" '
-        'height="${_n(box.height)}" rx="4"/><text class="edge-label" '
-        'x="${_n(start ? box.left + 4 : box.center.x)}" '
-        'y="${_n(box.center.y + 4)}" '
-        'text-anchor="${start ? 'start' : 'middle'}">$text</text></g>',
-      );
+  // arrow): measured again wider, it grows away from the arrow. With
+  // [curve], a label off its arrow has a thin line to it: which arrow it
+  // says stays plain where the room was elsewhere.
+  void label(
+    String cls,
+    int i,
+    Box box,
+    String text, {
+    bool start = false,
+    Curve? curve,
+  }) => out.write(
+    '<g class="$cls" data-i="$i">${curve == null ? '' : leaderOf(box, curve)}'
+    '<rect class="edge-bg" '
+    'x="${_n(box.left)}" y="${_n(box.top)}" width="${_n(box.width)}" '
+    'height="${_n(box.height)}" rx="4"/><text class="edge-label" '
+    'x="${_n(start ? box.left + 4 : box.center.x)}" '
+    'y="${_n(box.center.y + 4)}" '
+    'text-anchor="${start ? 'start' : 'middle'}">$text</text></g>',
+  );
   // With [plain], a background the size of what is left; from the same
   // left, with [start].
   Box fit(Box box, String? words, {bool start = false}) {
@@ -228,6 +247,7 @@ String mapOver(SheetMap map, {bool plain = false}) {
       fit(box, words, start: jump != null),
       text,
       start: jump != null,
+      curve: jump == null ? map.layout.curveOf(edge) : null,
     );
   }
   for (final (i, entry) in map.sheet.entries.indexed) {
@@ -301,6 +321,36 @@ String exportSvg(
     ..write('</svg>');
   return '$out';
 }
+
+/// The thin line from a label's [box] to the nearest point of its arrow's
+/// [curve]; none where the label is on it, or touches it.
+String leaderOf(Box box, Curve curve) {
+  final (a, b, c, d) = curve;
+  Point nearestIn(Point p) => Point(
+    p.x.clamp(box.left, box.right).toDouble(),
+    p.y.clamp(box.top, box.bottom).toDouble(),
+  );
+  // The nearest; of those as near, the one nearest the label's middle.
+  Point? on, from;
+  var least = double.infinity, middle = double.infinity;
+  for (var i = 1; i < 40; i++) {
+    final p = MapLayout.bezier(a, b, c, d, i / 40);
+    final q = nearestIn(p);
+    final gap = p.distanceTo(q);
+    final mid = p.distanceTo(box.center);
+    if (gap < least - 0.5 || (gap < least + 0.5 && mid < middle)) {
+      least = math.min(least, gap);
+      middle = mid;
+      on = p;
+      from = q;
+    }
+  }
+  if (least <= _leaderFrom) return '';
+  return '<path class="leader" d="M${_p(from!)} L${_p(on!)}"/>';
+}
+
+/// How far off its arrow a label is drawn with a line to it.
+const _leaderFrom = 8.0;
 
 /// A coordinate to a tenth of a pixel.
 String _n(double v) {

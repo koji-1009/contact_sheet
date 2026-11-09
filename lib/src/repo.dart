@@ -53,6 +53,10 @@ class SheetRepo {
 
   /// What the app is called in the map: its package name, or its directory.
   String get displayName => appName ?? p.basename(root);
+
+  /// Whether the app has [file], relative to it with `/`, as the sheet
+  /// names files.
+  bool hasFile(String file) => File(pathIn(root, file)).existsSync();
 }
 
 /// [relative], written with `/` (as in the sheet), under [dir], with the

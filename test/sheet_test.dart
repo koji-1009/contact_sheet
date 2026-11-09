@@ -6,9 +6,18 @@ final _m = Messages.of('en');
 
 Sheet _parse(String yaml) => Sheet.parse(yaml, _m);
 
-/// [message]: the message, or a matcher of it.
-Matcher _fails(Object message) =>
-    throwsA(isA<SheetException>().having((e) => e.message, 'message', message));
+/// [message]: the message, or a matcher of it, without the line it tells
+/// (which "tells the line of what is wrong" holds).
+Matcher _fails(Object message) => throwsA(
+  isA<SheetException>().having(
+    (e) => e.message.replaceFirst(
+      RegExp(r'(?<=^contact_sheet/sheet\.yaml, )line \d+, (?!column)'),
+      '',
+    ),
+    'message',
+    message,
+  ),
+);
 
 void main() {
   test('reads pages, states, edges, deep links and dependencies', () {
@@ -385,6 +394,62 @@ pages:
       isA<SheetPage>()
           .having((p) => p.label, 'label', '404')
           .having((p) => p.states.single.name, 'state', 'true'),
+    );
+  });
+
+  test('tells the line of what is wrong: where the path it names is, or as '
+      'much of it as the sheet has', () {
+    Matcher at(String message) => throwsA(
+      isA<SheetException>().having((e) => e.message, 'message', message),
+    );
+    const sheet = '''
+pages:
+  - id: a
+    label: A
+    states:
+      - {name: s, preview: a.dart#a}
+  - id: b
+    states: [{name: s, preview: b.dart#b}]
+''';
+    expect(
+      () => _parse(sheet),
+      at('contact_sheet/sheet.yaml, line 6, pages[1]: label is missing'),
+    );
+    expect(
+      () => _parse('''
+pages:
+  - {id: a, label: A, states: [{name: s, preview: a.dart#a}]}
+edges:
+  - from: a
+    to: a
+    when: x
+'''),
+      at('contact_sheet/sheet.yaml, line 6, edges[0].when: a has no state x'),
+    );
+  });
+
+  test('tells each mistake of what stands on its own at once', () {
+    expect(
+      () => _parse('''
+tags:
+  - {name: Spec, url: [x]}
+dependencies:
+  - {source: lib/a.dart}
+conditions:
+  - {name: Login, values: []}
+variants:
+  - {name: A, platform: web}
+'''),
+      throwsA(
+        isA<SheetException>().having((e) => e.message.split('\n'), 'lines', [
+          'contact_sheet/sheet.yaml, line 2, tags[0].url: should be text',
+          'contact_sheet/sheet.yaml, line 4, dependencies[0]: name is missing',
+          ('contact_sheet/sheet.yaml, line 6, conditions[0].values: needs at '
+              'least one value'),
+          ('contact_sheet/sheet.yaml, line 8, variants[0].platform: web is '
+              'not a platform: ios or android'),
+        ]),
+      ),
     );
   });
 
@@ -854,8 +919,8 @@ edges:
           'says no state does not happen'),
       ('Banned and Also of Home: the same values of the conditions; where '
           'an arrow says no state, the map shows the first'),
-      ('edges[0]: Banned is a state of other values than its if: it does '
-          'not happen in it'),
+      ('edges[0]: Banned is a state of other values than its if. The edge '
+          'does not happen in it'),
       ('edges[1] from Shop: no way through the app reaches it there while '
           'its if holds'),
     ]);
@@ -964,16 +1029,100 @@ entries:
       'gone of Cart: none of the page\'s arrows leaves from it',
       'loading of Cart: none of the page\'s arrows leaves from it',
       // What the page loads decides loading: arriving in it is not told.
-      ('gone of Cart: no arrow arrives in it and no deep link opens it (a '
-          'then, or the state left having its name), nor is it data: true '
-          '(what the page loads decides it): the map shows it only when it '
-          'is chosen'),
+      ('gone of Cart: no arrow arrives in it (by a then, or from a state of '
+          'its name) and no deep link opens it. Nor is it data: true (what '
+          'the page loads decides it). The map shows it only when it is '
+          'chosen'),
       'edges[1] is edges[0] again',
-      ('edges[3] is edges[2] in other states: one edge, its when both\'s '
-          'states, its then by the state it leaves'),
+      ('edges[3] is edges[2] in other states. Write them as one edge: its '
+          'when both\'s states, its then by the state it leaves'),
       'entries[1] is entries[0] again',
     ]);
     expect(lintSheet(_parse(''), _m), isEmpty);
+  });
+
+  test('lint tells a then that gives values its set does not say, and an '
+      'arrow that arrives in a state by its name alone', () {
+    final sheet = _parse('''
+conditions:
+  - {name: Login, values: [Guest, Member]}
+pages:
+  - id: home
+    label: Home
+    states:
+      - {name: Full, preview: h.dart#h}
+      - {name: Empty, preview: h.dart#h@1}
+  - id: cart
+    label: Cart
+    states:
+      - {name: Empty, preview: c.dart#c}
+      - {name: Full, preview: c.dart#c@1}
+      - {name: Loading, preview: c.dart#c@2, data: true}
+  - id: account
+    label: Account
+    states:
+      - {name: Guest, preview: a.dart#a, if: {Login: Guest}}
+      - {name: Member, preview: a.dart#a@1, if: {Login: Member}}
+edges:
+  - {from: home, to: cart, trigger: text:Cart}
+  - {from: home, to: account, trigger: text:Sign in, then: Member}
+  - {from: home, to: account, trigger: text:Join, then: Member, set: {Login: Member}}
+  - {from: home, to: cart, trigger: text:Again, then: Full}
+  - {from: home, to: cart, trigger: text:Sorted, then: {Full: Full, Empty: Empty}, when: [Full, Empty]}
+''');
+    expect(
+      [
+        for (final hint in lintHints(sheet, _m))
+          if (hint.key.startsWith('then-sets') ||
+              hint.key.startsWith('by-name'))
+            (hint.key, hint.message),
+      ],
+      [
+        // Empty is the cart's first: it arrives there as not said too.
+        (
+          'by-name home>cart text:Cart push Full',
+          'edges[0] from Home: it has no then, so leaving Full it arrives in '
+              'Cart\'s Full, by the name. If they are not the same state, '
+              'write then',
+        ),
+        (
+          'then-sets home>account text:Sign in push Member',
+          'edges[1]: its then, Member, gives Login: Member, which its set does '
+              'not say. If the code gives them, write them in set',
+        ),
+      ],
+    );
+  });
+
+  test('lint tells a source the app has no file of, when it is told which '
+      'files the app has', () {
+    final sheet = _parse('''
+dependencies:
+  - {name: Auth, source: lib/auth.dart}
+pages:
+  - {id: home, label: Home, source: lib/home.dart, states: [{name: s, preview: h.dart#h}]}
+  - {id: cart, label: Cart, source: lib/gone.dart, states: [{name: s, preview: c.dart#c}]}
+edges:
+  - {from: home, to: cart, trigger: text:Cart, source: lib/home.dart}
+''');
+    expect(lintSheet(sheet, _m), isEmpty);
+    expect(
+      [
+        for (final hint in lintHints(
+          sheet,
+          _m,
+          exists: {'lib/home.dart', 'lib/auth.dart'}.contains,
+        ))
+          (hint.key, hint.message),
+      ],
+      [
+        (
+          'no-file lib/gone.dart',
+          'lib/gone.dart: the sheet names it as where the code is, and the app '
+              'has no such file',
+        ),
+      ],
+    );
   });
 
   test('lint tells a tag no page has, and one most pages have that some do '

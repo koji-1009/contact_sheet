@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:contact_sheet/contact_sheet.dart';
 import 'package:contact_sheet/src/layout.dart';
 import 'package:contact_sheet/src/map.dart';
@@ -230,6 +232,95 @@ entries:
       expect(box.bottom, lessThanOrEqualTo(height));
     }
     expect(width, greaterThan(map.layout.width));
+  });
+
+  test('a large app (150 pages in 10 sections, arrows across them): every '
+      'arrow on the map, no column taller than it holds, few labels over one '
+      'another', () {
+    // A tree in each section, an arrow back from half the pages, and one in
+    // three to anywhere: denser than an app, as a check of the worst.
+    final random = Random(1);
+    final b = StringBuffer('pages:\n');
+    const n = 150, per = 15;
+    for (var i = 0; i < n; i++) {
+      b.writeln(
+        '  - {id: p$i, label: Page $i, section: S${i ~/ per}, '
+        'states: [{name: s, preview: lib/p$i.dart#p}]}',
+      );
+    }
+    b.writeln('edges:');
+    for (var i = 1; i < n; i++) {
+      final s = i ~/ per;
+      final parent = i % per == 0 ? 0 : s * per + random.nextInt(i % per);
+      b.writeln('  - {from: p$parent, to: p$i, trigger: "text:Open $i"}');
+      if (random.nextDouble() < 0.5) {
+        b.writeln('  - {from: p$i, to: p$parent, trigger: back, kind: pop}');
+      }
+      if (random.nextDouble() < 0.3) {
+        final j = random.nextInt(n);
+        if (j != i) {
+          b.writeln('  - {from: p$i, to: p$j, trigger: "text:Go $j"}');
+        }
+      }
+    }
+    final sheet = Sheet.parse('$b', m);
+    final map = SheetMap(sheet, shots: const {}, m: m);
+    final layout = map.layout;
+    final (width, height) = map.canvas;
+    // Every arrow on the map, all along it.
+    for (final edge in sheet.edges) {
+      final curve = layout.curveOf(edge);
+      if (curve == null) continue;
+      final (a, b, c, d) = curve;
+      for (var i = 0; i <= 32; i++) {
+        final p = MapLayout.bezier(a, b, c, d, i / 32);
+        expect(p.x, inInclusiveRange(0, width), reason: edge.key);
+        expect(p.y, inInclusiveRange(0, height), reason: edge.key);
+      }
+    }
+    // No column of more pages than it holds, but the row under the rest.
+    for (final s in layout.sections) {
+      final inColumn = <double, int>{};
+      for (final box in layout.nodes.values) {
+        if (s.box.contains(box.center)) {
+          inColumn[box.left] = (inColumn[box.left] ?? 0) + 1;
+        }
+      }
+      expect(
+        inColumn.values,
+        everyElement(lessThanOrEqualTo(MapLayout.columnRows + 1)),
+      );
+    }
+    // Few labels over one another, none over a page.
+    final labels = [...map.edgeLabels.values, ...map.bundleLabels.values];
+    var over = 0;
+    for (var i = 0; i < labels.length; i++) {
+      for (var j = i + 1; j < labels.length; j++) {
+        if (labels[i].overlap(labels[j]) > 0) over++;
+      }
+    }
+    final onPages = labels.where(
+      (l) => layout.nodes.values.any((p) => l.overlap(p) > 0),
+    );
+    // As many as there are now, of 285: no more.
+    expect(over, lessThanOrEqualTo(11));
+    expect(onPages.length, lessThanOrEqualTo(2));
+  });
+
+  test('a label off its arrow has a line to it; one on it, none', () {
+    const curve = (
+      Point(0, 100),
+      Point(50, 100),
+      Point(150, 100),
+      Point(200, 100),
+    );
+    // On it: none.
+    expect(leaderOf(const Box(80, 92, 40, 17), curve), isEmpty);
+    // Above it, past the room of a line: from the label's foot to the arrow.
+    expect(
+      leaderOf(const Box(80, 60, 40, 17), curve),
+      '<path class="leader" d="M100,77 L100,100"/>',
+    );
   });
 
   test('an arrow runs behind no page but its own two', () {

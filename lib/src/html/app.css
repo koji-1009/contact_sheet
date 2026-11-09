@@ -1,0 +1,247 @@
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; font: 14px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--text); }
+/* What only the app's developers read: the code. */
+body.plain .dev { display: none !important; }
+body:not(.plain) .plain-only { display: none !important; }
+header { position: sticky; top: 0; z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); padding: 8px 16px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+header h1 { font-size: 16px; margin: 0; }
+#meta { display: flex; flex-wrap: wrap; gap: 0 10px; }
+header input[type=search] { font: inherit; padding: 4px 12px; border: 1px solid var(--line); border-radius: 8px; min-width: 200px; }
+header label { font-size: 12px; color: var(--muted); display: flex; gap: 4px; align-items: center; cursor: pointer; }
+header select { font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); }
+nav { display: flex; gap: 4px; margin-left: auto; }
+nav button { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 8px; padding: 4px 12px; cursor: pointer; font: inherit; }
+nav button[aria-selected="true"] { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
+main > section { display: none; }
+main > section.on { display: block; }
+button.link { border: 1px solid var(--line); background: var(--surface); color: var(--accent); border-radius: 8px; padding: 2px 12px; cursor: pointer; font: inherit; font-size: 12px; }
+.badge { display: inline-block; border-radius: 999px; padding: 0 8px; font-size: 12px; border: 1px solid currentColor; white-space: nowrap; }
+.e-sheet { color: var(--e-sheet); } .e-entry { color: var(--e-entry); }
+.changed { color: var(--changed); }
+button.badge { background: none; font: inherit; font-size: 12px; cursor: pointer; }
+.meta { color: var(--muted); font-size: 12px; }
+code { font: 12px ui-monospace, Menlo, monospace; }
+/* What the sheet says of a page: its memo and tags, each value with its
+   tag's name. */
+.memo { white-space: pre-wrap; margin: 8px 0 12px; padding: 8px 12px; background: var(--surface); border-left: 3px solid var(--accent); border-radius: 4px; }
+.tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.tags a, .tags span { display: inline-flex; gap: 6px; align-items: baseline; border: 1px solid var(--line); border-radius: 999px; padding: 1px 10px; font-size: 12px; background: var(--surface); color: var(--accent); text-decoration: none; }
+.tags a:hover { border-color: var(--accent); background: var(--hover); }
+.tags a::after { content: '↗'; }
+.tags small { color: var(--muted); font-size: 11px; }
+.tags span { color: var(--text); }
+.state .tags { margin: 4px 0 0; }
+/* map */
+/* Under the header, however many lines it takes (--header-h, measured). */
+/* No element's id is a view's address (#map, #list, #table), or opening one would scroll to it. */
+#map-view { position: relative; height: calc(100vh - var(--header-h, 52px)); height: calc(100dvh - var(--header-h, 52px)); overflow: hidden; cursor: grab; touch-action: none; }
+#map-view.drag { cursor: grabbing; }
+#map-view:focus { outline: none; }
+#map-view:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+#canvas { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+#canvas.moving { transition: transform .45s ease; }
+#canvas svg { position: absolute; left: 0; top: 0; overflow: visible; }
+#over { pointer-events: none; z-index: 1; }
+.node { position: absolute; cursor: pointer; transition: opacity .3s; }
+.node .img { width: 100%; border: 1px solid var(--line); background: var(--surface); overflow: hidden; }
+.node img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.node .no-preview { display: flex; height: 100%; align-items: center; justify-content: center; padding: 8px; text-align: center; font-size: 11px; color: var(--muted); }
+.node .label { height: var(--label-height); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; line-height: 1.2; white-space: nowrap; }
+/* A tab's first page has its bar under the image (3px down, 3px tall): its name from under the bar, the state's under that, past the label's room. */
+.node.tabbed .label { justify-content: flex-start; padding-top: 7px; }
+/* Another state than its first: named under the page's name. */
+.node .label small { font-size: 10px; color: var(--accent); }
+.node .label small:empty { display: none; }
+.node.other-state .img { border-color: var(--accent); }
+/* Far out, the sections' names to go into, of a size to read. */
+.island-chip { position: absolute; display: none; transform-origin: 0 0; transform: scale(var(--inv, 1)); z-index: 2; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text); font: 600 14px/1.4 inherit; padding: 4px 14px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.12); white-space: nowrap; }
+.island-chip:hover { border-color: var(--accent); color: var(--accent); }
+#canvas.far .island-chip { display: block; }
+#canvas.far .island-name { visibility: hidden; }
+.node:hover .img { border: 2px solid var(--accent); }
+.node:focus { outline: none; }
+.node:focus-visible .img { outline: 3px solid var(--accent); outline-offset: 2px; }
+.node.sel .img { border: 3px solid var(--accent); }
+/* Above the image, in the room the layout keeps there: the image stays readable. In one row no wider than the page (those past it in one +N), clear of the arrows meeting its top and of the labels (renderMark); where nothing there is clear, on the image's top edge, its status bar. */
+.node .marks { position: absolute; bottom: calc(100% + 4px); left: 0; display: flex; gap: 4px; }
+.node .marks.on-image { bottom: auto; top: 4px; }
+.node .marks:empty { display: none; }
+.mark { background: var(--accent-fill); color: #fff; border-radius: 999px; padding: 0 6px; font-size: 11px; line-height: 18px; white-space: nowrap; text-decoration: none; }
+a.mark::after { content: ' ↗'; }
+path.edge, g.lbl, g.entry, g.bundle, g.blbl { transition: opacity .3s; }
+/* A page chosen: it and the pages next to it, the rest faint. */
+#canvas.focusing .node:not(.near) { opacity: .25; }
+#canvas.focusing path.edge:not(.near), #canvas.focusing g.lbl:not(.near), #canvas.focusing g.entry:not(.near), #canvas.focusing g.bundle:not(.near), #canvas.focusing g.blbl:not(.near) { opacity: .12; }
+/* How much the map shows: the pages alone, with the arrows, or with what
+   each arrow says too. A page chosen, or a route, shows its own arrows
+   whatever; what they say, as much shows it: the card, or the route's
+   panel, says it as sentences. */
+#map-view[data-level="pages"] :is(path.edge, g.entry, g.bundle):not(.near),
+#map-view:is([data-level="pages"], [data-level="flow"]) :is(g.lbl, g.blbl, #over g.entry) { visibility: hidden; pointer-events: none; }
+#map-view[data-level="pages"] .legend { display: none; }
+/* The arrows back, hidden when the viewer chose so: those of a page chosen,
+   or of a route, stay. */
+#map-view.no-back :is(path.edge.pop, g.lbl.pop, g.bundle.pop, g.blbl.pop):not(.near) { visibility: hidden; pointer-events: none; }
+/* An arrow, or its label, tapped to read it: a wide line to tap, unseen. */
+#under path.hit { stroke: transparent; stroke-width: 14; stroke-dasharray: none; fill: none; pointer-events: stroke; cursor: pointer; }
+#over :is(g.lbl, g.blbl) { pointer-events: auto; cursor: pointer; }
+.tools { position: absolute; right: 12px; top: 12px; display: flex; gap: 4px; z-index: 2; }
+.tools button { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 8px; min-width: 32px; height: 32px; cursor: pointer; font-size: 16px; }
+.tools #routeOpen { font-size: 13px; padding: 0 12px; }
+/* Under the map: how much it shows, and what its lines are. */
+.bar { position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; pointer-events: none; }
+/* Each group whole on its line, to the next where it does not fit; one wider than the map, its buttons over lines. */
+.bar > * { pointer-events: auto; flex: none; max-width: 100%; }
+.levels { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 4px 4px 4px 12px; font-size: 12px; }
+.levels > span { color: var(--muted); margin-right: 4px; }
+/* How many pages a mark is on. */
+.levels button small { font-size: 11px; opacity: .75; }
+.levels button { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 4px; padding: 2px 12px; cursor: pointer; font: inherit; }
+.levels button[aria-pressed="true"] { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
+/* The conditions' values the map is shown while: a choice for each. */
+.levels label { display: inline-flex; align-items: center; gap: 4px; margin-right: 4px; }
+.levels select { font: inherit; padding: 1px 4px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--text); }
+.levels select.on { border-color: var(--accent); color: var(--accent); }
+#held-none, #held-busy { color: var(--muted); }
+/* What the app does not show while the conditions keep the values chosen:
+   gone, where it is, unless a page chosen or a route brings it out. */
+#canvas .held-out:not(.near) { visibility: hidden; pointer-events: none; }
+.legend { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; }
+/* On a phone, all this behind one button (#bar-open). */
+#bar-open { display: none; }
+.legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid currentColor; vertical-align: middle; margin-right: 4px; }
+.legend i.dash { border-top-style: dashed; }
+.legend i.dot { border-top-style: dotted; }
+.legend button { border: 0; background: none; color: inherit; font: inherit; padding: 0; cursor: pointer; }
+.legend button[aria-pressed="false"] { opacity: .45; text-decoration: line-through; }
+/* The chosen page, beside the map. */
+/* Its body scrolls; what can be done with the page stays at its foot. */
+#card { position: absolute; right: 12px; bottom: 12px; z-index: 3; width: 320px; max-height: calc(100% - 68px); flex-direction: column; overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.18); display: none; cursor: auto; }
+#card.on { display: flex; }
+#card .card-body { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 12px 16px; }
+#card h3 { margin: 0 0 2px; font-size: 15px; }
+#card .close { float: right; margin-left: 8px; }
+#card .actions { flex: none; display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 16px; border-top: 1px solid var(--line); }
+#card .memo { background: var(--bg); }
+/* The transitions, as sentences: their words in line with the headings, the hover past them. */
+#card h4 { margin: 12px 0 4px; font-size: 12px; color: var(--muted); font-weight: 600; }
+ul.says { margin: 0; padding: 0; list-style: none; font-size: 13px; }
+ul.says li { margin: 2px 0; }
+ul.says a { display: block; margin: 0 -8px; padding: 4px 8px; border-radius: 8px; color: var(--text); text-decoration: none; cursor: pointer; }
+ul.says a:hover { background: var(--hover); }
+#route ol code, ul.says code { font-size: 11px; }
+/* Which of the page's states the map shows. */
+.card-states { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 0; }
+.card-states button { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); padding: 3px; cursor: pointer; font: inherit; font-size: 11px; max-width: 76px; }
+.card-states button[aria-pressed="true"] { border-color: var(--accent); outline: 1px solid var(--accent); }
+.card-states img { width: 40px; height: 64px; object-fit: cover; object-position: top; border-radius: 3px; }
+/* The route between two pages, beside the map. */
+#route { position: absolute; left: 12px; top: 12px; z-index: 3; width: 340px; max-height: calc(100% - 72px); overflow: auto; overscroll-behavior: contain; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 12px 16px; display: none; cursor: auto; }
+#route.on, #route.busy { display: block; }
+#route h3 { margin: 0 0 8px; font-size: 15px; }
+#route .close { float: right; }
+#route .pick { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+#route select { font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); min-width: 0; }
+#route .row-actions { display: flex; gap: 8px; margin: 8px 0; }
+#route ol { margin: 0; padding-left: 20px; font-size: 13px; }
+#route li { margin: 4px 0; }
+#route li small { display: block; color: var(--muted); }
+/* tree: the pages top to bottom, scrolled, larger or smaller */
+.tree-wrap { position: relative; }
+#tree-view { height: calc(100vh - var(--header-h, 52px)); height: calc(100dvh - var(--header-h, 52px)); overflow: auto; overscroll-behavior: contain; }
+/* Narrower than the view, in its middle. */
+#tree-sizer { position: relative; margin: 0 auto; }
+#tree-canvas { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+#tree-canvas svg { position: absolute; left: 0; top: 0; overflow: visible; }
+#tree-canvas path { fill: none; stroke: var(--e-sheet); stroke-width: 1.5; }
+.tlabel { position: absolute; transform: translate(-50%, -50%); background: var(--surface); border-radius: 4px; padding: 0 4px; font-size: 11px; line-height: 17px; color: var(--muted); white-space: nowrap; }
+.tlabel .l-does, .tlabel.tab { color: var(--text); }
+.tlabel .l-kind { font-style: italic; }
+.tree-outside { position: absolute; font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+/* list */
+.wrap { padding: 16px; max-width: 1200px; margin: 0 auto; }
+h2 { font-size: 15px; margin: 24px 0 8px; color: var(--muted); }.row { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; margin-bottom: 12px; scroll-margin-top: 64px; }
+/* The tags under what is above them, as far as a memo is. */
+.row > header + .tags, #card-notes > .tags:first-child { margin-top: 8px; }
+.row.hit { outline: 3px solid var(--accent); }
+.row > header { position: static; padding: 0; border: 0; background: none; gap: 8px 12px; }
+.row h3 { font-size: 15px; margin: 0; }
+.row .actions { margin-left: auto; display: flex; gap: 6px; }
+.states { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
+/* As wide as its screen is to the first variant's (--k). */
+.states > * { max-width: 100%; }
+.state { width: calc(150px * var(--k, 1)); max-width: 100%; }
+.state img, .state .none { width: 100%; border: 1px solid var(--line); display: block; background: var(--bg); border-radius: 4px; }
+.state img { cursor: zoom-in; }
+.state .none { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; padding: 8px; text-align: center; overflow-wrap: anywhere; min-width: 0; }
+.state .none.error { color: var(--error); }
+.state .name { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.flows { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
+.flows h4 { margin: 4px 0; font-size: 12px; color: var(--muted); font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px 3px 3px; background: var(--bg); cursor: pointer; text-decoration: none; color: var(--text); font-size: 12px; }
+.chip:hover { border-color: var(--accent); }
+.chip img { width: 22px; height: 36px; object-fit: cover; object-position: top; border-radius: 3px; border: 1px solid var(--line); }
+.chip small { color: var(--muted); }
+.chip.entry { color: var(--e-entry); cursor: default; padding-left: 8px; }
+#nomatch { display: none; color: var(--muted); }
+/* table */
+table { border-collapse: collapse; width: 100%; background: var(--surface); }
+th, td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; font-size: 13px; }
+th { color: var(--muted); font-weight: 600; }
+td a { color: var(--accent); text-decoration: none; cursor: pointer; }
+tr.group td { border-top: 2px solid var(--line); }
+#edge-table:not(.filtering) tr.again td:first-child > * { visibility: hidden; }
+/* detail */
+#detail { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: none; z-index: 10; }
+#detail.on { display: block; }
+#detail .panel { position: absolute; right: 0; top: 0; bottom: 0; width: min(920px, 100%); background: var(--bg); overflow: auto; overscroll-behavior: contain; padding: 16px 24px; box-shadow: -4px 0 24px rgba(0,0,0,.2); }
+#detail .close { float: right; }
+#detail .state { width: calc(240px * var(--k, 1)); }
+/* An image, large. */
+#zoom { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none; z-index: 20; align-items: center; justify-content: center; flex-direction: column; gap: 8px; cursor: zoom-out; }
+#zoom.on { display: flex; }
+#zoom img { max-height: 88vh; max-width: 92vw; border-radius: 6px; background: var(--surface); }
+#zoom div { color: #fff; font-size: 13px; }
+.scroll { overflow-x: auto; }
+/* A phone: one column, the panels across the map. */
+.kind-inline { display: none; }
+@media (max-width: 640px) {
+  /* The header in two lines: the app's name and the views; the search. Its version and date behind its name. */
+  header { padding: 8px 12px; gap: 8px; }
+  header h1 { order: -2; flex: 1 1 auto; cursor: pointer; }
+  header h1::after { content: ' ▾'; font-size: 11px; color: var(--muted); }
+  body.meta-open header h1::after { content: ' ▴'; }
+  nav { order: -1; margin-left: 0; }
+  nav button { padding: 4px 8px; font-size: 13px; }
+  #meta { flex-basis: 100%; }
+  body:not(.meta-open) #meta { display: none; }
+  header input[type=search] { min-width: 0; flex: 1 1 140px; }
+  /* Of a size to tap. */
+  nav button, button.link, .levels button, .tools button, #bar-open { min-height: 36px; }
+  .tools button { min-width: 36px; }
+  /* Under the map, one button; what it holds, over the map when opened. */
+  #bar-open { display: block; border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 8px; padding: 0 12px; font: inherit; font-size: 12px; cursor: pointer; }
+  .bar:not(.open) > :not(#bar-open) { display: none !important; }
+  .flows { grid-template-columns: 1fr; }
+  #card { left: 12px; right: 12px; width: auto; bottom: calc(var(--bar-h, 32px) + 20px); max-height: 45%; }
+  #route { right: 12px; width: auto; max-height: 50%; }
+  .wrap { padding: 12px; }
+  /* The table's moves in its pages' column: most are none. */
+  th.kind, td.kind { display: none; }
+  .kind-inline { display: inline; }
+}
+/* On paper: the list, or the table, whole; the map is map.svg's, and from
+   the map or the tree, the list is printed. */
+@media print {
+  header input, header label, nav, .actions, .tools, #detail, #zoom, #route, #card { display: none !important; }
+  header { position: static; border: 0; }
+  body:is([data-view="map"], [data-view="tree"]) :is(#sec-map, #sec-tree) { display: none; }
+  body:is([data-view="map"], [data-view="tree"]) #sec-list { display: block; }
+  #nomatch { display: none !important; }
+  .row { break-inside: avoid; border-color: #bbb; }
+  .row.hit { outline: 0; }
+  tr { break-inside: avoid; }
+  .wrap { max-width: none; padding: 0; }
+}

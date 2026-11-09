@@ -485,6 +485,9 @@ class SheetMap {
         'height': _round(canvas.$2),
         // The page's label under its image, in each page's box below.
         'labelHeight': MapLayout.labelHeight,
+        // The room kept above each page's image, for what the HTML shows
+        // there.
+        'marksHeight': MapLayout.marksHeight,
       },
       // Each section's island on the map; unnamed for the pages without.
       'sections': _sections,

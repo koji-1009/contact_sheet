@@ -52,6 +52,8 @@ jobs:
       - uses: koji-1009/setup-flutter@158060745e545426c27a6e9814e5c5486a5f7dd8 # v1.4.2
       - run: dart pub get
       - run: dart run tool/gen_messages.dart
+      - run: dart run tool/gen_docs.dart
+      - run: dart run tool/gen_html.dart
       - run: dart run build_runner build
       - run: git diff --exit-code
 
@@ -63,3 +65,17 @@ jobs:
       - uses: koji-1009/setup-flutter@158060745e545426c27a6e9814e5c5486a5f7dd8 # v1.4.2
       - run: dart pub get
       - run: dart test
+
+  # The examples' sheets: lint has nothing to say of them but what they
+  # checked.
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: koji-1009/setup-flutter@158060745e545426c27a6e9814e5c5486a5f7dd8 # v1.4.2
+      - run: dart pub get
+      - run: dart run contact_sheet lint --fail example/shop_app
+      - run: dart run contact_sheet lint --fail example/notes_app
+      - run: dart run contact_sheet lint --fail example/tabs_app
+      - run: dart run contact_sheet lint --fail example/trips_app

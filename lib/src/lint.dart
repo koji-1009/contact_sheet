@@ -21,14 +21,21 @@ import 'package:contact_sheet/src/sheet.dart';
 ///   their values, or two for the same; the first page with none for the
 ///   launch's; an arrow whose `if` no history meets where it happens, or
 ///   that names in `when` a state its `if` leaves out;
+/// - an arrow whose `then` gives values of the conditions its `set` does
+///   not say; one without `then` that arrives in a state of `to` by the name
+///   of the state it leaves, not `to`'s first;
 /// - a tag no page has, or one most pages have that some do not; a path a
-///   tag's url is made with whose parameters have no values.
+///   tag's url is made with whose parameters have no values;
+/// - with [exists], which tells whether the app has a file (relative to it,
+///   with `/`): a `source` the app has no file of.
 ///
 /// The hints the sheet's `checked` names are looked at and kept as they
 /// are: left out. A key `checked` names that is no hint now is told.
-List<String> lintSheet(Sheet sheet, Messages m) => [
-  for (final hint in lintHints(sheet, m)) hint.message,
-];
+List<String> lintSheet(
+  Sheet sheet,
+  Messages m, {
+  bool Function(String file)? exists,
+}) => [for (final hint in lintHints(sheet, m, exists: exists)) hint.message];
 
 /// A hint of [lintSheet]'s: what it says, and the key the sheet's
 /// `checked` names it by once it is looked at; empty for one that cannot
@@ -42,31 +49,47 @@ class LintHint {
 
 /// [lintSheet]'s hints, with their keys: those the sheet's `checked` names
 /// left out, and one for each key it names that is no hint now.
-List<LintHint> lintHints(Sheet sheet, Messages m) {
-  final all = _hints(sheet, m);
+List<LintHint> lintHints(
+  Sheet sheet,
+  Messages m, {
+  bool Function(String file)? exists,
+}) => lintReport(sheet, m, exists: exists).hints;
+
+/// [lintHints], and how many hints the sheet's `checked` leaves out, from
+/// one look at the sheet.
+({List<LintHint> hints, int checked}) lintReport(
+  Sheet sheet,
+  Messages m, {
+  bool Function(String file)? exists,
+}) {
+  final all = _hints(sheet, m, exists);
   final keys = {for (final hint in all) hint.key};
-  return [
-    for (final hint in all)
-      if (!sheet.checked.contains(hint.key)) hint,
-    for (final key in sheet.checked)
-      if (!keys.contains(key)) LintHint('', m.lintCheckedGone(jsonEncode(key))),
-  ];
+  return (
+    hints: [
+      for (final hint in all)
+        if (!sheet.checked.contains(hint.key)) hint,
+      for (final key in sheet.checked)
+        if (!keys.contains(key))
+          LintHint('', m.lintCheckedGone(jsonEncode(key))),
+    ],
+    checked: all.where((h) => sheet.checked.contains(h.key)).length,
+  );
 }
 
-/// [lintHints] as the command tells them: each, and under it the key to
-/// add to `checked` once it is looked at, quoted as YAML takes it.
-List<String> lintLines(Sheet sheet, Messages m) => [
-  for (final hint in lintHints(sheet, m)) ...[
+/// [hints] as the command tells them: each, and under it the key to add to
+/// `checked` once it is looked at, quoted as YAML takes it.
+List<String> lintLines(List<LintHint> hints, Messages m) => [
+  for (final hint in hints) ...[
     hint.message,
     if (hint.key.isNotEmpty) m.lintKey(jsonEncode(hint.key)),
   ],
 ];
 
-/// How many of [sheet]'s hints its `checked` leaves out.
-int checkedHints(Sheet sheet, Messages m) =>
-    _hints(sheet, m).where((h) => sheet.checked.contains(h.key)).length;
-
-List<LintHint> _hints(Sheet sheet, Messages m) {
+List<LintHint> _hints(
+  Sheet sheet,
+  Messages m,
+  bool Function(String file)? exists,
+) {
   final findings = <LintHint>[];
   if (sheet.pages.isEmpty) return findings;
   final reached = <String>{
@@ -194,11 +217,87 @@ List<LintHint> _hints(Sheet sheet, Messages m) {
   }
   return [
     ...findings,
+    ..._lintArrivals(sheet, m),
     ..._lintConditions(sheet, m, reached),
     ..._lintTabs(sheet, m),
     ..._lintTags(sheet, m),
+    if (exists != null) ..._lintFiles(sheet, m, exists),
   ];
 }
+
+/// The hints of where arrows arrive by what is not written: a `then` that
+/// gives values of the conditions its `set` does not say; an arrow without
+/// `then` that arrives, from a state of its `from`, in the state of `to` of
+/// that name, not `to`'s first (another page's state of the name is taken
+/// for it).
+List<LintHint> _lintArrivals(Sheet sheet, Messages m) {
+  final findings = <LintHint>[];
+  String said(Map<String, String> values) =>
+      [for (final MapEntry(:key, :value) in values.entries) '$key: $value']
+          .join(', ');
+  final told = <String>{};
+  for (final e in sheet.edges) {
+    final to = sheet.pageOf(e.to)!;
+    SheetState? stateOf(String name) =>
+        to.states.where((s) => s.name == name).firstOrNull;
+    for (final then in {?e.then, ...e.thenBy.values}) {
+      final unsaid = {
+        for (final MapEntry(:key, :value)
+            in (stateOf(then)?.conditions ?? const {}).entries)
+          if (e.sets[key] != value) key: value,
+      };
+      if (unsaid.isNotEmpty && told.add('then-sets ${e.item} $then')) {
+        findings.add(
+          LintHint(
+            'then-sets ${e.key} $then',
+            m.lintThenSets(e.item, then, said(unsaid)),
+          ),
+        );
+      }
+    }
+    if (e.then != null || e.from == e.to) continue;
+    final from = sheet.pageOf(e.from)!;
+    final arrivals = sheet.arrivals(e);
+    for (final state in from.states) {
+      if (e.thenBy.containsKey(state.name)) continue;
+      final same = stateOf(state.name);
+      // Where the name alone takes it: not to a state it would arrive in
+      // as not said (the first, a data state, one of the conditions).
+      if (same == null ||
+          same == to.states.first ||
+          same.data ||
+          same.conditions.isNotEmpty ||
+          !(arrivals[state.name]?.contains(same.name) ?? false)) {
+        continue;
+      }
+      findings.add(
+        LintHint(
+          'by-name ${e.key} ${state.name}',
+          m.lintByName(e.item, from.label, state.name, to.label),
+        ),
+      );
+    }
+  }
+  return findings;
+}
+
+/// The hints of the files the sheet names as where the code is (each
+/// `source`): one the app does not have, by [exists].
+List<LintHint> _lintFiles(
+  Sheet sheet,
+  Messages m,
+  bool Function(String file) exists,
+) => [
+  for (final file in <String>{
+    for (final page in sheet.pages) ?page.source,
+    for (final e in sheet.edges) ?e.source,
+    for (final e in sheet.entries) ?e.source,
+    for (final d in sheet.dependencies) ?d.source,
+    for (final c in sheet.conditions) ?c.source,
+    for (final bar in sheet.tabBars) ?bar.source,
+  })
+    if (!exists(file)) LintHint('no-file $file', m.lintNoFile(file)),
+];
 
 /// The hints of the tags: one no page has (nor a state of it); one most
 /// pages have (three quarters or more), the pages without it named; a path

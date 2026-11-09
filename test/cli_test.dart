@@ -136,6 +136,24 @@ void main() {
     expect(out.last, 'It is there already: nothing written');
   });
 
+  test('init --package overrides what the app overrides, its paths from the '
+      'sheet package', () async {
+    File('${app.path}/pubspec.yaml').writeAsStringSync('''
+name: shop
+dependency_overrides:
+  local: {path: packages/local}
+  far: {path: /opt/far}
+  pinned: 1.2.3
+''');
+    expect(await cli(['init', '--package', app.path]), 0);
+    final pubspec = File('${app.path}/contact_sheet/pubspec.yaml')
+        .readAsStringSync();
+    expect(pubspec, contains('dependency_overrides:\n'));
+    expect(pubspec, contains('  local: {"path":"../packages/local"}\n'));
+    expect(pubspec, contains('  far: {"path":"/opt/far"}\n'));
+    expect(pubspec, contains('  pinned: "1.2.3"\n'));
+  });
+
   test('export without a sheet says to write one', () async {
     expect(await cli(['export', app.path]), 66);
     expect(err.single, startsWith('There is no contact_sheet/sheet.yaml'));
@@ -273,7 +291,7 @@ void main() {
     expect(await cli(['export', app.path]), 65);
     expect(
       err.last,
-      'contact_sheet/sheet.yaml, sheet.yaml.locale: fr is not a language the '
+      'contact_sheet/sheet.yaml, line 1, sheet.yaml.locale: fr is not a language the '
       'map is drawn in: en, ja',
     );
   });
@@ -376,6 +394,29 @@ checked: ["unreachable b"]
     out.clear();
     expect(await cli(['lint', app.path]), 0);
     expect(out, ['Nothing found in the sheet but the hints in checked: 1']);
+    expect(await cli(['lint', '--fail', app.path]), 0);
+  });
+
+  test('lint --fail fails while there is a hint; lint tells a source the app '
+      'has no file of', () async {
+    File('${app.path}/lib/home.dart')
+      ..createSync(recursive: true)
+      ..writeAsStringSync('// home\n');
+    File('${app.path}/contact_sheet/sheet.yaml')
+      ..createSync(recursive: true)
+      ..writeAsStringSync('''
+pages:
+  - {id: home, label: Home, source: lib/home.dart, states: [{name: s}]}
+  - {id: cart, label: Cart, source: lib/cart.dart, states: [{name: s}]}
+edges:
+  - {from: home, to: cart, trigger: text:Cart}
+''');
+    expect(await cli(['lint', app.path]), 0);
+    expect(await cli(['lint', '--fail', app.path]), 65);
+    expect(
+      out.last,
+      '  looked at, and kept as it is: add "no-file lib/cart.dart" to checked',
+    );
   });
 
   test('flutter pub get that fails is told with what it said; an error no '

@@ -63,6 +63,10 @@ abstract class Messages {
   String lintTwoStatesUnder(Object first, Object second, Object page);
   String lintIfExcludesWhen(Object item, Object state);
   String lintGuardUnsatisfied(Object item, Object page);
+  String lintThenSets(Object item, Object state, Object values);
+  String lintByName(Object item, Object page, Object state, Object to);
+  String lintNoFile(Object file);
+  String get helpFail;
   String lintOneTab(Object bar);
   String lintTabEdge(Object item);
   String lintNotInTab(Object item, Object page);
@@ -105,6 +109,7 @@ abstract class Messages {
   String sheetNotYaml(Object error);
   String sheetNotYamlAt(Object line, Object column, Object error);
   String sheetInvalid(Object where, Object problem);
+  String sheetInvalidAt(Object line, Object where, Object problem);
   String get sheetNotMap;
   String get sheetNotList;
   String get sheetNotText;
@@ -230,6 +235,7 @@ abstract class Messages {
   String get htmlAsLeft;
   String htmlRouteTabs(Object tabs);
   String get htmlRouteBounded;
+  String htmlRouteAtLeast(Object count);
   String get htmlRouteUnsearched;
   String htmlSetting(Object values);
   String htmlRouteUnder(Object pages);
@@ -245,6 +251,10 @@ abstract class Messages {
   String get htmlHeldNone;
   String get htmlHeldBusy;
   String get htmlRouteBusy;
+  String htmlFailed(Object error);
+  String get htmlLevelsAbout;
+  String get htmlNotesAbout;
+  String get htmlLegendAbout;
 }
 
 class MessagesEn extends Messages {
@@ -361,11 +371,11 @@ class MessagesEn extends Messages {
 
   @override
   String lintSplitEdge(Object first, Object second) =>
-      "edges[${second}] is edges[${first}] in other states: one edge, its when both's states, its then by the state it leaves";
+      "edges[${second}] is edges[${first}] in other states. Write them as one edge: its when both's states, its then by the state it leaves";
 
   @override
   String lintUnarrivedState(Object state, Object page) =>
-      "${state} of ${page}: no arrow arrives in it and no deep link opens it (a then, or the state left having its name), nor is it data: true (what the page loads decides it): the map shows it only when it is chosen";
+      "${state} of ${page}: no arrow arrives in it (by a then, or from a state of its name) and no deep link opens it. Nor is it data: true (what the page loads decides it). The map shows it only when it is chosen";
 
   @override
   String lintDuplicateEntry(Object first, Object second) =>
@@ -404,11 +414,26 @@ class MessagesEn extends Messages {
 
   @override
   String lintIfExcludesWhen(Object item, Object state) =>
-      "edges[${item}]: ${state} is a state of other values than its if: it does not happen in it";
+      "edges[${item}]: ${state} is a state of other values than its if. The edge does not happen in it";
 
   @override
   String lintGuardUnsatisfied(Object item, Object page) =>
       "edges[${item}] from ${page}: no way through the app reaches it there while its if holds";
+
+  @override
+  String lintThenSets(Object item, Object state, Object values) =>
+      "edges[${item}]: its then, ${state}, gives ${values}, which its set does not say. If the code gives them, write them in set";
+
+  @override
+  String lintByName(Object item, Object page, Object state, Object to) =>
+      "edges[${item}] from ${page}: it has no then, so leaving ${state} it arrives in ${to}'s ${state}, by the name. If they are not the same state, write then";
+
+  @override
+  String lintNoFile(Object file) =>
+      "${file}: the sheet names it as where the code is, and the app has no such file";
+
+  @override
+  String get helpFail => "Fail (exit code 65) when there is a hint.";
 
   @override
   String lintOneTab(Object bar) => "tabs[${bar}]: a bar of one tab";
@@ -561,6 +586,10 @@ class MessagesEn extends Messages {
   @override
   String sheetInvalid(Object where, Object problem) =>
       "contact_sheet/sheet.yaml, ${where}: ${problem}";
+
+  @override
+  String sheetInvalidAt(Object line, Object where, Object problem) =>
+      "contact_sheet/sheet.yaml, line ${line}, ${where}: ${problem}";
 
   @override
   String get sheetNotMap => "should be a map (key: value)";
@@ -968,6 +997,10 @@ class MessagesEn extends Messages {
       "None within the pages followed in each tab's history: the app may have one through a tab left deeper.";
 
   @override
+  String htmlRouteAtLeast(Object count) =>
+      "None within the pages followed in each tab's history: the app may have one through a tab left deeper, of ${count} steps or more.";
+
+  @override
   String get htmlRouteUnsearched =>
       "Too many histories to search to the end: the app may have a route here, or a shorter one.";
 
@@ -1014,6 +1047,21 @@ class MessagesEn extends Messages {
 
   @override
   String get htmlRouteBusy => "Finding the route…";
+
+  @override
+  String htmlFailed(Object error) => "It could not be worked out: ${error}";
+
+  @override
+  String get htmlLevelsAbout =>
+      "How much the map shows: the pages alone, with the arrows between them, or with what each arrow says too";
+
+  @override
+  String get htmlNotesAbout =>
+      "What is shown above each page that has it: its memo, or a tag. The number is how many pages have it";
+
+  @override
+  String get htmlLegendAbout =>
+      "What the lines are. Tap Back to show or hide the arrows back";
 }
 
 class MessagesJa extends Messages {
@@ -1120,7 +1168,7 @@ class MessagesJa extends Messages {
 
   @override
   String lintSplitEdge(Object first, Object second) =>
-      "edges[${second}] は edges[${first}] の別の状態の場合です: 1 つの辺にして、when に両方の状態を、then に出ていく状態ごとの到着先を書けます";
+      "edges[${second}] は edges[${first}] の別の状態の場合です。1 つの辺にして、when に両方の状態を、then に出ていく状態ごとの到着先を書けます";
 
   @override
   String lintUnarrivedState(Object state, Object page) =>
@@ -1168,6 +1216,21 @@ class MessagesJa extends Messages {
   @override
   String lintGuardUnsatisfied(Object item, Object page) =>
       "edges[${item}]（${page} から）: if が成り立つときにこの画面へたどり着く道がありません";
+
+  @override
+  String lintThenSets(Object item, Object state, Object values) =>
+      "edges[${item}]: then の ${state} は ${values} にしますが、set には書かれていません。コードがその値にするなら、set に書いてください";
+
+  @override
+  String lintByName(Object item, Object page, Object state, Object to) =>
+      "edges[${item}]（${page} から）: then がないので、${state} から出ると、名前が同じ ${to} の ${state} に着きます。同じ状態でないなら、then を書いてください";
+
+  @override
+  String lintNoFile(Object file) =>
+      "${file}: sheet がコードの場所として書いていますが、アプリにそのファイルはありません";
+
+  @override
+  String get helpFail => "ヒントがあるときは失敗する（終了コード 65）";
 
   @override
   String lintOneTab(Object bar) => "tabs[${bar}]: タブが 1 つしかないタブバーです";
@@ -1316,6 +1379,10 @@ class MessagesJa extends Messages {
   @override
   String sheetInvalid(Object where, Object problem) =>
       "contact_sheet/sheet.yaml の ${where}: ${problem}";
+
+  @override
+  String sheetInvalidAt(Object line, Object where, Object problem) =>
+      "contact_sheet/sheet.yaml の ${line} 行目、${where}: ${problem}";
 
   @override
   String get sheetNotMap => "マップ（キー: 値）にしてください";
@@ -1710,6 +1777,10 @@ class MessagesJa extends Messages {
       "各タブの履歴をたどる範囲には経路がありません。より深く離れたタブを経由すれば、アプリには経路があるかもしれません。";
 
   @override
+  String htmlRouteAtLeast(Object count) =>
+      "各タブの履歴をたどる範囲には経路がありません。より深く離れたタブを経由すれば、${count} ステップ以上の経路があるかもしれません。";
+
+  @override
   String get htmlRouteUnsearched =>
       "履歴が多すぎて最後まで調べていません。アプリにはここへの経路、またはより短い経路があるかもしれません。";
 
@@ -1755,4 +1826,16 @@ class MessagesJa extends Messages {
 
   @override
   String get htmlRouteBusy => "経路を調べています…";
+
+  @override
+  String htmlFailed(Object error) => "求められませんでした: ${error}";
+
+  @override
+  String get htmlLevelsAbout => "地図に何を出すか: 画面だけ、画面の間の矢印も、矢印ごとの操作も";
+
+  @override
+  String get htmlNotesAbout => "それがある画面の上に出すもの: メモ、またはタグ。数はそれがある画面の数です";
+
+  @override
+  String get htmlLegendAbout => "線の意味。「戻る」を押すと、戻る矢印を出したり隠したりします";
 }

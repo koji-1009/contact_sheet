@@ -189,6 +189,34 @@ class MapLayout {
 
       seeds.forEach(reach);
       if (depth.isEmpty) reach([pages.first.id]);
+      // The pages of one depth more than a column holds: in columns side by
+      // side, [columnRows] pages each, the first pages of a bar's tabs
+      // together in the first. One that holds them is a column as it is.
+      final byDepth = <int, List<SheetPage>>{};
+      for (final page in pages) {
+        if (depth[page.id] case final d?) (byDepth[d] ??= []).add(page);
+      }
+      final columnOf = <String, int>{};
+      var columnCount = 0;
+      for (var d = 0; byDepth.containsKey(d); d++) {
+        final all = byDepth[d]!;
+        final tabs = [
+          for (final p in all)
+            if (sheet.tabOf(p.id) != null) p,
+        ];
+        final rows = math.max(columnRows, tabs.length);
+        final laid = all.length <= rows
+            ? all
+            : [
+                ...tabs,
+                for (final p in all)
+                  if (sheet.tabOf(p.id) == null) p,
+              ];
+        for (final (i, page) in laid.indexed) {
+          columnOf[page.id] = columnCount + i ~/ rows;
+        }
+        columnCount += (laid.length + rows - 1) ~/ rows;
+      }
       // The pages' first row has the room the rows below have in rowGap.
       final first = (name.isEmpty ? 0 : sectionLabelHeight) + marksHeight;
       final local = <String, Box>{};
@@ -196,7 +224,7 @@ class MapLayout {
       // Each column as wide as its widest page, the others in its middle.
       final widths = <int, double>{};
       for (final page in pages) {
-        if (depth[page.id] case final column?) {
+        if (columnOf[page.id] case final column?) {
           widths[column] = math.max(widths[column] ?? 0, sizeOf(page).$1);
         }
       }
@@ -212,7 +240,7 @@ class MapLayout {
       }
 
       for (final page in pages) {
-        final column = depth[page.id];
+        final column = columnOf[page.id];
         if (column == null) continue;
         final box = place(
           page,
@@ -347,7 +375,8 @@ class MapLayout {
     for (final MapEntry(key: (to, _, _), value: edges) in jumpsInto.entries) {
       bundles.add((to: to, edges: edges));
     }
-    // Room for the arrows that go back over the top or round the side, and
+    // Room for the arrows that go back over the top or round the side, all
+    // along them (over the top, a curve is highest past its middle), and
     // for the short arrows' labels above the pages.
     final placed = MapLayout._(
       nodes,
@@ -365,10 +394,12 @@ class MapLayout {
       final curve = placed.curveOf(e);
       if (curve == null) continue;
       final (s, c1, c2, end) = curve;
-      final mid = bezier(s, c1, c2, end, 0.5);
-      top = math.min(top, mid.y - 20);
-      right = math.max(right, mid.x + margin);
-      bottom = math.max(bottom, mid.y + 20);
+      for (var i = 1; i < 32; i++) {
+        final p = bezier(s, c1, c2, end, i / 32);
+        top = math.min(top, p.y - 20);
+        right = math.max(right, p.x + margin);
+        bottom = math.max(bottom, p.y + 20);
+      }
     }
     for (final entry in sheet.entries) {
       final (s, _) = placed.entryOf(entry);
@@ -420,6 +451,10 @@ class MapLayout {
   static const double sectionLabelHeight = 24;
   static const double sectionGap = 56;
   static const double islandPadding = 16;
+
+  /// How many pages one column holds: more of one depth (a page that leads
+  /// to many) go on in the columns beside it.
+  static const columnRows = 4;
 
   /// Room above each page's image for the HTML's marks (a memo, tags),
   /// drawn there and not on the image, but where arrows or labels take all
@@ -850,17 +885,21 @@ class MapLayout {
       box.overlap(const Box(0, 0, double.infinity, double.infinity));
 
   /// Where each arrow's [labelOf] goes: on its curve, beside it, or a little
-  /// above or below it; where it covers the fewest labels placed before it
-  /// and those to [avoid] (above all, the deep links'), and pages, and stays
-  /// near its line.
+  /// above or below it; where it covers the fewest other labels and those
+  /// to [avoid] (above all, the deep links'), and pages, and stays near its
+  /// line. The shortest arrows first, as they have the least room; then
+  /// each label that covers another, or a page, placed again, the others
+  /// where they are.
   Map<SheetEdge, Box> placeEdgeLabels(
     String? Function(SheetEdge) labelOf,
     (double, double) Function(String) sizeOf, {
     Iterable<Box> avoid = const [],
   }) {
-    final placed = <SheetEdge, Box>{};
     final pages = _keepOff(sizeOf);
     final entries = avoid.toList();
+    // Each arrow with a label: where it may go, and its cost there.
+    final choices = <SheetEdge, (List<Point>, double, double, List<Point>)>{};
+    final lengths = <SheetEdge, double>{};
     for (final edge in _sheet.edges) {
       final label = labelOf(edge);
       final curve = curveOf(edge);
@@ -868,11 +907,27 @@ class MapLayout {
       final (s, c1, c2, e) = curve;
       final (w, h) = sizeOf(label);
       final line = [for (var i = 1; i < 20; i++) bezier(s, c1, c2, e, i / 20)];
+      var length = 0.0;
+      for (var i = 1; i < line.length; i++) {
+        length += line[i].distanceTo(line[i - 1]);
+      }
+      lengths[edge] = length;
       final side = Point(w / 2 + 6, 0);
       final step = Point(0, h + 2);
       // A jump's label starts where its short arrow ends, as it reads on:
       // centred on so short an arrow, it would lie over its own page.
       final ahead = e + Point(w / 2 + 4, 0);
+      // Along a long arrow, nearer its ends too, where there may be room.
+      final along = [
+        0.5,
+        0.4,
+        0.6,
+        0.3,
+        0.7,
+        0.2,
+        0.8,
+        if (length > maxColumnGap * 2) ...[0.1, 0.9],
+      ];
       final candidates = jumps.contains(edge)
           ? [
               ahead,
@@ -882,7 +937,7 @@ class MapLayout {
               ],
             ]
           : [
-              for (final t in [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8])
+              for (final t in along)
                 for (final p in [bezier(s, c1, c2, e, t)]) ...[
                   p,
                   p + side,
@@ -893,19 +948,46 @@ class MapLayout {
                   ],
                 ],
             ];
+      choices[edge] = (candidates, w, h, line);
+    }
+    final order = choices.keys.toList();
+    final at = {for (final (i, e) in _sheet.edges.indexed) e: i};
+    order.sort((a, b) {
+      final by = lengths[a]!.compareTo(lengths[b]!);
+      return by != 0 ? by : at[a]!.compareTo(at[b]!);
+    });
+    final placed = <SheetEdge, Box>{};
+    Box place(SheetEdge edge) {
+      final (candidates, w, h, line) = choices[edge]!;
+      final others = [
+        for (final MapEntry(:key, :value) in placed.entries)
+          if (key != edge) value,
+      ];
       double away(Box box) => line.map(box.center.distanceTo).reduce(math.min);
-      placed[edge] = _cheapest(
+      return _cheapest(
         candidates,
         w,
         h,
         (box) =>
             _offMap(box) * 8 +
-            (_overlap(box, placed.values) + _overlap(box, entries)) * 4 +
+            (_overlap(box, others) + _overlap(box, entries)) * 4 +
             _overlap(box, pages) +
             away(box) * h,
       );
     }
-    return placed;
+
+    for (final edge in order) {
+      placed[edge] = place(edge);
+    }
+    for (final edge in order) {
+      final box = placed[edge]!;
+      final covers =
+          _overlap(box, pages) > 0 ||
+          placed.entries.any((o) => o.key != edge && box.overlap(o.value) > 0);
+      if (covers) placed[edge] = place(edge);
+    }
+    // In the sheet's order, as the map draws them.
+    return {for (final edge in _sheet.edges) edge: ?placed[edge]};
   }
 
   /// Of a [w] by [h] label centred at each of [candidates], the first that

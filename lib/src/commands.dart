@@ -255,7 +255,9 @@ class _ExportCommand extends _AppCommand {
 }
 
 class _LintCommand extends _AppCommand {
-  _LintCommand(super.m);
+  _LintCommand(super.m) {
+    argParser.addFlag('fail', negatable: false, help: m.helpFail);
+  }
 
   @override
   String get name => 'lint';
@@ -266,15 +268,17 @@ class _LintCommand extends _AppCommand {
   @override
   Future<int> runOn(SheetRepo repo) async {
     final sheet = SheetExport(repo, m: m).readSheet();
-    final lines = lintLines(sheet, m);
-    final checked = checkedHints(sheet, m);
+    final (:hints, :checked) = lintReport(sheet, m, exists: repo.hasFile);
+    final lines = lintLines(hints, m);
     lines.forEach(cli.out);
     if (lines.isEmpty) {
       cli.out(checked > 0 ? m.lintOnlyChecked(checked) : m.lintNone);
     } else if (checked > 0) {
       cli.out(m.lintChecked(checked));
     }
-    return ExitCode.success.code;
+    return hints.isNotEmpty && argResults!.flag('fail')
+        ? ExitCode.data.code
+        : ExitCode.success.code;
   }
 }
 

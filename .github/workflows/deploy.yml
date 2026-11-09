@@ -1,11 +1,13 @@
 name: Deploy
 
 # The example apps' maps, exported with shutter from their sheets, on GitHub
-# Pages, from main.
+# Pages, from main. A pull request exports them too, with shutter as it is,
+# and puts nothing on Pages.
 on:
   push:
     branches:
       - main
+  pull_request:
   workflow_dispatch:
 
 concurrency:
@@ -34,7 +36,8 @@ jobs:
           path: site
 
   deploy:
-    # Started by hand on another branch: exported, not put on Pages.
+    # A pull request, or started by hand on another branch: exported, not put
+    # on Pages.
     if: github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-slim

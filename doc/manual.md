@@ -100,14 +100,18 @@ An edge's `key` (which transition it is, in `sheet.json`) is not written: Contac
 An arrow arrives in:
 
 1. the state its `then` names;
-2. else the state of `to` of the name of the state it leaves, as what the user does not change stays (a full cart stays full), if the conditions after it allow that state;
-3. else, as not said: `to`'s first state, its `data` states, and its states of the conditions, those the conditions after it allow.
+2. else the state of `to` that has the name of the state it leaves, if the conditions after it allow that state. What the user does not change stays: a full cart stays full;
+3. else, as not said: `to`'s first state, its `data` states, and its states of the conditions. Of those, the ones the conditions after it allow.
 
 On the map, an arrow's end shows the state it arrives in from the state chosen on its page; where it is not said, the first of those it can arrive in. The route between two pages takes the one the conditions' values are then: the first state, or any `data` state.
 
 #### The back
 
-Every page put over another (by a `push` or a `redirect`) goes back to the page under it by its back, and that back is not written. The page under shows in the state of the name the page above was in (full above, full below), else in the state it was in, each if the conditions now allow it, else as not said (logged in above, the page under shows logged in).
+Every page put over another (by a `push` or a `redirect`) goes back to the page under it by its back, and that back is not written. The page under shows in:
+
+1. the state that has the name of the state the page above was in (full above, full below), if the conditions now allow it;
+2. else the state it was in, if the conditions now allow it;
+3. else as not said (logged in above, the page under shows logged in).
 
 With nothing under it, a page's back goes to its `parent`, where it has one, and otherwise nowhere.
 
@@ -272,7 +276,7 @@ And in every view:
 - **The route between two pages**: the fewest steps from one to the other as the app's navigator goes, each as a sentence (see "The route").
 - **A page's details**, and each image opening large.
 - **Search**: pages by their names, memo, states, tags (their names and values) and what is done on them (a button's words find its page). The table narrows as it is typed.
-- **How much the map shows**, chosen under it: the pages alone (the default), with the arrows, or with what each arrow says; and the arrows back, shown or hidden (tapping "Back" in the legend). A page chosen, or a route, shows its own arrows whatever is chosen, and beside the map says them as sentences.
+- **How much the map shows**, chosen under it: the pages alone, with the arrows (the default), or with what each arrow says; and the arrows back, shown or hidden (tapping "Back" in the legend). A page chosen, or a route, shows its own arrows whatever is chosen, and beside the map says them as sentences.
 - **What is shown on the pages** ("On pages"), a mark above each page that has it and beside a page chosen: its memo and each tag, each shown when chosen (none is, at first), each button with how many pages have it. Above a page, they are one row no wider than it, those past it one `+<n>`, clear of the arrows and labels there; where those take all the room above, on the top edge of its image.
 - **What the app shows while conditions keep values** ("While"), with `conditions`, chosen under the map, a value or any for each (any, at first: the whole map): only the pages, each in the first state the app shows it in, the transitions and the deep links the app shows while the values chosen stay so (what a guest sees, never signed in). It launches with them (the other conditions as at launch, changing as they do), or opens by a deep link while they are so, and nothing that would change them happens. The rest is gone where it is, the pages keeping their places; a page chosen, or a route, still brings out its own. A route starts with those values, unless it names its own. A back takes back the transition that put the page there, and a switch goes to a page as the tab was left at it, under the values another tab came to meanwhile, each in the state those give: a page the app shows is never left out, and one is shown that the app does not show only where what two tabs' histories hold goes together with no condition saying so.
 - **Variants**, chosen in the header ("Shown as"): every image follows, and the map and the tree are laid out again, each page's box its screen at the scale the first variant's is drawn at.
@@ -283,21 +287,22 @@ And in every view:
   - `#map/<page id>`, `#map/<page id>/<state>`;
   - `#route/<from>/<to>`, `#route/<from>/<state>/<to>`, each followed by `/<condition>=<value>` for each value chosen;
   - `#tree/<page id>`, `#list/<page id>`, `#page/<page id>` (its details), `#table`;
-  - before them: `?variant=<name>`, with variants (none: the first); `?show=flow` or `?show=actions`, for how much the map shows (none: the pages alone); `?dev`, for developers; and `?with=<key>`, once for each of what is shown of the arrows back (`back`), the memo (`memo`) and the tags (`tag:<name>`): only those it names are shown, and their buttons pressed; `?if=<condition>=<value>`, once for each value the map is shown while (an `=` in a name escaped).
+  - before them: `?variant=<name>`, with variants (none: the first); `?show=pages` or `?show=actions`, for how much the map shows (none: with the arrows); `?dev`, for developers; and `?with=<key>`, once for each of what is shown of the arrows back (`back`), the memo (`memo`) and the tags (`tag:<name>`): only those it names are shown, and their buttons pressed; `?if=<condition>=<value>`, once for each value the map is shown while (an `=` in a name escaped).
 
 ### The route
 
 The route follows the states (from a state, only what can happen in it), the conditions (`if`, `set`) and the history (`kind`, and the back of every page put over another).
 
-It starts with the history the fewest steps from the app's launch reach the first page with, in the state and under the conditions' values chosen beside it. The launch is the first page, in its first state that the conditions' first values allow. The values default to those the launch reaches the page with; a value the state itself is of (its `if`) is that state's, whatever is chosen. The pages under the start, where its back goes, are named.
+It starts with the history the fewest steps from the app's launch reach the first page with, in the state and under the conditions' values chosen beside it; of those, the one that keeps the most pages. The launch is the first page, in its first state that the conditions' first values allow. The values default to those the launch reaches the page with; a value the state itself is of (its `if`) is that state's, whatever is chosen. The pages under the start, where its back goes, are named.
 
 Its fewest steps are exact: a shortest path in the pushdown system the history makes, its stack the pages and its control the conditions' values, each page entered under each valuation summarised once.
 
-In a tab bar of `tabs`, a switch finds a tab as it was left, and the other tabs' histories are named beside the route. A route found is the fewest of all: it is searched again past the three pages of a tab's history kept exactly, where a tab left deeper might have made it shorter. There, the histories can be too many to search to the end (each tab's multiplied together): the route then says the app may have a route, or a shorter one, than it shows. A page no route is found to may still be reached through a tab left deeper.
+In a tab bar of `tabs`, a switch finds a tab as it was left, and the other tabs' histories are named beside the route. A route found is the fewest of all: it is searched again past the three pages of a tab's history kept exactly, where a tab left deeper might have made it shorter. There, the histories can be too many to search to the end (each tab's multiplied together): the route then says the app may have a route, or a shorter one, than it shows. A route none is found to within the three pages is searched for once more, within three pages more; if still none is found, the page may still be reached through a tab left deeper, and the route says the fewest steps that would take.
 
 ### The layout
 
-- Each section is an island of its own. In it, the flow runs left to right from where it comes in: the first page, an arrow from another section, a deep link, in that order. The pages nothing in the section leads to are a row under the rest. The islands are laid in rows.
+- Each section is an island of its own. In it, the flow runs left to right from where it comes in: the first page, an arrow from another section, a deep link, in that order. A column holds four pages: more as far from where the flow comes in (a page that leads to many) go on in the columns beside it. The pages nothing in the section leads to are a row under the rest. The islands are laid in rows.
+- An arrow's label goes on its arrow, or where it covers the least; one off its arrow has a thin dotted line to it.
 - Three or more arrows from other sections into one page that say the same (and all go back, dashed, or none does) are drawn as one short arrow into it, `<label> ×<n>`; those from every page always, `<label> From any page`.
 - An arrow between sections that would run through where another island's pages are is a jump: a short arrow out of its page, `<label> → <page>`, and one into the page it goes to, bundled with those that say the same (`<label> ← <page>` for one alone).
 - A tab's first page has its bar drawn under it, its own tab lit; the first pages of one bar's tabs stand in one column.
@@ -313,7 +318,7 @@ A state shutter could not draw has no image: the command tells its error, and th
 
 `schemaVersion` (1) changes when what is there does.
 
-Top level: `app`, `locale`, `generatedAt`, `conditions` (`name`, `values`, `source`), `tabs` (each `pages`, with `page`, `trigger` and `if`; `retap`, `first` or `stay`; `source`), `tags` (`name`, `url`), `variants` (`name`, `platform`, `preview`; one, unnamed, when the sheet names none), `release` (`version`, the app's pubspec's; `commit` and `branch`, where git knows them), `basis` (when there is one: `commit`, `found`, `changed`, `unmapped`: what changed in `lib/` that the sheet names for no page, nor as a preview), `canvas` (`width`, `height`, `labelHeight`), `sections` (`name` and its island's box), `pages`, `edges`, `entries`, `bundles`, `tree`.
+Top level: `app`, `locale`, `generatedAt`, `conditions` (`name`, `values`, `source`), `tabs` (each `pages`, with `page`, `trigger` and `if`; `retap`, `first` or `stay`; `source`), `tags` (`name`, `url`), `variants` (`name`, `platform`, `preview`; one, unnamed, when the sheet names none), `release` (`version`, the app's pubspec's; `commit` and `branch`, where git knows them), `basis` (when there is one: `commit`, `found`, `changed`, `unmapped`: what changed in `lib/` that the sheet names for no page, nor as a preview), `canvas` (`width`, `height`, `labelHeight`, `marksHeight`: the room kept above each page's image), `sections` (`name` and its island's box), `pages`, `edges`, `entries`, `bundles`, `tree`.
 
 - A page: the sheet's fields (`tab` a list, empty for none; `parent` or null; `params`, `{}` for none; `tags` a list in the tags' order, each `tag`, `label` and `url`: the value in its tag's `url`, its own, or null), its `dependencies` in full, `sheetChanged` (its files changed since the basis), and its box as the first variant lays the map out (`x`, `y`, `width`, `height`; its label is the bottom `labelHeight` of it).
 - A page's `states`: `name`, `preview` (null while not written), `project` (`app` or `sheet`, the sheet package; null without a preview), `uses`, `data`, `if` (`{}` for none), `params` (its own, `{}` for none), `tags` (all of them in it: its own, else its page's, as a page's are); and as the first variant draws it, `shot` (shutter's id), `width`, `height`, `image` (relative to `sheet.json`, or null) and `error` (or null); `variants`: those five in each variant, in order.
@@ -360,7 +365,7 @@ The WebP made of each shot is kept in `contact_sheet/.dart_tool/contact_sheet/we
 | `manual` | Print this reference |
 | `init [--package]` | Write an empty sheet; with `--package`, the sheet package's skeleton too |
 | `export [--out <folder>] [--only <page id>]... [--locale <en\|ja>] [--strict] [--svg] [--pixel-ratio <ratio>] [--images <folder>]` | Shoot the previews the sheet names and write the map. `--only`: those pages' previews alone, the others keeping their images. `--locale`: the map in that language (else the sheet's `locale`, else English). `--strict`: fail while a state has no image. `--svg`: write `map.svg` and `map-dev.svg` too. `--pixel-ratio`: the images drawn at it (1.5 by default). `--images`: the folder next to `index.html` the images are in (`images` by default): a relative path, `/` between its parts, each of letters, digits, `.`, `_` and `-` |
-| `lint` | Tell what the sheet itself shows may be missing or written twice |
+| `lint [--fail]` | Tell what the sheet itself shows may be missing or written twice. `--fail`: fail while there is a hint |
 | `basis` | Record the app as the sheet was written against |
 | `changed [--by-page]` | List the app's files changed since the basis; with `--by-page`, by the pages the sheet names them for |
 | `prune` | Delete the runs of shutter's that Contact Sheet left |
@@ -373,7 +378,7 @@ Each command but `agent` and `manual` runs on the app directory given last, the 
 | --- | --- |
 | 0 | Done |
 | 64 | A wrong use: the message and the usage on stderr. `export --only`: the sheet has no such page |
-| 65 | `sheet.yaml` cannot be read (said with where). `changed`: the basis's commit is not in the repository. `export --strict`: a state has no image |
+| 65 | `sheet.yaml` cannot be read (said with its line and where; each mistake in the conditions, tags, dependencies and variants at once). `changed`: the basis's commit is not in the repository. `export --strict`: a state has no image. `lint --fail`: there is a hint |
 | 66 | No `pubspec.yaml` in the directory; no `sheet.yaml`. `changed`: no basis yet |
 | 69 | `export`: no `flutter` to run (`FLUTTER_ROOT`, else the PATH), `flutter pub get` failed, or shutter cannot run |
 | 70 | An unexpected error (`--verbose` tells where it came from) |
@@ -387,9 +392,10 @@ Under each hint is its key. Once a hint is looked at and the sheet is right as i
 
 - Pages: one no arrow leads to from the first page, and no deep link opens; the first page with no state of the conditions' first values.
 - States: one none of the page's arrows leaves from; one nothing arrives in (not `data`); two of the same values of the conditions; a page with no state of some values.
-- Edges: one written twice; one written again for other states (write one edge, `when` both's, `then` by the state it leaves); a `when` state of other values than the `if`; an `if` no way through the app meets there.
+- Edges: one written twice; one written again for other states (write one edge, `when` both's, `then` by the state it leaves); a `when` state of other values than the `if`; an `if` no way through the app meets there; a `then` that gives values of the conditions its `set` does not say; one without `then` that arrives in a state of `to` by the name of the state it leaves alone (not `to`'s first, a `data` state, nor one of the conditions).
 - Conditions: a value nothing names; a value nothing gives, not the first.
 - Deep links: one written twice.
 - Tags: one no page has; one that three quarters of the pages or more have, and some do not; a page's path whose parameters have no value in `params`, where a tag's url is made with `{path}`.
 - Tabs: a bar of one tab; an edge between two tabs of a bar (the bar switches them); a page opened from a tab it is not shown in, or from over the bar; a go or a deep link to a page in several tabs that names none.
+- Files: a `source` the app has no file of.
 - Checked: a key `checked` names that is no hint now.

@@ -60,7 +60,7 @@ dev_dependencies:
   # shutter shoots the previews in flutter test.
   flutter_test:
     sdk: flutter
-
+${_overrides(repo)}
 flutter:
   uses-material-design: true
 ''');
@@ -78,6 +78,29 @@ Widget standard(Widget child) => child;
 ''');
   if (_ignoreShots(repo)) written.add('.gitignore');
   return written;
+}
+
+/// The app's `dependency_overrides`, for the sheet package that imports it
+/// to resolve as the app does: a `path` made relative to the sheet package
+/// (`..` before it), the rest as written. Empty without any.
+String _overrides(SheetRepo repo) {
+  final overrides = repo.pubspec?['dependency_overrides'];
+  if (overrides is! Map || overrides.isEmpty) return '';
+  final b = StringBuffer(
+    '\n# As the app overrides them.\ndependency_overrides:\n',
+  );
+  for (final MapEntry(:key, :value) in overrides.entries) {
+    final source = switch (value) {
+      {'path': final String path} when !p.posix.isAbsolute(path) => {
+        ...value,
+        'path': p.posix.normalize(p.posix.join('..', path)),
+      },
+      _ => value,
+    };
+    // YAML takes JSON as it is.
+    b.writeln('  $key: ${jsonEncode(source)}');
+  }
+  return '$b';
 }
 
 /// Keeps shutter's shots (the sheet package's `.dart_tool/`) out of the

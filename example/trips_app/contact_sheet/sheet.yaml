@@ -1062,3 +1062,10 @@ edges:
     to: licenses
     trigger: text:Licenses
     source: lib/features/account/about_page.dart
+# lint's hints looked at and kept as they are: creating an account goes on to
+# where signing in was sent from, so it is in the state of that name.
+checked:
+  - "by-name sign_in>sign_up text:Create an account push From trips"
+  - "by-name sign_in>sign_up text:Create an account push From inbox"
+  - "by-name sign_in>sign_up text:Create an account push From a stay"
+  - "by-name sign_in>sign_up text:Create an account push For booking"

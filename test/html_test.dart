@@ -1,6 +1,7 @@
 // index.html as a browser runs it: the examples' sheets exported, and each
 // view opened in headless Chrome. Its JavaScript is not run anywhere else.
 // Without Chrome on the machine, skipped.
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:contact_sheet/contact_sheet.dart';
@@ -36,9 +37,16 @@ final Object _skip = _chrome != null || Platform.environment['CI'] == 'true'
     : 'no Chrome on this machine';
 
 /// [example]'s sheet, exported into a new app of its own without images
-/// (nothing shot): what the HTML draws is the sheet.
-Future<(Sheet, String)> _export(String example, Directory dir) async {
-  final app = Directory(p.join(dir.path, example))..createSync();
+/// (nothing shot): what the HTML draws is the sheet. In [locale]'s words,
+/// as `--locale` has it, into a folder of its own.
+Future<(Sheet, String)> _export(
+  String example,
+  Directory dir, {
+  String? locale,
+}) async {
+  final app = Directory(
+    p.join(dir.path, locale == null ? example : '${example}_$locale'),
+  )..createSync();
   File(p.join(app.path, 'pubspec.yaml')).writeAsStringSync('name: $example\n');
   final repo = SheetRepo(app.path);
   repo.sheetFile
@@ -58,6 +66,7 @@ Future<(Sheet, String)> _export(String example, Directory dir) async {
     runner: Tools(),
     shoot: nothing,
     m: Messages.of('en'),
+    locale: locale,
   ).run();
   return (
     Sheet.parse(repo.sheetFile.readAsStringSync(), Messages.of('en')),
@@ -84,7 +93,11 @@ Future<(Sheet, String)> _export(String example, Directory dir) async {
   return opened;
 }
 
-({String dom, List<String> errors}) _openOnce(String html, String hash) {
+({String dom, List<String> errors}) _openOnce(
+  String html,
+  String hash, {
+  List<String> flags = const [],
+}) {
   final profile = Directory.systemTemp.createTempSync('chrome_');
   try {
     final result = Process.runSync(_chrome!, [
@@ -97,6 +110,7 @@ Future<(Sheet, String)> _export(String example, Directory dir) async {
       '--v=0',
       '--virtual-time-budget=10000',
       '--window-size=1280,900',
+      ...flags,
       '--dump-dom',
       '${Uri.file(html)}$hash',
     ]);
@@ -115,6 +129,60 @@ Future<(Sheet, String)> _export(String example, Directory dir) async {
   } finally {
     profile.deleteSync(recursive: true);
   }
+}
+
+/// What [probe] (a JavaScript expression of JSON's values) gives on [html]
+/// opened at [hash], once the page has drawn itself: run by a script added
+/// to a copy of it, next to it. With [width], the page in an iframe that
+/// wide (headless Chrome's window is 500px at the least), as on a phone.
+/// [flags] are Chrome's. Null when the page gave nothing.
+Object? _probe(
+  String html,
+  String hash,
+  String probe, {
+  int? width,
+  List<String> flags = const [],
+}) {
+  final dir = p.dirname(html);
+  final page = File(p.join(dir, 'probe.html'))
+    ..writeAsStringSync(
+      File(html).readAsStringSync().replaceFirst(
+        '</body>',
+        '<script>setTimeout(() => { const said = JSON.stringify($probe);'
+            ' if (parent !== window) parent.postMessage(said, "*");'
+            ' else document.body.dataset.probe = said; }, 2000);</script>'
+            '</body>',
+      ),
+    );
+  var open = page.path;
+  if (width != null) {
+    open = p.join(dir, 'phone.html');
+    File(open).writeAsStringSync(
+      '<!doctype html><body style="margin:0">'
+      '<iframe src="probe.html$hash" width="$width" height="844" '
+      'style="border:0"></iframe><script>addEventListener("message", '
+      '(e) => { document.body.dataset.probe = e.data; });</script></body>',
+    );
+  }
+  for (var i = 0; i < 3; i++) {
+    final (:dom, errors: _) = _openOnce(
+      open,
+      width == null ? hash : '',
+      flags: flags,
+    );
+    final said = RegExp(r'data-probe="([^"]*)"').firstMatch(dom)?[1];
+    if (said != null) {
+      return jsonDecode(
+        said
+            .replaceAll('&quot;', '"')
+            .replaceAll('&lt;', '<')
+            .replaceAll('&gt;', '>')
+            .replaceAll('&#39;', "'")
+            .replaceAll('&amp;', '&'),
+      );
+    }
+  }
+  return null;
 }
 
 /// The route the page shows: its steps, each as it reads; null when it says
@@ -226,7 +294,7 @@ void main() {
     );
     // For developers, and how much the map shows: as the address says too.
     expect(none, contains('<body class="plain"'));
-    expect(none, contains('data-level="pages"'));
+    expect(none, contains('data-level="flow"'));
     final dev = _open(shopHtml, '?dev&show=actions#map/home', drawn: drawn).dom;
     expect(dev, isNot(contains('<body class="plain"')));
     expect(dev, contains('data-level="actions"'));
@@ -336,6 +404,130 @@ void main() {
         );
         expect(errors, isEmpty);
         expect(_routeSteps(dom), hasLength(steps), reason: '$values');
+      }
+    },
+    skip: _skip,
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
+
+  test(
+    'every arrow and label on the map, as the browser draws them; the map '
+    'opens with its arrows',
+    () {
+      const probe = '''(() => {
+        const under = document.querySelector('#under');
+        const W = +under.getAttribute('width'), H = +under.getAttribute('height');
+        const off = (b) => b.x < -1 || b.y < -1 || b.x + b.width > W + 1 || b.y + b.height > H + 1;
+        const labels = [...document.querySelectorAll('#over g > rect')].map((r) => r.getBBox()).filter((b) => b.width > 0);
+        return {
+          edges: document.querySelectorAll('#under path.edge').length,
+          edgesOff: [...document.querySelectorAll('#under path.edge')].filter((p) => off(p.getBBox())).map((p) => p.dataset.i),
+          labels: labels.length,
+          labelsOff: labels.filter(off).length,
+          level: document.querySelector('#map-view').dataset.level,
+        };
+      })()''';
+      for (final html in [shopHtml, tripsHtml]) {
+        final got = _probe(html, '?show=actions#map', probe)! as Map;
+        expect(got['edges'], greaterThan(0), reason: html);
+        expect(got['edgesOff'], isEmpty, reason: html);
+        expect(got['labels'], greaterThan(0), reason: html);
+        expect(got['labelsOff'], 0, reason: html);
+        expect(got['level'], 'actions');
+        // Nothing in the address: with the arrows.
+        expect((_probe(html, '#map', probe)! as Map)['level'], 'flow');
+      }
+    },
+    skip: _skip,
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
+
+  test(
+    'dark as the browser is set; on a phone, one column, nothing wider '
+    'than it',
+    () {
+      final dark = _probe(
+        shopHtml,
+        '#map',
+        'getComputedStyle(document.body).backgroundColor',
+        flags: ['--force-dark-mode', '--blink-settings=preferredColorScheme=0'],
+      ) as String?;
+      expect(dark, 'rgb(21, 23, 26)');
+      // Light, whatever the machine is set to.
+      final light = _probe(
+        shopHtml,
+        '#map',
+        'getComputedStyle(document.body).backgroundColor',
+        flags: ['--blink-settings=preferredColorScheme=1'],
+      ) as String?;
+      expect(light, 'rgb(246, 247, 249)');
+      for (final html in [shopHtml, tripsHtml]) {
+        for (final hash in ['#map/home', '#list', '#table', '#tree']) {
+          final phone =
+              _probe(
+                    html,
+                    hash.replaceFirst(
+                      'home',
+                      html == shopHtml ? 'home' : 'welcome',
+                    ),
+                    '''({
+              phone: matchMedia('(max-width: 640px)').matches,
+              wide: document.documentElement.scrollWidth,
+              width: innerWidth,
+              barOpen: getComputedStyle(document.querySelector('#bar-open')).display,
+              card: document.querySelector('#card').getBoundingClientRect().width,
+              past: (() => {
+                const out = [];
+                const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+                for (let t = walk.nextNode(); t && out.length < 5; t = walk.nextNode()) {
+                  const r = document.createRange();
+                  r.selectNodeContents(t);
+                  if ([...r.getClientRects()].some((b) => b.right > innerWidth + 0.5)) {
+                    const e = t.parentElement;
+                    out.push(e.tagName + '#' + e.id + '.' + e.className + ' ' + t.textContent.slice(0, 40));
+                  }
+                }
+                return out;
+              })(),
+            })''',
+                    width: 390,
+                    flags: ['--allow-file-access-from-files'],
+                  )!
+                  as Map;
+          expect(phone['phone'], isTrue, reason: '$html$hash');
+          expect(phone['width'], 390, reason: '$html$hash');
+          expect(
+            phone['wide'],
+            lessThanOrEqualTo(390),
+            reason: '$html$hash: ${phone['past']}',
+          );
+          expect(phone['barOpen'], isNot('none'), reason: '$html$hash');
+          expect(phone['card'], lessThanOrEqualTo(390), reason: '$html$hash');
+        }
+      }
+    },
+    skip: _skip,
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
+
+  test(
+    'in Japanese, as --locale says; a variant chosen by the address',
+    () async {
+      final (_, ja) = await _export('trips_app', dir, locale: 'ja');
+      final (:dom, :errors) = _open(ja, '#map');
+      expect(errors, isEmpty);
+      expect(dom, contains('<html lang="ja"'));
+      expect(dom, contains('>地図<'));
+      expect(dom, contains('>流れ<'));
+      final (notes, notesHtml) = await _export('notes_app', dir);
+      for (final (i, variant) in notes.variants.indexed) {
+        final hash = '?variant=${Uri.encodeQueryComponent(variant.name)}#map';
+        expect(_open(notesHtml, hash).errors, isEmpty, reason: variant.name);
+        expect(
+          _probe(notesHtml, hash, "document.querySelector('#variant').value"),
+          '$i',
+          reason: variant.name,
+        );
       }
     },
     skip: _skip,
