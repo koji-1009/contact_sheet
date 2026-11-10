@@ -1,5 +1,6 @@
-import 'package:contact_sheet/contact_sheet.dart';
 import 'package:contact_sheet/src/map.dart';
+import 'package:contact_sheet/src/messages.g.dart';
+import 'package:contact_sheet/src/sheet.dart';
 import 'package:test/test.dart';
 
 void main() {

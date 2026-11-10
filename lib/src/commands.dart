@@ -17,12 +17,22 @@ import 'package:io/io.dart' show ExitCode;
 import 'package:shutter/shutter.dart';
 import 'package:stack_trace/stack_trace.dart';
 
-/// Runs `sheet` with [args]: its exit code (sysexits). [out] gets
-/// what it gives (and the usage, when asked for), [err] what went wrong, in
-/// English; the map is in the sheet's `locale` (English without one)
-/// unless `--locale` says otherwise. [runner] runs flutter and git,
-/// [shoot] is shutter's.
+/// Runs `sheet` with [args] and returns its exit code (sysexits).
+///
+/// [out] gets what it gives (and the usage, when asked for or no command is
+/// given), [err] what went wrong (and the usage, after a wrong use), in
+/// English, each call one message, which may hold several lines (the
+/// usage, the playbook); the map is in the sheet's `locale` (English
+/// without one) unless `--locale` says otherwise.
 Future<int> runCli(
+  List<String> args, {
+  required void Function(String line) out,
+  required void Function(String line) err,
+}) => runSheet(args, out: out, err: err);
+
+/// [runCli], with [runner] running flutter and git and [shoot] shooting the
+/// previews (shutter's `shot`).
+Future<int> runSheet(
   List<String> args, {
   required void Function(String line) out,
   required void Function(String line) err,
@@ -135,11 +145,17 @@ abstract class _AppCommand extends _Command {
     try {
       return await runOn(repo);
     } on ExportException catch (e) {
+      // A wrong use: said as every wrong use is, the usage after it.
+      if (e.exitCode == ExitCode.usage.code) usageException(e.message);
       cli.err(e.message);
       return e.exitCode;
     } on ShutterException catch (e) {
       cli.err(e.message);
       return e.exitCode;
+    } on FileSystemException catch (e) {
+      // A folder not to be written in, a full disk: said as it is.
+      cli.err(m.ioFailed(e.path ?? '', e.osError?.message ?? e.message));
+      return ExitCode.ioError.code;
     }
   }
 
@@ -157,6 +173,10 @@ class _TextCommand extends _Command {
   final String description;
 
   final String text;
+
+  // `sheet agent foo` is a wrong use, not the playbook.
+  @override
+  bool get takesArguments => false;
 
   @override
   Future<int> run() async {

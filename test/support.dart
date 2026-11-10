@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:contact_sheet/contact_sheet.dart';
+import 'package:contact_sheet/src/process.dart';
 import 'package:test/test.dart';
 
 /// Real git; anything else answered as done, and kept with the directory

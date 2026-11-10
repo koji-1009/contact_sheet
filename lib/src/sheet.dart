@@ -3,8 +3,8 @@ import 'package:contact_sheet/src/route.dart';
 import 'package:yaml/yaml.dart';
 
 /// The transition structure of an app, as its `contact_sheet/sheet.yaml`
-/// gives it: its pages, the state each `@Preview` of the sheet package
-/// starts a page in, and the transitions between them.
+/// gives it: its pages, each state of a page the `@Preview` it is (the
+/// app's, or the sheet package's), and the transitions between them.
 ///
 /// An AI agent writes it from what tells how the app works, such as its code
 /// and its specifications; nothing in the app is marked. Contact Sheet draws
@@ -358,7 +358,8 @@ class SheetVariant {
 /// The platform a variant is drawn as.
 enum VariantPlatform { ios, android }
 
-/// A page started in one state: one `@Preview` of the sheet package.
+/// A page in one state: one `@Preview`, the app's or the sheet package's
+/// ([file]), or none yet.
 class SheetState {
   SheetState({
     required this.name,
@@ -531,7 +532,8 @@ class SheetEdge {
   ].join(' ');
 }
 
-/// [guard] as a key says it: `{Login=Member,Cart=Full|Empty}`, in order.
+/// [guard] as a key says it, its conditions and their values each sorted:
+/// `{Cart=Empty|Full,Login=Member}`.
 String guardKey(Map<String, List<String>> guard) =>
     '{${[for (final c in guard.keys.toList()..sort()) '$c=${(guard[c]!.toList()..sort()).join('|')}'].join(',')}}';
 
@@ -923,7 +925,9 @@ class _Parser {
         if (to == null) continue;
         for (final from in fromOf(item)) {
           final tabs = [if (roots.contains(from)) from, ...byId[from]!.tabs];
-          final overBar = tabs.isNotEmpty && !tabs.any((t) => inTab(to, t));
+          // In a tab of its `from`'s where `to` is not shown, a replace puts
+          // `to` over the bar, `from` kept under it.
+          final overBar = tabs.any((t) => !inTab(to, t));
           final under = switch (item.kind) {
             NavigationKind.push || NavigationKind.redirect => {from},
             NavigationKind.replace => {if (overBar) from, ...?over[from]},
@@ -939,6 +943,11 @@ class _Parser {
         }
       }
     }
+    // And each page's parent: go_router builds it under the page, gone to
+    // or opened by a deep link.
+    for (final p in pages) {
+      if (p.parent case final parent?) (over[p.id] ??= {}).add(parent);
+    }
     final edges = [
       for (final item in items)
         for (final from in fromOf(item))
@@ -952,6 +961,10 @@ class _Parser {
               if (over[from]!.contains(p.id)) item.edge(from, p.id),
           ],
     ];
+    // The items an edge of which can happen: some state of its `from` it
+    // leaves is of values its `if` allows. A list of `from`s (or `'*'`) may
+    // have pages it never happens on, as long as it happens on one.
+    final happens = <int>{};
     for (final edge in edges) {
       final where = 'edges[${edge.item}]';
       final from = page(edge.from, '$where.from');
@@ -991,9 +1004,7 @@ class _Parser {
       final leaving = edge.when.isEmpty
           ? from.states
           : from.states.where((s) => edge.when.contains(s.name));
-      if (!leaving.any((s) => s.allowedBy(edge.guard))) {
-        _fail('$where.if', m.sheetIfAgainstWhen);
-      }
+      if (leaving.any((s) => s.allowedBy(edge.guard))) happens.add(edge.item);
       if (edge.tab case final tab?) {
         if (edge.kind != NavigationKind.go) {
           _fail('$where.tab', m.sheetTabNotGo);
@@ -1002,6 +1013,11 @@ class _Parser {
         if (!inTab(to.id, tab)) {
           _fail('$where.tab', m.sheetTabNotOf(tab, to.id));
         }
+      }
+    }
+    for (final edge in edges) {
+      if (!happens.contains(edge.item)) {
+        _fail('edges[${edge.item}].if', m.sheetIfAgainstWhen);
       }
     }
     final entries = [
@@ -1054,8 +1070,9 @@ class _Parser {
     final given = map['tags'];
     if (given == null) return const {};
     if (given is! YamlMap) _fail('$where.tags', m.sheetNotMap);
-    _Written one(Object? value, String at) => switch (value) {
-      String() || num() => (text: '$value', link: null),
+    _Written one(Object? value, YamlNode? node, String at) => switch (value) {
+      final String s => (text: s, link: null),
+      final num n => (text: _asWritten(node, n), link: null),
       YamlMap() => () {
         final link = _map(value, at, const {'label', 'url'});
         return (
@@ -1071,9 +1088,9 @@ class _Parser {
             .name: value is YamlList
             ? [
                 for (final (i, v) in value.indexed)
-                  one(v, '$where.tags.$key[$i]'),
+                  one(v, value.nodes[i], '$where.tags.$key[$i]'),
               ]
-            : [one(value, '$where.tags.$key')],
+            : [one(value, given.nodes[key], '$where.tags.$key')],
     };
   }
 
@@ -1099,7 +1116,7 @@ class _Parser {
         final YamlMap values => {
           for (final MapEntry(key: c, value: v) in values.entries)
             '$c': v is String || v is num
-                ? '$v'
+                ? _optional(values, '$c', '$where.$key')!
                 : _fail('$where.$key.$c', m.sheetNotText),
         },
         _ => _fail('$where.$key', m.sheetNotMap),
@@ -1114,11 +1131,13 @@ class _Parser {
           for (final MapEntry(key: c, value: v) in values.entries)
             '$c': switch (v) {
               final String s => [s],
-              final num n => ['$n'],
+              final num n => [_asWritten(values.nodes[c], n)],
               final YamlList list when list.isNotEmpty => [
                 for (final (i, x) in list.indexed)
-                  x is String || x is num
-                      ? '$x'
+                  x is String
+                      ? x
+                      : x is num
+                      ? _asWritten(list.nodes[i], x)
                       : _fail('$where.if.$c[$i]', m.sheetNotText),
               ],
               final YamlList _ => _fail('$where.if.$c', m.sheetNoValues),
@@ -1184,6 +1203,14 @@ class _Parser {
         _fail('$where.dependencies', m.sheetUnknownDependency(name));
       }
     }
+    // What a state's fakes hold, by the dependencies'.
+    for (final (i, s) in states.indexed) {
+      for (final name in s.uses.keys) {
+        if (!dependencyNames.contains(name)) {
+          _fail('$where.states[$i].uses.$name', m.sheetUnknownDependency(name));
+        }
+      }
+    }
     return SheetPage(
       id: _required(map, 'id', where),
       label: _required(map, 'label', where),
@@ -1209,7 +1236,8 @@ class _Parser {
   /// and which of the `Preview`s it gives.
   static final _preview = RegExp(
     r'^([^#@]+\.dart)#([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)?)'
-    r'(?:@(\d+)(?:\.(\d+))?)?$',
+    // No more digits than a number of annotations can be.
+    r'(?:@(\d{1,6})(?:\.(\d{1,6}))?)?$',
   );
 
   SheetState _state(Object? yaml, String where, _PageTags page) {
@@ -1256,7 +1284,10 @@ class _Parser {
       runtime: int.parse(match?[4] ?? '0'),
       uses: {
         if (uses is YamlMap)
-          for (final MapEntry(:key, :value) in uses.entries) '$key': '$value',
+          for (final key in uses.keys)
+            '$key':
+                _optional(uses, '$key', '$where.uses') ??
+                _fail('$where.uses.$key', m.sheetNotText),
       },
       data: data,
       conditions: _values(map, 'if', where),
@@ -1295,15 +1326,22 @@ class _Parser {
     }
     // One state, or one by the state it leaves.
     final thenMap = map['then'];
+    if (thenMap is YamlMap && thenMap.isEmpty) {
+      _fail('$where.then', m.sheetEmpty);
+    }
     final thenBy = <String, String>{
       if (thenMap is YamlMap)
-        for (final MapEntry(:key, :value) in thenMap.entries)
-          '$key': value is String || value is num
-              ? '$value'
-              : _fail('$where.then.$key', m.sheetNotText),
+        for (final key in thenMap.keys)
+          '$key':
+              _optional(thenMap, '$key', '$where.then') ??
+              _fail('$where.then.$key', m.sheetNotText),
     };
     final then = thenMap is YamlMap ? null : _optional(map, 'then', where);
     // One state, or a list of them.
+    final whenList = map['when'];
+    if (whenList is YamlList && whenList.isEmpty) {
+      _fail('$where.when', m.sheetEmpty);
+    }
     final when = map['when'] is YamlList
         ? _strings(map, 'when', where)
         : [?_optional(map, 'when', where)];
@@ -1426,8 +1464,10 @@ class _Parser {
 
   List<String> _strings(YamlMap map, String key, String where) => [
     for (final (i, v) in _list(map, key, where).indexed)
-      if (v is String || v is num)
-        '$v'
+      if (v is String)
+        v
+      else if (v is num)
+        _asWritten((map.nodes[key]! as YamlList).nodes[i], v)
       else
         _fail('$where.$key[$i]', m.sheetNotText),
   ];
@@ -1435,13 +1475,20 @@ class _Parser {
   String _required(YamlMap map, String key, String where) =>
       _optional(map, key, where) ?? _fail(where, m.sheetMissing(key));
 
-  /// A scalar as text: `/` and `1.0` are written without quotes.
+  /// A scalar as text: `/` and `1.50` are written without quotes, and read
+  /// as written.
   String? _optional(YamlMap map, String key, String where) =>
       switch (map[key]) {
         null => null,
         final String s => s,
-        final num n => '$n',
-        final bool b => '$b',
+        final num n => _asWritten(map.nodes[key], n),
+        final bool b => _asWritten(map.nodes[key], b),
         _ => _fail('$where.$key', m.sheetNotText),
       };
+
+  /// A number or `true`, [value], as the sheet writes it ([node]'s text).
+  static String _asWritten(YamlNode? node, Object value) =>
+      node is YamlScalar && node.style == ScalarStyle.PLAIN
+      ? node.span.text
+      : '$value';
 }

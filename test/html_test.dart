@@ -4,8 +4,11 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:contact_sheet/contact_sheet.dart';
+import 'package:contact_sheet/src/export.dart' show SheetExport;
+import 'package:contact_sheet/src/messages.g.dart';
+import 'package:contact_sheet/src/repo.dart';
 import 'package:contact_sheet/src/route.dart';
+import 'package:contact_sheet/src/sheet.dart';
 import 'package:path/path.dart' as p;
 import 'package:shutter/shutter.dart';
 import 'package:test/test.dart';
@@ -135,22 +138,27 @@ Future<(Sheet, String)> _export(
 /// opened at [hash], once the page has drawn itself: run by a script added
 /// to a copy of it, next to it. With [width], the page in an iframe that
 /// wide (headless Chrome's window is 500px at the least), as on a phone.
-/// [flags] are Chrome's. Null when the page gave nothing.
+/// [flags] are Chrome's. [acts], scripts run one after the other before it,
+/// each a while after the one before (a step in the history taking its
+/// time). Null when the page gave nothing.
 Object? _probe(
   String html,
   String hash,
   String probe, {
   int? width,
   List<String> flags = const [],
+  List<String> acts = const [],
 }) {
   final dir = p.dirname(html);
+  final done = 2000 + 500 * acts.length;
   final page = File(p.join(dir, 'probe.html'))
     ..writeAsStringSync(
       File(html).readAsStringSync().replaceFirst(
         '</body>',
-        '<script>setTimeout(() => { const said = JSON.stringify($probe);'
+        '<script>${[for (final (i, act) in acts.indexed) 'setTimeout(() => { $act; }, ${1500 + 500 * i});'].join()}'
+            'setTimeout(() => { const said = JSON.stringify($probe);'
             ' if (parent !== window) parent.postMessage(said, "*");'
-            ' else document.body.dataset.probe = said; }, 2000);</script>'
+            ' else document.body.dataset.probe = said; }, $done);</script>'
             '</body>',
       ),
     );
@@ -437,6 +445,96 @@ void main() {
         // Nothing in the address: with the arrows.
         expect((_probe(html, '#map', probe)! as Map)['level'], 'flow');
       }
+    },
+    skip: _skip,
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
+
+  test(
+    'a step back keeps what is chosen, and the address says it; details '
+    'closed leave the history as it was; links and labels are reached from '
+    'the keyboard',
+    () {
+      const state = '''({
+        search: location.search,
+        hash: location.hash,
+        level: document.querySelector('#map-view').dataset.level,
+        length: history.length,
+        details: document.querySelector('#detail').classList.contains('on'),
+        view: document.body.dataset.view,
+      })''';
+      final back =
+          _probe(
+                shopHtml,
+                '#map',
+                state,
+                acts: [
+                  "location.hash = '#tree'",
+                  "document.querySelector('#levels [data-level=pages]').click()",
+                  'history.back()',
+                ],
+              )!
+              as Map;
+      expect(back['hash'], '#map', reason: '$back');
+      expect(back['search'], '?show=pages', reason: '$back');
+      expect(back['level'], 'pages');
+
+      final closed =
+          _probe(
+                shopHtml,
+                '#map',
+                state,
+                acts: [
+                  "location.hash = '#map/home'",
+                  "location.hash = '#page/home'",
+                  "document.querySelector('#close').click()",
+                ],
+              )!
+              as Map;
+      expect(closed['details'], isFalse, reason: '$closed');
+      expect(closed['hash'], '#map/home', reason: '$closed');
+      // Back where it was opened from: a step back from there goes on to
+      // what was before it, not to it again.
+      final before =
+          _probe(
+                shopHtml,
+                '#map',
+                state,
+                acts: [
+                  "location.hash = '#map/home'",
+                  "location.hash = '#page/home'",
+                  "document.querySelector('#close').click()",
+                  'history.back()',
+                ],
+              )!
+              as Map;
+      expect(before['hash'], '#map', reason: '$before');
+
+      final keys =
+          _probe(shopHtml, '#map/home', '''({
+        links: [...document.querySelectorAll('a[data-go]')].every((a) => a.getAttribute('href')?.startsWith('#')),
+        some: document.querySelectorAll('a[data-go]').length,
+        labels: [...document.querySelectorAll('#over g.lbl')].every((g) => g.getAttribute('tabindex') === '0'),
+      })''')!
+              as Map;
+      expect(keys['some'], greaterThan(0));
+      expect(keys['links'], isTrue);
+      expect(keys['labels'], isTrue);
+
+      // On a phone, the route under the map's tools, which stay to be
+      // tapped.
+      final phone =
+          _probe(shopHtml, '#route/home/cart', '''(() => {
+        const r = document.querySelector('#route').getBoundingClientRect();
+        const t = document.querySelector('.tools').getBoundingClientRect();
+        return { routeTop: r.top, toolsBottom: t.bottom, shown: r.height > 0 };
+      })()''', width: 390)!
+              as Map;
+      expect(phone['shown'], isTrue);
+      expect(
+        phone['routeTop']! as num,
+        greaterThanOrEqualTo(phone['toolsBottom']! as num),
+      );
     },
     skip: _skip,
     timeout: const Timeout(Duration(minutes: 3)),

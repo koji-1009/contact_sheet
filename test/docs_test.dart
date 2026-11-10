@@ -1,5 +1,7 @@
-import 'package:contact_sheet/contact_sheet.dart';
 import 'package:contact_sheet/src/docs.dart';
+import 'package:contact_sheet/src/lint.dart';
+import 'package:contact_sheet/src/messages.g.dart';
+import 'package:contact_sheet/src/sheet.dart';
 import 'package:test/test.dart';
 
 /// The playbook's sheet is the first one an agent copies: one the command

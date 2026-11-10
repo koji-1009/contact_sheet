@@ -118,15 +118,17 @@ Map<String, String> htmlStrings(Messages m) => {
 
 /// `index.html` of an export: one file that reads [sheet] (`sheet.json`)
 /// from a JSON block inside it (so it works opened from disk or served
-/// anywhere), with the images next to it in `images/`, and holds the map's
-/// drawing, as `map.svg` draws it, from [map]. [strings] are its own words.
-/// Its script and style are `lib/src/html/app.js` and `app.css`, inlined
-/// ([appJs], [appCss]).
+/// anywhere), with the images next to it in the folder [SheetMap.imagesDir]
+/// names, and holds the map's drawing, as `map.svg` draws it, from [map].
+/// [strings] are its own words. Its script and style are
+/// `lib/src/html/app.js` and `app.css`, inlined ([appJs], [appCss]).
 ///
-/// Two views of the same pages: the map, which moves to a page and the
-/// pages next to it when one is chosen, and the list, one page under the
-/// other, each with the pages it goes to and comes from. Each view and page
-/// has its own address (`#map/<id>`, `#list/<id>`), to be passed around.
+/// Views of the same pages: the map, which moves to a page and the pages
+/// next to it when one is chosen; the tree; the list, one page under the
+/// other, each with the pages it goes to and comes from; and the table of
+/// the transitions. Each view, page, state and route has its own address
+/// (`#map/<id>`, `#tree/<id>`, `#list/<id>`, `#route/<from>/<to>`, ...), to
+/// be passed around, as `doc/manual.md` lists them.
 String exportHtml(
   Map<String, Object?> sheet,
   Map<String, String> strings,

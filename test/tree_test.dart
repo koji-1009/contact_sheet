@@ -1,5 +1,6 @@
-import 'package:contact_sheet/contact_sheet.dart';
 import 'package:contact_sheet/src/map.dart';
+import 'package:contact_sheet/src/messages.g.dart';
+import 'package:contact_sheet/src/sheet.dart';
 import 'package:test/test.dart';
 
 /// A page [id], with one state.
@@ -51,6 +52,21 @@ entries:
     // Each branch ends on top of its page, its words above it.
     expect(tree.lines['detail']!.last.y, n['detail']!.top);
     expect(tree.labels['detail']!.bottom, lessThanOrEqualTo(n['detail']!.top));
+  });
+
+  test('pages nothing from the start reaches are a tree from the one none of '
+      'them leads to, whatever the sheet\'s order', () {
+    final sheet = Sheet.parse('''
+pages:
+  - ${_page('start')}
+  - ${_page('b')}
+  - ${_page('c')}
+edges:
+  - {from: c, to: b, trigger: text:B}
+''', m);
+    final tree = SheetMap(sheet, shots: const {}, m: m).tree;
+    expect(tree.parent, {'start': null, 'c': null, 'b': 'c'});
+    expect(tree.outside, ['c']);
   });
 
   test("a tab bar's tabs are each under the tab the start is in", () {

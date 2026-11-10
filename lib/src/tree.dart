@@ -10,10 +10,12 @@ typedef TreeLink = ({SheetEdge? edge, SheetTab? tab});
 /// The pages as a tree, top to bottom, as a site map draws an app: each
 /// page under the page from which the fewest steps from the app's start
 /// first reach it, by a transition forward or a tab of its bar; its
-/// children in the sheet's order. A transition back, one from every page,
-/// or one from a page to itself, is no branch: the map and a page's
+/// children its bar's other tabs, in the bar's order, then those its
+/// transitions reach, in the sheet's. A transition back, one from every
+/// page, or one from a page to itself, is no branch: the map and a page's
 /// sentences tell those. The pages nothing from the start reaches are trees
-/// of their own, after it ([outside]).
+/// of their own, after it ([outside]), each from a page none of the others
+/// leads to, where there is one.
 ///
 /// Each page is the size the map draws it ([MapLayout.nodes]); the words of
 /// what reaches it ([labelOf], [sizeOf] their size) sit on its branch,
@@ -64,19 +66,19 @@ class PageTree {
     }
 
     // Breadth first from the app's start; then from each page not reached
-    // yet, in the sheet's order.
+    // yet that none of the others not reached leads to, in the sheet's
+    // order; then from those left (leading to each other round), likewise.
     final parent = <String, String?>{};
     final link = <String, TreeLink>{};
     final depth = <String, int>{};
     final children = <String, List<String>>{};
     final roots = <String>[];
-    for (final page in sheet.pages) {
-      if (depth.containsKey(page.id)) continue;
-      roots.add(page.id);
-      parent[page.id] = null;
-      link[page.id] = (edge: null, tab: null);
-      depth[page.id] = 0;
-      final queue = [page.id];
+    void grow(String root) {
+      roots.add(root);
+      parent[root] = null;
+      link[root] = (edge: null, tab: null);
+      depth[root] = 0;
+      final queue = [root];
       for (var i = 0; i < queue.length; i++) {
         final from = queue[i];
         for (final (to, how) in out[from] ?? const <(String, TreeLink)>[]) {
@@ -88,6 +90,23 @@ class PageTree {
           queue.add(to);
         }
       }
+    }
+
+    if (sheet.pages.isNotEmpty) grow(sheet.pages.first.id);
+    final left = {
+      for (final page in sheet.pages)
+        if (!depth.containsKey(page.id)) page.id,
+    };
+    final ledTo = {
+      for (final from in left)
+        for (final (to, _) in out[from] ?? const <(String, TreeLink)>[])
+          if (to != from && left.contains(to)) to,
+    };
+    for (final id in left) {
+      if (!ledTo.contains(id) && !depth.containsKey(id)) grow(id);
+    }
+    for (final id in left) {
+      if (!depth.containsKey(id)) grow(id);
     }
 
     // Each page's room across: its own (the page, or the words above it,

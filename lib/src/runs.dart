@@ -61,7 +61,9 @@ class ExportRuns {
   /// (`.<id>` beside it), and the list: how many runs there were. With
   /// [halfMade], those an interrupted shot left too: a run shutter had not
   /// finished (no manifest yet) that was not there before the export shot
-  /// in its project.
+  /// in its project. Without, what tells those is kept for `prune` (an
+  /// earlier export's, interrupted, or a shot of this one's that failed
+  /// half made), the rest forgotten.
   int deleteAll({bool halfMade = false}) {
     var deleted = 0;
     void delete(String dir) {
@@ -75,33 +77,49 @@ class ExportRuns {
     }
 
     listed.forEach(delete);
-    if (halfMade && _shooting.existsSync()) {
+    final kept = <String>[];
+    if (_shooting.existsSync()) {
       for (final line in _shooting.readAsLinesSync()) {
-        if (line.trim().isEmpty) continue;
-        final Object? entry;
-        try {
-          entry = jsonDecode(line);
-        } on FormatException {
-          continue;
-        }
-        if (entry case {
-          'runs': final String runs,
-          'before': final List<Object?> before,
-        }) {
-          if (!Directory(runs).existsSync()) continue;
-          for (final entity in Directory(runs).listSync()) {
-            if (entity is Directory &&
-                !before.contains(p.basename(entity.path)) &&
-                // shutter writes it last: a run without it was not finished.
-                !File(p.join(entity.path, 'manifest.json')).existsSync()) {
-              delete(entity.path);
-            }
-          }
+        final left = _halfMade(line);
+        if (left.isEmpty) continue;
+        if (halfMade) {
+          left.forEach(delete);
+        } else {
+          kept.add(line);
         }
       }
     }
     if (_record.existsSync()) _record.deleteSync();
-    if (_shooting.existsSync()) _shooting.deleteSync();
+    if (kept.isNotEmpty) {
+      _shooting.writeAsStringSync(kept.map((l) => '$l\n').join());
+    } else if (_shooting.existsSync()) {
+      _shooting.deleteSync();
+    }
     return deleted;
+  }
+
+  /// The runs half made that the line [line] of `shooting` tells: in its
+  /// project, not there before, and not finished (no manifest).
+  static List<String> _halfMade(String line) {
+    if (line.trim().isEmpty) return const [];
+    final Object? entry;
+    try {
+      entry = jsonDecode(line);
+    } on FormatException {
+      return const [];
+    }
+    if (entry
+        case {'runs': final String runs, 'before': final List<Object?> before}
+        when Directory(runs).existsSync()) {
+      return [
+        for (final entity in Directory(runs).listSync())
+          if (entity is Directory &&
+              !before.contains(p.basename(entity.path)) &&
+              // shutter writes it last: a run without it was not finished.
+              !File(p.join(entity.path, 'manifest.json')).existsSync())
+            entity.path,
+      ];
+    }
+    return const [];
   }
 }

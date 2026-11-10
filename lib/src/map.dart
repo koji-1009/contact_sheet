@@ -80,7 +80,8 @@ String kindName(Messages m, NavigationKind kind) => switch (kind) {
 
 /// What an arrow says, in three parts, in this order: [code], what only the
 /// code names (a key, a widget class tapped); [plain], what anyone reads
-/// (what is on the screen, the state it needs, a redirect); and [kind], how
+/// (what is on the screen, the state and the conditions' values it needs, a
+/// redirect); and [kind], how
 /// the code keeps its pages (go, replace). [code] and [kind] are shown to
 /// developers only.
 typedef EdgeLabel = ({String? code, String? plain, String? kind});
@@ -305,8 +306,8 @@ class SheetMap {
       };
 
   /// The file name of [state]'s image in [variant] in an export, a WebP
-  /// (named by the shot, and the platform when it is not iOS); null when it
-  /// has none.
+  /// (named by the shot, after `sheet-` for the sheet package's and the
+  /// platform when it is not iOS); null when it has none.
   String? imageNameOf(SheetState state, [SheetVariant? variant]) {
     final v = variant ?? sheet.variants.first;
     final shot = shotOf(state, v);

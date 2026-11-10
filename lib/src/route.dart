@@ -298,7 +298,8 @@ class Route {
 
   /// Where none is found but one might be past the bound ([bounded]): the
   /// fewest steps that one would take, as the search, gone to the end
-  /// within the bound, proves; null otherwise.
+  /// within the bound, proves; null otherwise, and where the start alone
+  /// is past the bound and the search proves no fewer.
   final int? atLeast;
 
   Map<String, Object?> toJson() => {
@@ -685,8 +686,9 @@ class Router {
   bool _inTab(String page, int t) =>
       _rootTab[page] == t || _inTabs[page]!.contains(t);
 
-  /// The tab a go (by [edge], or a deep link naming [named]) opens [page]
-  /// in, while [active] is shown; null when the page is in none.
+  /// The tab a go or a deep link opens [page] in, naming the tab [named]
+  /// (its `tab`) or not, while [active] is shown; null when the page is in
+  /// none.
   int? _goTab(String page, int? active, String? named) {
     final t = _rootTab[named] ?? _rootTab[page];
     if (t != null) return t;
@@ -697,7 +699,7 @@ class Router {
 
   /// Where a go, or the app's launch, or a deep link, puts [node] (of a
   /// canonical frame) as all the history, from [ctx] (the shell at the
-  /// bottom, or -1), by [edge] or naming [named]: in its tab (keeping the
+  /// bottom, or -1), naming the tab [named] or not: in its tab (keeping the
   /// other tabs' histories when the shell is the same bar's), or alone.
   int _startAt(int node, int ctx, {String? named}) {
     final f = _frameOf(node);
@@ -915,18 +917,25 @@ class Router {
 
   /// Where [top], with nothing under it, goes by its pop [j] (null: its
   /// back), from the tab [tab]'s history (null: from none): a written pop
-  /// where it names (none for one back to the page under it), the back to
-  /// the page's parent, as go_router builds it under it. Alone in that
-  /// tab's history where its page is shown in the tab; else a pop's page
-  /// out of any bar, and the parent as a go from nowhere puts it.
+  /// where it names; the back, and a pop back to the page under it written
+  /// for the page's parent, to that parent, as go_router builds it under
+  /// it (the pop's `then` and `set` its own). Alone in that tab's history
+  /// where its page is shown in the tab; else a pop's page out of any bar,
+  /// and the parent as a go from nowhere puts it.
   List<_Alone> _alone(int top, int? j, int? tab) {
     bool stays(int h) => tab != null && _inTab(_frames[_frameOf(h)].page, tab);
-    if (j != null) {
-      if (edges[j].under) return const [];
+    final List<int> parent;
+    if (j == null) {
+      parent = _toParent(top);
+    } else if (!edges[j].under) {
       return [for (final h in _arrive(j, top)) (node: h, stays: stays(h))];
+    } else if (edges[j].to == _parents[_frames[_frameOf(top)].page]) {
+      parent = _arrive(j, top);
+    } else {
+      return const [];
     }
     return [
-      for (final h in _toParent(top))
+      for (final h in parent)
         stays(h)
             ? (node: h, stays: true)
             : (node: _startAt(h, -1), stays: false),
@@ -1019,8 +1028,9 @@ class Router {
   /// stops at the first node [done] holds of ([ties]: once it has taken
   /// every node [done] holds of in as few steps), and gives what it
   /// reached, each with what it was reached from and by, those nodes, the
-  /// fewest steps after which a page went past a tab's bound, and whether
-  /// it stopped short, at [searchLimit] nodes taken. Each step it relaxes is
+  /// fewest steps a route through a page past a tab's bound would take at
+  /// least (the steps to it and the bound from it: `deep`), and whether it
+  /// stopped short, at [searchLimit] nodes taken. Each step it relaxes is
   /// told to [onStep] (the steps it takes).
   ({Map<_At, (_At?, _Hop?)> seen, List<_At> ends, int? deep, bool short})
   _explore(
@@ -1040,8 +1050,16 @@ class Router {
     final heap = _Heap<(int, _At, _At?, _Hop?)>();
     final seen = <_At, (_At?, _Hop?)>{};
     // The fewest steps a node is in the heap with: one no fewer is not
-    // pushed again.
+    // pushed again; with [ties], one as few is, if it has more frames.
     final best = <_At, int>{};
+    // With [ties]: what each node in the heap is reached from and by, and
+    // the frames on the stack then. A node is reached the same way past it
+    // whatever is under its level, so the most frames at a node are the
+    // most at the end. Of those as near, the nearer is taken first, so a
+    // node is taken after every way to it in as few steps.
+    final via = <_At, (_At, _Hop, int)>{};
+    int framesBy(_At from, _Hop how) =>
+        _flat(_replay(stack, [..._path(seen, from), ..._open(how)]).$1).length;
     int? deep;
     // Whether [stack]'s first k frames hold one past a tab's bound.
     final pastUnder = [false];
@@ -1072,9 +1090,14 @@ class Router {
       }
       if (seen.containsKey(next)) return;
       final b = best[next];
-      if (b != null && b <= d) return;
+      if (b != null && (b < d || (b == d && !ties))) return;
+      if (ties) {
+        final frames = framesBy(from, how);
+        if (b == d && frames <= via[next]!.$3) return;
+        via[next] = (from, how, frames);
+      }
       best[next] = d;
-      heap.push(d + left, (d, next, from, how));
+      heap.push(d + left, (d, next, from, how), tie: d);
     }
 
     if (stack.isNotEmpty) {
@@ -1107,7 +1130,8 @@ class Router {
       // now: the bound is no more than the steps left.
       if (fewest != null && key > fewest) break;
       if (seen.containsKey(at)) continue;
-      seen[at] = (from, how);
+      final (byFrom, byHow, _) = via[at] ?? (from, how, 0);
+      seen[at] = from == null ? (null, null) : (byFrom, byHow);
       final (:top, :under, :shell) = at;
       if (done(top)) {
         ends.add(at);
@@ -1307,8 +1331,9 @@ class Router {
   }
 
   /// The fewest steps from [stack] (its top last) to a node [done] holds
-  /// of; null when none reaches one; the fewest steps after which a page
-  /// went past a tab's bound (none found: one might be past it); whether
+  /// of; null when none reaches one; the fewest steps a route through a page
+  /// past a tab's bound would take at least (none found: one might be past
+  /// it); whether
   /// the search stopped short; the stack searched from; and, none found but
   /// one might be, the fewest steps that one would take. [alone] and [to]
   /// as [_toward] has them; [fullest]: of the routes of the fewest steps,
@@ -1318,7 +1343,7 @@ class Router {
   ///
   /// None found within the bound, but one might be past it: it is searched
   /// for once more, the bound raised by [tabDepth] over the deepest history
-  /// at the start. A route found is the fewest of all: when a switch past
+  /// at the start, or over [tabDepth] where that is less. A route found is the fewest of all: when a switch past
   /// the bound might have been shorter, it is searched again among routes
   /// of fewer steps, with the bound raised to the deepest history at the
   /// start and the steps found (none of fewer steps puts more pages in a
@@ -1826,22 +1851,26 @@ class Router {
     return [
       for (final u in _overFrames[e.from] ?? const <int>{})
         if (_frames[u].page == e.to) ..._landOn(u, node, i),
-      if (!e.under) ..._arrive(i, node),
+      // Naming its page; or back to its parent, built under it.
+      if (!e.under || e.to == _parents[e.from]) ..._arrive(i, node),
     ];
   }
 
   /// The pages [page] can be put over, as the sheet has them: a pop back to
-  /// the page under it, written from [page], goes to each.
+  /// the page under it, written from [page], goes to each. Its parent among
+  /// them: go_router builds it under the page, gone to or opened by a deep
+  /// link.
   Set<String> under(String page) => {
     for (final f in _overFrames[page] ?? const <int>{}) _frames[f].page,
+    ?_parents[page],
   };
 
-  /// Whether the edge [e], a replace, puts its page over the bar instead of
-  /// in its `from`'s place, its `from` kept under it: from a tab's page, a
-  /// page shown in none of its tabs.
+  /// Whether the edge [e], a replace, can put its page over the bar instead
+  /// of in its `from`'s place, its `from` kept under it: from a tab's page,
+  /// a page not shown in one of its tabs (in that tab, as [_effect] has it).
   bool _replacesOverBar(RouteEdge e) {
     final tabs = [?_rootTab[e.from], ..._inTabs[e.from]!];
-    return tabs.isNotEmpty && !tabs.any((t) => _inTab(e.to, t));
+    return tabs.any((t) => !_inTab(e.to, t));
   }
 
   /// The frames each page can be put over, by the rule the sheet draws a
@@ -2789,21 +2818,26 @@ class _Unfollowed {
   }
 }
 
-/// A binary heap on (d, then the order pushed): the same route each time.
-/// Only numbers move in it: the values stay where they were pushed, by the
-/// order (moving a value of a record type checks its type each time).
+/// A binary heap on (d, then the tie, then the order pushed): the same route
+/// each time. Only numbers move in it: the values stay where they were
+/// pushed, by the order (moving a value of a record type checks its type
+/// each time).
 class _Heap<T> {
   final _d = <int>[];
+  final _tie = <int>[];
   final _order = <int>[];
   final _values = <Object?>[];
 
   bool get isNotEmpty => _d.isNotEmpty;
 
   bool _less(int i, int j) =>
-      _d[i] < _d[j] || (_d[i] == _d[j] && _order[i] < _order[j]);
+      _d[i] < _d[j] ||
+      (_d[i] == _d[j] &&
+          (_tie[i] < _tie[j] || (_tie[i] == _tie[j] && _order[i] < _order[j])));
 
-  void push(int d, T value) {
+  void push(int d, T value, {int tie = 0}) {
     _d.add(d);
+    _tie.add(tie);
     _order.add(_values.length);
     _values.add(value);
     for (var i = _d.length - 1; i > 0;) {
@@ -2822,6 +2856,7 @@ class _Heap<T> {
     final last = _d.length - 1;
     _swap(0, last);
     _d.removeLast();
+    _tie.removeLast();
     _order.removeLast();
     final n = _d.length;
     for (var i = 0; ;) {
@@ -2840,6 +2875,9 @@ class _Heap<T> {
     final d = _d[i];
     _d[i] = _d[j];
     _d[j] = d;
+    final t = _tie[i];
+    _tie[i] = _tie[j];
+    _tie[j] = t;
     final o = _order[i];
     _order[i] = _order[j];
     _order[j] = o;

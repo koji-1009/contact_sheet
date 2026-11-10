@@ -35,7 +35,7 @@ pages:
     path: /note
     dependencies: [NotesApi]
     states:
-      - {name: Default, preview: lib/pages/note_page_preview.dart#notePage, uses: {NotesApi: 3 notes}}
+      - {name: A note, preview: lib/pages/note_page_preview.dart#notePage, uses: {NotesApi: 3 notes}}
 
   - id: edit
     label: Edit
@@ -54,7 +54,7 @@ pages:
     source: lib/pages/settings_page.dart
     path: /settings
     states:
-      - {name: Default, preview: lib/pages/settings_page_preview.dart#settingsPage}
+      - {name: Options, preview: lib/pages/settings_page_preview.dart#settingsPage}
 
 edges:
   # Each note's ListTile opens it.

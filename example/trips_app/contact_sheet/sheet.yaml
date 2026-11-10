@@ -87,7 +87,7 @@ pages:
     memo: |
       Where Continue goes depends on where the user was sent from (the page that asked to sign in, carried in the link as "from"), else Explore. "Sign in to go on." is shown when a page asked.
     states:
-      - name: Standard
+      - name: Not asked
         preview: contact_sheet/lib/preview/sign_in.dart#signIn
         uses: {AuthRepository: guest}
       - name: From trips
@@ -112,7 +112,7 @@ pages:
     memo: |
       Opened from the sign-in, it carries the same "from": creating the account goes where signing in would have.
     states:
-      - name: Standard
+      - name: Not asked
         preview: contact_sheet/lib/preview/sign_up.dart#signUp
         uses: {AuthRepository: guest}
       - name: From trips
@@ -658,7 +658,7 @@ edges:
     to: sign_in
     trigger: text:I have an account
     set: {Welcome: Seen}
-    then: Standard
+    then: Not asked
     source: lib/features/onboarding/welcome_page.dart
 
   # Sign in
@@ -673,7 +673,7 @@ edges:
   - from: sign_in
     to: explore
     trigger: text:Continue
-    when: Standard
+    when: Not asked
     set: {Login: Signed in}
     kind: go
     source: lib/features/auth/sign_in_page.dart
@@ -708,7 +708,7 @@ edges:
   - from: sign_up
     to: explore
     trigger: text:Create account
-    when: Standard
+    when: Not asked
     set: {Login: Signed in}
     kind: go
     source: lib/features/auth/sign_up_page.dart
@@ -970,13 +970,13 @@ edges:
     to: sign_in
     trigger: text:Sign in
     when: Guest
-    then: Standard
+    then: Not asked
     source: lib/features/account/account_page.dart
   - from: account
     to: sign_up
     trigger: text:Create an account
     when: Guest
-    then: Standard
+    then: Not asked
     source: lib/features/account/account_page.dart
   - from: account
     to: profile

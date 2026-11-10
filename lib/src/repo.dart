@@ -12,7 +12,8 @@ import 'package:yaml/yaml.dart';
 /// | `contact_sheet/sheet.yaml` | The sheet. Written by an AI agent or by hand | yes |
 /// | `contact_sheet/basis.json` | What the app was when the sheet was written | yes |
 /// | `contact_sheet/map/` | The map, written by `sheet export` | as the app's owners choose |
-/// | `contact_sheet/pubspec.yaml`, `lib/` | The sheet package, for the previews the app lacks | yes |
+/// | `contact_sheet/pubspec.yaml`, `pubspec.lock`, `lib/` | The sheet package, for the previews the app lacks | yes |
+/// | `contact_sheet/.dart_tool/contact_sheet/` | What an export keeps between runs: the WebP made of each shot, when `flutter pub get` last ran, the runs it made | no |
 class SheetRepo {
   SheetRepo(String root) : root = p.normalize(p.absolute(root));
 

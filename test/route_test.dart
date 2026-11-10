@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:contact_sheet/contact_sheet.dart';
+import 'package:contact_sheet/src/lint.dart';
 import 'package:contact_sheet/src/map.dart';
+import 'package:contact_sheet/src/messages.g.dart';
 import 'package:contact_sheet/src/route.dart';
 import 'package:contact_sheet/src/route_js.g.dart';
+import 'package:contact_sheet/src/sheet.dart';
 import 'package:test/test.dart';
 
 import '../tool/route_sources.dart';
@@ -1228,7 +1230,120 @@ edges:
       'home:s b:s',
       'back => home:s',
     ]);
+
+    // Two pushed in two steps, one replaced: whichever the sheet writes
+    // first, the start keeps a under b.
+    for (final first in [true, false]) {
+      const replaced =
+          '  - {from: home, to: c, trigger: text:C}\n'
+          '  - {from: c, to: b, trigger: text:B, kind: replace}\n';
+      const pushed =
+          '  - {from: home, to: a, trigger: text:A}\n'
+          '  - {from: a, to: b, trigger: text:B}\n';
+      final sheet = Sheet.parse('''
+pages:
+  - {id: home, label: Home, states: [{name: s, preview: a.dart#a}]}
+  - {id: a, label: A, states: [{name: s, preview: b.dart#b}]}
+  - {id: b, label: B, states: [{name: s, preview: c.dart#c}]}
+  - {id: c, label: C, states: [{name: s, preview: d.dart#d}]}
+edges:
+${first ? '$replaced$pushed' : '$pushed$replaced'}''', _m);
+      expect(_said(sheet, sheet.router.route('b', null, 'home')), [
+        'home:s a:s b:s',
+        'back => a:s',
+        'back => home:s',
+      ], reason: first ? 'replace first' : 'push first');
+    }
   });
+
+  test('with nothing under it, a pop back to the page under it goes to the '
+      'page\'s parent, as its back would', () {
+    // edit is gone to, alone: its written back goes to list, built under
+    // it; Save, only gone to, can be written too.
+    final sheet = Sheet.parse('''
+conditions: [{name: Saved, values: [no, yes]}]
+pages:
+  - {id: home, label: Home, states: [{name: s, preview: a.dart#a}]}
+  - {id: list, label: List, states: [{name: s, preview: b.dart#b}, {name: saved, preview: b.dart#b@1, if: {Saved: yes}}]}
+  - {id: edit, label: Edit, parent: list, states: [{name: s, preview: c.dart#c}]}
+  - {id: hotel, label: Hotel, parent: list, states: [{name: h, preview: d.dart#d}]}
+edges:
+  - {from: home, to: list, trigger: text:List}
+  - {from: list, to: edit, trigger: text:Edit}
+  - {from: home, to: edit, trigger: text:New, kind: go}
+  - {from: edit, trigger: back, kind: pop}
+  - {from: home, to: hotel, trigger: text:Hotel, kind: go}
+  - {from: hotel, trigger: text:Save, kind: pop, set: {Saved: yes}}
+''', _m);
+    expect(sheet.router.under('hotel'), {'list'});
+    // The go reaches edit first: alone.
+    expect(_said(sheet, sheet.router.route('edit', null, 'list')), [
+      'edit:s',
+      'edit>list back pop => list:s',
+    ]);
+    // Save lands on list as nothing says, of the values it gives: saved.
+    final save = sheet.edges.singleWhere((e) => e.key.contains('Save'));
+    expect(save.to, 'list');
+    expect(sheet.arrivals(save), {
+      'h': ['s', 'saved'],
+    });
+  });
+
+  test('a dialog as the playbook writes it: a state of the page, opened and '
+      'closed in its place', () {
+    final sheet = Sheet.parse('''
+pages:
+  - {id: home, label: Home, states: [{name: s, preview: a.dart#a}]}
+  - {id: list, label: List, states: [{name: s, preview: b.dart#b}]}
+  - {id: edit, label: Edit, states: [{name: Editing, preview: c.dart#c}, {name: Confirm, preview: c.dart#c@1}]}
+edges:
+  - {from: home, to: list, trigger: text:List}
+  - {from: list, to: edit, trigger: text:Edit}
+  - {from: edit, to: edit, trigger: back, when: Editing, then: Confirm, kind: replace}
+  - {from: edit, to: edit, trigger: back, when: Confirm, then: Editing, kind: replace}
+  - {from: edit, trigger: text:Discard, when: Confirm, kind: pop}
+''', _m);
+    expect(sheet.router.under('edit'), {'list'});
+    expect(_said(sheet, sheet.router.route('edit', 'Editing', 'list')), [
+      'home:s list:s edit:Editing',
+      'edit>edit back [Editing] replace => edit:Confirm',
+      'edit>list text:Discard [Confirm] pop => list:s',
+    ]);
+  });
+
+  test(
+    'a replace from a page in two tabs, by a page in one, goes over the '
+    'bar in the other: a pop back to the page under it lands on that page',
+    () {
+      final sheet = Sheet.parse('''
+conditions: [{name: Saved, values: [no, yes]}]
+tabs:
+  - pages:
+      - {page: a, trigger: text:A}
+      - {page: b, trigger: text:B}
+pages:
+  - {id: a, label: A, states: [{name: s, preview: a.dart#a}]}
+  - {id: b, label: B, states: [{name: s, preview: b.dart#b}]}
+  - {id: x, label: X, tab: [a, b], states: [{name: s, preview: x.dart#x}, {name: t, preview: x.dart#x@1, if: {Saved: yes}}]}
+  - {id: y, label: Y, tab: [b], states: [{name: t, preview: y.dart#y}]}
+  - {id: w, label: W, states: [{name: s, preview: w.dart#w}]}
+edges:
+  - {from: a, to: x, trigger: text:X}
+  - {from: b, to: x, trigger: text:X}
+  - {from: x, to: y, trigger: text:Y, kind: replace}
+  - {from: y, trigger: text:Done, kind: pop, set: {Saved: yes}}
+  - {from: x, to: w, trigger: text:W, when: t}
+''', _m);
+      expect(sheet.router.under('y'), {'a', 'b', 'x'});
+      expect(_said(sheet, sheet.router.route('a', null, 'w')), [
+        'a:s',
+        'a>x text:X push => x:s',
+        'x>y text:Y replace => y:t',
+        'y>x text:Done pop => x:t',
+        'x>w text:W [t] push => w:s',
+      ]);
+    },
+  );
 
   test('the JavaScript is compiled from the route as it is', () {
     final generated = File('lib/src/route_js.g.dart').readAsStringSync();
@@ -1731,10 +1846,20 @@ Map<String, int> _searched(
             add(landed(f, after));
           }
         }
-      } else if (!out.any((e) => e.back)) {
-        // Nothing under it: its back to its parent, in the tab where the
-        // parent is in it, else as a go from nowhere puts it.
-        for (final f in toParent(top, g)) {
+      } else {
+        // Nothing under it: its back to its parent, and a pop back to the
+        // page under it written for its parent, with its values; in the tab
+        // where the parent is in it, else as a go from nowhere puts it.
+        final parent = pages[top.page]!.parent;
+        final toParents = <(RouteFrame, Map<String, String>)>[
+          if (!out.any((e) => e.back))
+            for (final f in toParent(top, g)) (f, g),
+          for (final e in out)
+            if (e.move == RouteMove.pop && e.under && e.to == parent)
+              for (final f in arrive(e, top.state, g).$2)
+                (f, arrive(e, top.state, g).$1),
+        ];
+        for (final (f, g) in toParents) {
           if (onShell && inTab(f.page, shell!.active)) {
             add(withStack([f], g));
             continue;

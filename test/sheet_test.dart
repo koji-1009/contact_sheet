@@ -1,5 +1,7 @@
-import 'package:contact_sheet/contact_sheet.dart';
+import 'package:contact_sheet/src/lint.dart';
 import 'package:contact_sheet/src/map.dart';
+import 'package:contact_sheet/src/messages.g.dart';
+import 'package:contact_sheet/src/sheet.dart';
 import 'package:test/test.dart';
 
 final _m = Messages.of('en');
@@ -267,6 +269,49 @@ pages:
     expect(
       () => _parse('pages: [$page]\nedges: [{from: a, to: a, kind: jump}]'),
       _fails(startsWith('contact_sheet/sheet.yaml, edges[0].kind: jump is')),
+    );
+    // Empty, what means nothing: said; a fake of no dependency, said.
+    expect(
+      () => _parse('pages: [$page]\nedges: [{from: a, to: a, when: []}]'),
+      _fails(
+        'contact_sheet/sheet.yaml, edges[0].when: is empty: write at least '
+        'one, or leave it out',
+      ),
+    );
+    expect(
+      () => _parse('pages: [$page]\nedges: [{from: a, to: a, then: {}}]'),
+      _fails(startsWith('contact_sheet/sheet.yaml, edges[0].then: is empty')),
+    );
+    expect(
+      () => _parse(
+        'pages: [{id: a, label: A, states: '
+        '[{name: s, preview: a.dart#a, uses: {Auth: guest}}]}]',
+      ),
+      _fails(
+        'contact_sheet/sheet.yaml, pages[0].states[0].uses.Auth: '
+        'Auth is not in dependencies',
+      ),
+    );
+    // A number as written.
+    final numbers = _parse('''
+conditions: [{name: Fee, values: [1.50, 2.00]}]
+pages: [{id: a, label: 1.50, states: [{name: s, preview: a.dart#a, if: {Fee: 2.00}}]}]
+''');
+    expect(numbers.pages.single.label, '1.50');
+    expect(numbers.conditions.single.values, ['1.50', '2.00']);
+    expect(numbers.pages.single.states.single.conditions, {'Fee': '2.00'});
+    // A number no annotation can be: said where, not thrown.
+    expect(
+      () => _parse(
+        'pages: [{id: a, label: A, states: '
+        '[{name: s, preview: "a.dart#a@99999999999999999999"}]}]',
+      ),
+      _fails(
+        startsWith(
+          'contact_sheet/sheet.yaml, pages[0].states[0].preview: '
+          'a.dart#a@99999999999999999999 is not a preview',
+        ),
+      ),
     );
     expect(
       () =>
@@ -703,6 +748,26 @@ entries:
     fails(
       '${conditions}pages: [$page]\n'
           'edges: [{from: a, to: a, when: s, if: {L: m}}]',
+      'edges[0].if: no state it happens in is a state of these values: '
+          'it never happens',
+    );
+    // From every page, or several: it happens where some page lets it, a
+    // page only of other values (a guest's own) as it is.
+    const guests =
+        '{id: g, label: G, states: [{name: s, preview: g.dart#g, if: {L: g}}]}';
+    const login =
+        '{id: login, label: Login, states: [{name: s, preview: l.dart#l}]}';
+    expect(
+      _parse(
+        '${conditions}pages: [$page, $guests, $login]\n'
+        'edges: [{from: \'*\', to: login, if: {L: m}, kind: go}, '
+        '{from: [g, a], to: login, if: {L: m}}]',
+      ).edges.where((e) => e.from == 'g'),
+      hasLength(2),
+    );
+    fails(
+      '${conditions}pages: [$page, $guests, $login]\n'
+          'edges: [{from: [g], to: login, if: {L: m}}]',
       'edges[0].if: no state it happens in is a state of these values: '
           'it never happens',
     );
@@ -1146,6 +1211,77 @@ edges:
       'the tag Analytics: 3 of the 4 pages have it, not D',
       'the tag Unused: no page has it',
     ]);
+  });
+
+  test('lint tells what is missing, not what the app does without a word', () {
+    List<String> keys(String yaml) => [
+      for (final hint in lintHints(_parse(yaml), _m)) hint.key,
+    ];
+    const login = 'conditions: [{name: Login, values: [Guest, Member]}]\n';
+
+    // The launch's state, second, and the state a back lands in under the
+    // values given above: both arrive.
+    expect(
+      keys('''
+$login
+pages:
+  - {id: home, label: Home, states: [{name: Member, preview: a.dart#a, if: {Login: Member}}, {name: Guest, preview: a.dart#a@1, if: {Login: Guest}}]}
+  - {id: login, label: Log in, states: [{name: s, preview: b.dart#b}]}
+edges:
+  - {from: home, to: login, trigger: text:Log in, when: Guest}
+  - {from: login, to: login, trigger: text:Go, set: {Login: Member}, kind: replace}
+'''),
+      isNot(anyElement(startsWith('nothing-arrives'))),
+    );
+
+    // A value named only by a tab's if is named; each page of an item from
+    // several is looked at.
+    expect(
+      keys('''
+$login
+tabs:
+  - pages:
+      - {page: feed, trigger: "label:Feed"}
+      - {page: mine, trigger: "label:Mine", if: {Login: Member}}
+pages:
+  - {id: feed, label: Feed, states: [{name: s, preview: a.dart#a}]}
+  - {id: mine, label: Mine, states: [{name: s, preview: b.dart#b}]}
+  - {id: settings, label: Settings, states: [{name: s, preview: c.dart#c}]}
+  - {id: detail, label: Detail, tab: feed, states: [{name: s, preview: d.dart#d}]}
+edges:
+  - {from: [feed, settings], to: detail, trigger: "text:Open"}
+  - {from: feed, to: settings, trigger: "text:Settings"}
+'''),
+      allOf(
+        isNot(contains('value-unnamed Login=Member')),
+        contains('over-bar settings>detail text:Open push'),
+      ),
+    );
+
+    // Two that give other values are two; a then of the values its if
+    // holds gives nothing new; an edge from every page that never happens
+    // is told once.
+    final told = keys('''
+conditions:
+  - {name: Login, values: [Guest, Member]}
+  - {name: Ban, values: ['No', 'Yes']}
+pages:
+  - {id: account, label: Account, states: [{name: Guest, preview: a.dart#a, if: {Login: Guest}}, {name: Member, preview: a.dart#a@1, if: {Login: Member}}]}
+  - {id: done, label: Done, states: [{name: s, preview: b.dart#b}]}
+  - {id: welcome, label: Welcome, states: [{name: s, preview: c.dart#c, if: {Login: Guest}}]}
+edges:
+  - {from: account, to: done, trigger: text:Pay, when: Guest, set: {Login: Member}}
+  - {from: account, to: done, trigger: text:Pay, when: Member}
+  - {from: done, to: account, trigger: text:Back, if: {Login: Member}, then: Member, kind: go}
+  - {from: account, to: welcome, trigger: text:Out, set: {Login: Guest}, kind: go}
+  - {from: '*', to: done, trigger: other:Never, if: {Ban: 'Yes'}, kind: go}
+''');
+    expect(told, isNot(anyElement(startsWith('split'))));
+    expect(told, isNot(anyElement(startsWith('then-sets'))));
+    expect(
+      told.where((k) => k.startsWith('if-never-met') && k.contains('Never')),
+      hasLength(1),
+    );
   });
 
   test('triggers are named as shutter names targets', () {

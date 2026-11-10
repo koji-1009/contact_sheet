@@ -2,9 +2,14 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:contact_sheet/contact_sheet.dart';
-import 'package:contact_sheet/src/export.dart' show webpMaxSide, webpOf;
+import 'package:contact_sheet/src/basis.dart';
+import 'package:contact_sheet/src/export.dart'
+    show ExportException, SheetExport, webpMaxSide, webpOf;
 import 'package:contact_sheet/src/map.dart';
+import 'package:contact_sheet/src/messages.g.dart';
+import 'package:contact_sheet/src/repo.dart';
+import 'package:contact_sheet/src/scaffold.dart';
+import 'package:contact_sheet/src/sheet.dart';
 import 'package:crypto/crypto.dart' show sha256;
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
@@ -836,6 +841,51 @@ pages:
     expect(images(some.dir), before);
     // A's detail has no Desktop Preview: missing either way.
     expect(some.missing, all.missing);
+  });
+
+  test('with only some pages, a preview they share with another page is as '
+      'just shot', () async {
+    repo.sheetFile.writeAsStringSync('''
+pages:
+  - {id: a, label: A, states: [{name: s, preview: lib/preview/home.dart#home}]}
+  - {id: b, label: B, states: [{name: s, preview: lib/preview/home.dart#home}]}
+''');
+    final id = shotIdOf(
+      SheetState(name: '', file: 'lib/preview/home.dart', symbol: 'home'),
+    );
+    var drawn = 0;
+    Future<ShotRun> shoot(
+      String dir,
+      ShotSubject subject, {
+      ShotPlatform platform = ShotPlatform.android,
+      double pixelRatio = 2,
+      void Function(ShotProgress event)? onProgress,
+    }) async {
+      final run = Directory(p.join(dir, 'run'))..createSync(recursive: true);
+      return ShotRun(
+        id: 'run',
+        dir: run.path,
+        shots: [
+          ShotResult(
+            id: id,
+            status: ShotStatus.ok,
+            name: 'home',
+            size: const LogicalSize(390, 844),
+            png: (File(
+              p.join(run.path, '$id.png'),
+            )..writeAsBytesSync(_png(drawn++))).path,
+          ),
+        ],
+      );
+    }
+
+    SheetExport export() =>
+        SheetExport(repo, runner: Tools(), shoot: shoot, m: Messages.of('en'));
+    final all = await export().run();
+    final image = File(p.join(all.dir, 'images', '$id.webp'));
+    final first = image.readAsBytesSync();
+    await export().run(null, {'a'});
+    expect(image.readAsBytesSync(), isNot(first));
   });
 
   test(

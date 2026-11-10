@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:contact_sheet/contact_sheet.dart';
+import 'package:contact_sheet/src/repo.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 

@@ -13,7 +13,7 @@ import 'package:contact_sheet/src/sheet.dart';
 ///   none of them names: nothing happens from it, or an arrow is missing;
 /// - a state, not a page's first nor one what it loads decides (`data`),
 ///   that nothing arrives in: no arrow (by its `then`, or from a state of
-///   its name) nor deep link;
+///   its name), deep link, back, nor the launch;
 /// - an arrow written twice, or twice for other states where one with
 ///   `then` by the state it leaves says it; a deep link written twice;
 /// - of the conditions: a value nothing gives but the launch, or nothing
@@ -21,9 +21,14 @@ import 'package:contact_sheet/src/sheet.dart';
 ///   their values, or two for the same; the first page with none for the
 ///   launch's; an arrow whose `if` no history meets where it happens, or
 ///   that names in `when` a state its `if` leaves out;
-/// - an arrow whose `then` gives values of the conditions its `set` does
-///   not say; one without `then` that arrives in a state of `to` by the name
-///   of the state it leaves, not `to`'s first;
+/// - an arrow whose `then` gives values of the conditions its `set` (or its
+///   `if`) does not say; one without `then` that arrives in a state of `to`
+///   by the name of the state it leaves alone (not `to`'s first, a `data`
+///   state, nor one of the conditions);
+/// - of the tab bars: one of one tab; an arrow between two tabs of a bar
+///   (the bar switches them); a page opened from a tab it is not shown in,
+///   or from over the bar; a go or a deep link to a page in several tabs
+///   that names none;
 /// - a tag no page has, or one most pages have that some do not; a path a
 ///   tag's url is made with whose parameters have no values;
 /// - with [exists], which tells whether the app has a file (relative to it,
@@ -148,6 +153,12 @@ List<LintHint> _hints(
       }
     }
   }
+  // The states the app shows each page in: the launch's, and those a back
+  // lands in, besides the arrows' and the deep links'.
+  final shown = sheet.router.shown([
+    for (final e in sheet.entries)
+      (to: e.to, then: e.then, guard: e.guard, tab: e.tab),
+  ]).states;
   for (final page in sheet.pages) {
     final into = [
       for (final e in sheet.edges)
@@ -156,6 +167,7 @@ List<LintHint> _hints(
     // A tab's first page opens, switched to, as nothing says which.
     final tab = sheet.tabOf(page.id);
     bool arrives(String state) =>
+        (shown[page.id]?.contains(state) ?? false) ||
         (tab != null &&
             sheet.router.opening(page.id, null, tab.guard).contains(state)) ||
         sheet.entries.any(
@@ -189,13 +201,17 @@ List<LintHint> _hints(
       continue;
     }
     if (e.when.isEmpty) continue;
-    // Two that differ by the conditions they happen while are two.
+    // Two that differ by the conditions they happen while, or the values
+    // they give (one `set` for every state), are two.
     final other = split.putIfAbsent(
       [
         e.from,
         e.to,
         '${e.trigger}',
         guardKey(e.guard),
+        ([
+          for (final MapEntry(:key, :value) in e.sets.entries) '$key=$value',
+        ]..sort()).join(','),
         e.kind.name,
       ].join('\u0001'),
       () => e,
@@ -226,10 +242,11 @@ List<LintHint> _hints(
 }
 
 /// The hints of where arrows arrive by what is not written: a `then` that
-/// gives values of the conditions its `set` does not say; an arrow without
-/// `then` that arrives, from a state of its `from`, in the state of `to` of
-/// that name, not `to`'s first (another page's state of the name is taken
-/// for it).
+/// gives values of the conditions its `set` (or its `if`) does not say; an
+/// arrow without `then` that arrives, from a state of its `from`, in the
+/// state of `to` of that name, and only by that name: not `to`'s first, a
+/// `data` state, nor one of the conditions (another page's state of the
+/// name is taken for it).
 List<LintHint> _lintArrivals(Sheet sheet, Messages m) {
   final findings = <LintHint>[];
   String said(Map<String, String> values) =>
@@ -241,10 +258,13 @@ List<LintHint> _lintArrivals(Sheet sheet, Messages m) {
     SheetState? stateOf(String name) =>
         to.states.where((s) => s.name == name).firstOrNull;
     for (final then in {?e.then, ...e.thenBy.values}) {
+      // What its `if` holds to one value already is no change to say.
       final unsaid = {
         for (final MapEntry(:key, :value)
             in (stateOf(then)?.conditions ?? const {}).entries)
-          if (e.sets[key] != value) key: value,
+          if (e.sets[key] != value &&
+              !(e.guard[key]?.length == 1 && e.guard[key]!.single == value))
+            key: value,
       };
       if (unsaid.isNotEmpty && told.add('then-sets ${e.item} $then')) {
         findings.add(
@@ -370,9 +390,16 @@ List<LintHint> _lintTabs(Sheet sheet, Messages m) {
     if (sheet.tabOf(page) != null) page,
     ...sheet.pageOf(page)!.tabs,
   ];
-  final told = <int>{};
+  // Each edge of an item from several pages looked at; each hint told once
+  // for the item.
+  final told = <String>{};
+  void tell(SheetEdge e, String kind, String message) {
+    if (told.add('${e.item} $kind')) {
+      findings.add(LintHint('$kind ${e.key}', message));
+    }
+  }
+
   for (final e in sheet.edges) {
-    if (!told.add(e.item)) continue;
     final from = tabsOf(e.from);
     final to = tabsOf(e.to);
     final fromTab = sheet.tabOf(e.from);
@@ -385,27 +412,18 @@ List<LintHint> _lintTabs(Sheet sheet, Messages m) {
         e.from != e.to &&
         sheet.barOf(fromTab) == sheet.barOf(toTab) &&
         (e.trigger == null || '${e.trigger}' == '${toTab.trigger}')) {
-      findings.add(LintHint('between-tabs ${e.key}', m.lintTabEdge(e.item)));
+      tell(e, 'between-tabs', m.lintTabEdge(e.item));
     } else if (to.isNotEmpty && toTab == null) {
       final push =
           e.kind == NavigationKind.push || e.kind == NavigationKind.redirect;
       if (push && from.isNotEmpty && !from.any(to.contains)) {
-        findings.add(
-          LintHint('not-in-tab ${e.key}', m.lintNotInTab(e.item, page)),
-        );
+        tell(e, 'not-in-tab', m.lintNotInTab(e.item, page));
       } else if ((push || e.kind == NavigationKind.replace) && from.isEmpty) {
-        findings.add(
-          LintHint('over-bar ${e.key}', m.lintTabFromOutside(e.item, page)),
-        );
+        tell(e, 'over-bar', m.lintTabFromOutside(e.item, page));
       } else if (e.kind == NavigationKind.go &&
           to.length > 1 &&
           e.tab == null) {
-        findings.add(
-          LintHint(
-            'which-tab ${e.key}',
-            m.lintWhichTab(e.item, page, to.first),
-          ),
-        );
+        tell(e, 'which-tab', m.lintWhichTab(e.item, page, to.first));
       }
     }
   }
@@ -423,8 +441,8 @@ List<LintHint> _lintTabs(Sheet sheet, Messages m) {
   return findings;
 }
 
-/// The hints of the conditions; [reached], the pages an arrow leads to
-/// from the first or a deep link opens (those not, already told).
+/// The hints of the conditions; [reached], the pages an arrow, a deep link
+/// or a tab of a bar leads to from the first (those not, already told).
 List<LintHint> _lintConditions(Sheet sheet, Messages m, Set<String> reached) {
   final findings = <LintHint>[];
   String said(Map<String, String> values) =>
@@ -460,6 +478,8 @@ List<LintHint> _lintConditions(Sheet sheet, Messages m, Set<String> reached) {
     for (final guard in [
       for (final e in sheet.edges) e.guard,
       for (final e in sheet.entries) e.guard,
+      for (final bar in sheet.tabBars)
+        for (final tab in bar.tabs) tab.guard,
     ])
       for (final MapEntry(:key, :value) in guard.entries)
         for (final v in value) (key, v),
@@ -567,9 +587,11 @@ List<LintHint> _lintConditions(Sheet sheet, Messages m, Set<String> reached) {
       }
     }
     if (reached.contains(e.from)) {
-      happens[(e.item, e.from)] =
-          (happens[(e.item, e.from)] ?? false) || happening.contains(i);
-      keys.putIfAbsent((e.item, e.from), () => e.key);
+      // From every page, written once: once for the item, where it happens
+      // on no page.
+      final at = (e.item, e.anywhere ? '*' : e.from);
+      happens[at] = (happens[at] ?? false) || happening.contains(i);
+      keys.putIfAbsent(at, () => e.key);
     }
   }
   for (final MapEntry(key: (item, from), value: does) in happens.entries) {
@@ -577,7 +599,9 @@ List<LintHint> _lintConditions(Sheet sheet, Messages m, Set<String> reached) {
       findings.add(
         LintHint(
           'if-never-met ${keys[(item, from)]}',
-          m.lintGuardUnsatisfied(item, sheet.pageOf(from)!.label),
+          from == '*'
+              ? m.lintGuardUnsatisfiedAnywhere(item)
+              : m.lintGuardUnsatisfied(item, sheet.pageOf(from)!.label),
         ),
       );
     }

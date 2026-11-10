@@ -73,12 +73,13 @@ class SheetExport {
           (s) =>
               RegExp(r'^[A-Za-z0-9._-]+$').hasMatch(s) && s != '.' && s != '..',
         ) &&
+        // As macOS's and Windows' file systems take names: whatever the case.
         !const {
           'index.html',
           'sheet.json',
           'map.svg',
           'map-dev.svg',
-        }.contains(parts.first);
+        }.contains(parts.first.toLowerCase());
   }
 
   final SheetRepo repo;
@@ -119,7 +120,7 @@ class SheetExport {
 
   /// Where it is written for [folder], a folder chosen for it: in a folder
   /// of its own there ([folderName]), since writing it replaces its
-  /// `images/`; or in [folder] itself when that is one written before.
+  /// [imagesDir]; or in [folder] itself when it has that name.
   String dirIn(String folder) {
     final dir = p.normalize(p.absolute(folder));
     return p.basename(dir) == folderName ? dir : p.join(dir, folderName);
@@ -170,7 +171,15 @@ class SheetExport {
       final (shots, failed) = await _shootAll(sheet, runs, only);
       await _toWebp(sheet, shots, failed, prune: only.isEmpty);
       if (only.isNotEmpty) {
-        shots.addAll(_keep(sheet, out, only, kept.path));
+        // A preview the pages shot share with another page is as just shot.
+        for (final MapEntry(:key, :value) in _keep(
+          sheet,
+          out,
+          only,
+          kept.path,
+        ).entries) {
+          shots.putIfAbsent(key, () => value);
+        }
       }
       final (:commit, :branch) = await at;
       final map = SheetMap(

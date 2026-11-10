@@ -73,7 +73,7 @@ pages:
     tags: {Design: product}
     dependencies: [ProductRepository, CartRepository]
     states:
-      - name: Default
+      - name: A product
         preview: contact_sheet/lib/preview/product_detail.dart#productDetail
         uses: {ProductRepository: 3 products, CartRepository: empty}
 
@@ -122,7 +122,7 @@ pages:
     path: /complete
     tags: {Design: complete}
     states:
-      - name: Default
+      - name: Order placed
         preview: contact_sheet/lib/preview/complete.dart#complete
 
   - id: login
@@ -149,7 +149,7 @@ pages:
     path: /orders
     tags: {Design: orders}
     states:
-      - name: Default
+      - name: Past orders
         preview: contact_sheet/lib/preview/orders.dart#orders
 
 edges:

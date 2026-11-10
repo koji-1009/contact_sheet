@@ -27,7 +27,7 @@ pages:
     memo: "HomeShell's first tab. The tabs keep no history: switching shows another in place."
     dependencies: [FeedApi]
     states:
-      - {name: Default, preview: lib/pages/home_shell_preview.dart#feedTab, uses: {FeedApi: 3 posts}}
+      - {name: Three posts, preview: lib/pages/home_shell_preview.dart#feedTab, uses: {FeedApi: 3 posts}}
 
   - id: search
     label: Search
@@ -53,7 +53,7 @@ pages:
     widget: PostPage
     source: lib/pages/post_page.dart
     states:
-      - {name: Default, preview: lib/pages/post_page_preview.dart#postPage}
+      - {name: A post, preview: lib/pages/post_page_preview.dart#postPage}
 
   - id: sign_in
     label: Sign in
@@ -62,7 +62,7 @@ pages:
     memo: Opens from the profile as a full-screen dialog.
     dependencies: [Session]
     states:
-      - {name: Default, preview: contact_sheet/lib/preview/sign_in.dart#signIn, uses: {Session: guest}}
+      - {name: Empty form, preview: contact_sheet/lib/preview/sign_in.dart#signIn, uses: {Session: guest}}
 
 edges:
   # The bottom tabs (HomeShell's NavigationBar): no history. Each tab from

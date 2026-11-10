@@ -63,6 +63,7 @@ abstract class Messages {
   String lintTwoStatesUnder(Object first, Object second, Object page);
   String lintIfExcludesWhen(Object item, Object state);
   String lintGuardUnsatisfied(Object item, Object page);
+  String lintGuardUnsatisfiedAnywhere(Object item);
   String lintThenSets(Object item, Object state, Object values);
   String lintByName(Object item, Object page, Object state, Object to);
   String lintNoFile(Object file);
@@ -85,6 +86,7 @@ abstract class Messages {
   String get descPrune;
   String get tooManyArguments;
   String fatal(Object error);
+  String ioFailed(Object path, Object error);
   String notApp(Object dir);
   String initWritten(Object files);
   String get initNothing;
@@ -129,6 +131,7 @@ abstract class Messages {
   String sheetListedTwice(Object id);
   String sheetDuplicateCondition(Object name);
   String get sheetNoValues;
+  String get sheetEmpty;
   String sheetUnknownCondition(Object name);
   String sheetUnknownValue(Object value, Object condition);
   String sheetThenAgainstSet(Object state);
@@ -298,7 +301,7 @@ class MessagesEn extends Messages {
 
   @override
   String get helpOut =>
-      "Write it into <app>_contact_sheet/ in this folder instead.";
+      "Write it into <app>_contact_sheet/ in this folder instead (into the folder itself, when it is named so).";
 
   @override
   String get helpOnly =>
@@ -421,6 +424,10 @@ class MessagesEn extends Messages {
       "edges[${item}] from ${page}: no way through the app reaches it there while its if holds";
 
   @override
+  String lintGuardUnsatisfiedAnywhere(Object item) =>
+      "edges[${item}] from every page: no way through the app reaches a page while its if holds";
+
+  @override
   String lintThenSets(Object item, Object state, Object values) =>
       "edges[${item}]: its then, ${state}, gives ${values}, which its set does not say. If the code gives them, write them in set";
 
@@ -498,6 +505,10 @@ class MessagesEn extends Messages {
 
   @override
   String fatal(Object error) => "Unexpected error: ${error}";
+
+  @override
+  String ioFailed(Object path, Object error) =>
+      "Could not read or write ${path}: ${error}";
 
   @override
   String notApp(Object dir) => "There is no pubspec.yaml in ${dir}";
@@ -655,6 +666,9 @@ class MessagesEn extends Messages {
 
   @override
   String get sheetNoValues => "needs at least one value";
+
+  @override
+  String get sheetEmpty => "is empty: write at least one, or leave it out";
 
   @override
   String sheetUnknownCondition(Object name) => "${name} is not in conditions";
@@ -1101,7 +1115,8 @@ class MessagesJa extends Messages {
       "sheet が指す Preview を shutter で撮り、地図（index.html・sheet.json・images/。--svg なら map.svg・map-dev.svg も）を contact_sheet/map/ に書き出す";
 
   @override
-  String get helpOut => "代わりにこのフォルダの中の <app>_contact_sheet/ に書き出す";
+  String get helpOut =>
+      "代わりにこのフォルダの中の <app>_contact_sheet/ に書き出す（フォルダ自体がその名前なら、そこに書き出す）";
 
   @override
   String get helpOnly =>
@@ -1218,6 +1233,10 @@ class MessagesJa extends Messages {
       "edges[${item}]（${page} から）: if が成り立つときにこの画面へたどり着く道がありません";
 
   @override
+  String lintGuardUnsatisfiedAnywhere(Object item) =>
+      "edges[${item}]（すべての画面から）: if が成り立つときにたどり着ける画面がありません";
+
+  @override
   String lintThenSets(Object item, Object state, Object values) =>
       "edges[${item}]: then の ${state} は ${values} にしますが、set には書かれていません。コードがその値にするなら、set に書いてください";
 
@@ -1294,6 +1313,10 @@ class MessagesJa extends Messages {
 
   @override
   String fatal(Object error) => "予期しないエラーです: ${error}";
+
+  @override
+  String ioFailed(Object path, Object error) =>
+      "${path} を読み書きできませんでした: ${error}";
 
   @override
   String notApp(Object dir) => "${dir} に pubspec.yaml がありません";
@@ -1444,6 +1467,9 @@ class MessagesJa extends Messages {
 
   @override
   String get sheetNoValues => "値が 1 つ以上要ります";
+
+  @override
+  String get sheetEmpty => "空です。1 つ以上書くか、項目ごと省いてください";
 
   @override
   String sheetUnknownCondition(Object name) => "${name} が conditions にありません";

@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:contact_sheet/contact_sheet.dart';
+import 'package:contact_sheet/src/commands.dart' show runSheet;
+import 'package:contact_sheet/src/export.dart' show SheetExport;
+import 'package:contact_sheet/src/repo.dart';
 import 'package:contact_sheet/src/runs.dart';
 import 'package:path/path.dart' as p;
 import 'package:shutter/shutter.dart';
@@ -59,8 +61,13 @@ void main() {
     return ShotRun(id: 'run', dir: p.join(dir, 'run'), shots: const []);
   }
 
-  Future<int> cli(List<String> args) =>
-      runCli(args, out: out.add, err: err.add, runner: Tools(), shoot: nothing);
+  Future<int> cli(List<String> args) => runSheet(
+    args,
+    out: out.add,
+    err: err.add,
+    runner: Tools(),
+    shoot: nothing,
+  );
 
   test('the usage when asked for, on out; a wrong use said on err, with the '
       'usage, as a usage error', () async {
@@ -107,21 +114,24 @@ void main() {
     expect('${out.last}\n', File('doc/manual.md').readAsStringSync());
   });
 
-  test('init writes the sheet; with --package, the sheet package too, its '
-      'shots kept out of git', () async {
+  test('init writes the sheet, what an export keeps kept out of git; with '
+      '--package, the sheet package too', () async {
     expect(await cli(['init', app.path]), 0);
-    expect(out.single, 'Written: contact_sheet/sheet.yaml');
+    expect(out.single, 'Written: contact_sheet/sheet.yaml, .gitignore');
     expect(
       File('${app.path}/contact_sheet/pubspec.yaml').existsSync(),
       isFalse,
     );
-    expect(File('${app.path}/.gitignore').existsSync(), isFalse);
+    expect(
+      File('${app.path}/.gitignore').readAsStringSync(),
+      contains('contact_sheet/.dart_tool/'),
+    );
 
     expect(await cli(['init', '--package', app.path]), 0);
     expect(
       out.last,
       'Written: contact_sheet/pubspec.yaml, contact_sheet/analysis_options.yaml, '
-      'contact_sheet/lib/fakes/states.dart, .gitignore',
+      'contact_sheet/lib/fakes/states.dart',
     );
     final pubspec = File('${app.path}/contact_sheet/pubspec.yaml')
         .readAsStringSync();
@@ -365,15 +375,30 @@ pages:
       Directory('${app.path}/contact_sheet/map/images').existsSync(),
       isFalse,
     );
-    for (final wrong in ['../up', '/abs', 'sheet.json']) {
+    for (final wrong in ['../up', '/abs', 'sheet.json', 'Index.html']) {
       ratios.clear();
+      err.clear();
       expect(await cli(['export', '--images', wrong, app.path]), 64);
-      expect(
-        err.reversed.elementAt(1),
-        startsWith('Not a folder for the images: $wrong ('),
-      );
+      expect(err.first, startsWith('Not a folder for the images: $wrong ('));
+      // A wrong use: the usage after it.
+      expect(err.last, contains('Usage: sheet export'));
       expect(ratios, isEmpty);
     }
+    // No such page: a wrong use too.
+    err.clear();
+    expect(await cli(['export', '--only', 'typo', app.path]), 64);
+    expect(err.first, contains('typo'));
+    expect(err.last, contains('Usage: sheet export'));
+    // A folder it cannot write in: said, not unexpected.
+    final file = File('${app.path}/taken')..writeAsStringSync('');
+    err.clear();
+    expect(await cli(['export', '--out', file.path, app.path]), 74);
+    expect(err.last, startsWith('Could not read or write '));
+  });
+
+  test('agent and manual take no arguments', () async {
+    expect(await cli(['agent', 'foo']), 64);
+    expect(out, isEmpty);
   });
 
   test('lint says when it finds nothing, and when only what checked '
@@ -430,7 +455,7 @@ edges:
     File('${app.path}/lib/home.dart')
       ..createSync(recursive: true)
       ..writeAsStringSync('// previews\n');
-    final failing = await runCli(
+    final failing = await runSheet(
       ['export', app.path],
       out: out.add,
       err: err.add,
@@ -454,7 +479,7 @@ edges:
     }) => throw StateError('a bug');
     for (final verbose in [false, true]) {
       err.clear();
-      final code = await runCli(
+      final code = await runSheet(
         ['export', if (verbose) '--verbose', app.path],
         out: out.add,
         err: err.add,
@@ -481,7 +506,7 @@ edges:
       ..createSync(recursive: true)
       ..writeAsStringSync('// previews\n');
     final tools = Tools();
-    Future<int> export() => runCli(
+    Future<int> export() => runSheet(
       ['export', app.path],
       out: out.add,
       err: err.add,
@@ -549,6 +574,9 @@ edges:
     ExportRuns(SheetRepo(app.path)).shooting(app.path);
     final half = Directory('$runs/20260104T000000Z')..createSync();
     final claim = File('$runs/.20260104T000000Z')..createSync();
+    // An export after it, done, forgets only what it shot itself.
+    ExportRuns(SheetRepo(app.path)).deleteAll();
+    expect(half.existsSync(), isTrue);
     expect(await cli(['prune', app.path]), 0);
     expect(out.last, 'Deleted shutter\'s runs Contact Sheet left: 1');
     expect(half.existsSync(), isFalse);

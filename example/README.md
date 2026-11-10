@@ -16,9 +16,11 @@ What each sheet shows:
 - `trips_app`: a sheet written by an AI agent given only `sheet agent` and `sheet manual`. Tabs that keep their own histories (`tabs`, `retap: first`, pages with `tab:`, pages over the bar without), nested routes gone to by `go` whose back goes to their `parent`, the router's redirects for the welcome and for guests, a sign-in with a state for each place it is sent from, conditions for the welcome, signing in, the trips, the cards, the wishlist and the language, and url_launcher faked at its platform interface. With 37 pages, arrows between sections that would cross another section are jumps.
 - `tabs_app`: tabs written as `replace` edges from a list of pages (`from: [search, profile]`), signing in that the profile keeps after the tabs change (`set: {Login: Signed in}`), and signing out in place (an edge from the page to itself).
 
-To draw one, from the repository's root:
+To draw one, from the root of a clone of [the repository](https://github.com/koji-1009/contact_sheet):
 
 ```sh
+git clone https://github.com/koji-1009/contact_sheet.git
+cd contact_sheet
 dart run contact_sheet export example/shop_app
 ```
 

@@ -7,10 +7,12 @@ import 'package:path/path.dart' as p;
 
 /// Writes an empty `contact_sheet/sheet.yaml`; with [package], the sheet
 /// package's skeleton too: a Flutter package that imports the app, for the
-/// previews (and fakes) the app does not have, whose shots are kept out of
-/// git ([_ignoreShots]). Files that exist are left alone.
+/// previews (and fakes) the app does not have. What an export keeps between
+/// runs, and the sheet package's shots, are kept out of git: a line added to
+/// the app's `.gitignore` where it does not ignore them ([_ignoreShots]).
+/// Files that exist are left alone, but for that line.
 ///
-/// Returns the files written.
+/// Returns the files written or changed.
 List<String> scaffoldSheet(SheetRepo repo, {bool package = false}) {
   final app = repo.appName ?? 'app';
   final sdk = switch (repo.pubspec?['environment']) {
@@ -37,6 +39,7 @@ List<String> scaffoldSheet(SheetRepo repo, {bool package = false}) {
 pages: []
 edges: []
 ''');
+  if (_ignoreShots(repo)) written.add('.gitignore');
   if (!package) return written;
 
   write('pubspec.yaml', '''
@@ -70,13 +73,12 @@ analyzer:
     - build/**
 ''');
   write('lib/fakes/states.dart', '''
-// The states pages start in: public top-level functions
-// `Widget name(Widget child)` that put the app's DI on fakes.
+// The wrappers previews start pages in (their `wrapper:`): public top-level
+// functions `Widget name(Widget child)` that put the app's DI on fakes.
 import 'package:flutter/widgets.dart';
 
-Widget standard(Widget child) => child;
+Widget withFakes(Widget child) => child;
 ''');
-  if (_ignoreShots(repo)) written.add('.gitignore');
   return written;
 }
 
@@ -91,10 +93,9 @@ String _overrides(SheetRepo repo) {
   );
   for (final MapEntry(:key, :value) in overrides.entries) {
     final source = switch (value) {
-      {'path': final String path} when !p.posix.isAbsolute(path) => {
-        ...value,
-        'path': p.posix.normalize(p.posix.join('..', path)),
-      },
+      {'path': final String path}
+          when !p.posix.isAbsolute(path) && !p.windows.isAbsolute(path) =>
+        {...value, 'path': p.posix.normalize(p.posix.join('..', path))},
       _ => value,
     };
     // YAML takes JSON as it is.

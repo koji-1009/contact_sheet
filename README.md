@@ -19,17 +19,17 @@ Contact Sheet draws the sheet as it is: it does not check it against the app.
 
 ## What the map shows
 
-- Every page, grouped by section, with the transitions between them and the deep links into them; each page's first state on the map, all its states (as a guest or signed in; empty; loading) when it is chosen and in the list.
-- A page chosen: its memo, its tags, its states, and its transitions as sentences ("When Guest, tap “Log in” → Log in (From home)"). An arrow tapped: what it is, as a sentence.
-- Tags, set alike for every page (where its analytics are, its design, its spec, its address on the web, made of its path): each page's values beside it and above it on the map, a state's own where they differ.
-- How much it shows: the pages alone, with the arrows, or with what each arrow says; the arrows back shown or hidden; on the pages, each tag and the memo, shown or hidden (the arrows and the analytics alone, say).
-- The tree: the pages top to bottom, as a site map draws an app, each under the page the app's start first reaches it from.
-- What the app shows while what it keeps across its pages stays as chosen: as a guest, never signed in, only the pages and transitions a guest sees, the rest gone where it is.
-- The route between two pages: the fewest steps as the app's navigator goes. It follows redirects, what the app keeps across its pages (signed in, the cart) and the tabs' own histories.
+- Every page, grouped by section, with the transitions between pages and the deep links into them. The map shows each page in its first state; a page chosen, and the list, show all its states (as a guest or signed in, empty, loading).
+- Choose a page to see its memo, its tags, its states, and each of its transitions as a sentence ("When Guest, tap “Log in” → Log in (From home)"). Tap an arrow to read it as a sentence.
+- Tags: links from each page to the team's other tools (its analytics, its design, its spec, its address on the web, made from its path), shown beside the page and above it on the map. A state has its own values where they differ from its page's.
+- How much the map shows: the pages only, the pages and arrows, or the arrows with their labels; the arrows back hidden at first, or shown; and which tags, and whether the memo, are shown on the pages (only the arrows and the analytics, say).
+- The tree: the pages top to bottom, like a site map, each under the page from which the app's start first reaches it.
+- What a user sees while some things stay fixed: choose values for what the app keeps across its pages (signed in or not, the cart), and only the pages and transitions the app shows then remain, the rest hidden in place. A guest who never signs in, say.
+- The route between two pages: the fewest steps, as the app's navigator takes them, following redirects, what the app keeps across its pages (signed in, the cart) and tabs that keep their own histories.
 - A list of the pages, a table of the transitions, search, and an address to pass around for each page, state and route.
 - Variants, where the sheet names them: iOS or Android, phone or tablet.
 - What only developers read (the code's names and files) is behind “For developers”.
-- Where it is from: the app's version and branch, when it was exported, and how many of the app's changes since the sheet was written it names for no page.
+- Where it came from: the app's version and branch, when it was exported, and how many of the app's changes since the sheet was written are on no page of the sheet (a sign the sheet may need bringing up to date).
 - Light and dark, a phone's width, and print.
 
 ![The cart of the shop example chosen: its states, and its transitions as sentences](https://raw.githubusercontent.com/koji-1009/contact_sheet/main/doc/images/page.png)
@@ -45,7 +45,7 @@ Contact Sheet draws the sheet as it is: it does not check it against the app.
 ## Requirements
 
 - Flutter 3.47 or later (Dart 3.13 or later), as shutter needs.
-- `flutter_test` in the app's `dev_dependencies`, as shutter shoots the previews in `flutter test` (the sheet package has it).
+- `flutter_test` in the app's `dev_dependencies` where the sheet names the app's own previews, as shutter shoots them in `flutter test` (the sheet package has it).
 - An AI agent to write the sheet: any that runs commands, such as [Claude Code](https://claude.com/claude-code) or [Codex](https://github.com/openai/codex).
 
 shutter comes with the command: nothing else to install.
@@ -58,7 +58,13 @@ shutter comes with the command: nothing else to install.
    dart install contact_sheet
    ```
 
-2. In the app's directory, ask the AI agent to run `sheet agent` and follow it.
+2. In the app's directory, ask the AI agent:
+
+   ```text
+   Run `sheet agent` and follow it.
+   ```
+
+   The agent reads the app, writes its sheet (`contact_sheet/sheet.yaml`), writes the previews the app does not have in the sheet package (`contact_sheet/`), and runs `sheet export`. The app's own code is not changed.
 3. Open `contact_sheet/map/index.html`.
 
 ## Commands
@@ -79,11 +85,11 @@ An export deletes the runs of shutter's it made, so the team's own runs in the a
 
 ## In the app's repository
 
-Contact Sheet adds `contact_sheet/` to the app, and with `init --package`, a line to its `.gitignore`:
+Contact Sheet adds `contact_sheet/` to the app, and, where it needs one, a line to its `.gitignore`:
 
 - `sheet.yaml` and `basis.json`, and the sheet package where there is one: kept in git.
 - `map/`: the map (about 0.38 MB for the shop example's 11 states, its images WebP drawn at a pixel ratio of 1.5). Commit it, or ignore it and export it where it is shared (`export --out <folder>`), or have CI export it. Its images depend on the machine's fonts (Cupertino text is SF Pro on macOS, Roboto elsewhere): export it on one kind of machine, macOS to look as an iPhone does.
-- `.dart_tool/`: what an export keeps between runs, and the sheet package's shots: out of git. Flutter's `.gitignore` ignores `.dart_tool/` at any depth; where the app's `.gitignore` does not, `init --package` adds `contact_sheet/.dart_tool/` to it.
+- `.dart_tool/`: what an export keeps between runs, and the sheet package's shots: out of git. Flutter's `.gitignore` ignores `.dart_tool/` at any depth; where the app's `.gitignore` does not, `init` adds `contact_sheet/.dart_tool/` to it.
 
 ## More
 

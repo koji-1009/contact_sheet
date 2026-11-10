@@ -54,7 +54,8 @@ void writeBasis(SheetRepo repo, SheetBasis basis) {
 }
 
 /// What [repo]'s app is now, without the sheet package's files; null
-/// outside a git repository (or before its first commit).
+/// outside a git repository (or before its first commit), and where git
+/// cannot be run or cannot tell what changed.
 Future<SheetBasis?> currentBasis(ProcessRunner runner, SheetRepo repo) async {
   final git = _Git(runner, repo);
   try {
@@ -174,12 +175,20 @@ class _Git {
       for (final path in paths)
         if (File(pathIn(repo.root, path)).existsSync()) path,
     ];
-    if (existing.isEmpty) return hashes;
-    final result = await this(['hash-object', '--', ...existing]);
-    if (result.exitCode != 0) return hashes;
-    final lines = result.stdout.trim().split('\n');
-    for (var i = 0; i < existing.length && i < lines.length; i++) {
-      hashes[existing[i]] = lines[i].trim();
+    // A few at a time: a command line has a length it cannot pass (Windows'
+    // 32K characters), and an app may have thousands of files not in git.
+    const each = 100;
+    for (var start = 0; start < existing.length; start += each) {
+      final some = existing.sublist(
+        start,
+        start + each < existing.length ? start + each : existing.length,
+      );
+      final result = await this(['hash-object', '--', ...some]);
+      if (result.exitCode != 0) continue;
+      final lines = result.stdout.trim().split('\n');
+      for (var i = 0; i < some.length && i < lines.length; i++) {
+        hashes[some[i]] = lines[i].trim();
+      }
     }
     return hashes;
   }

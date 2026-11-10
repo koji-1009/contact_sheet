@@ -191,6 +191,8 @@ table { border-collapse: collapse; width: 100%; background: var(--surface); }
 th, td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; font-size: 13px; }
 th { color: var(--muted); font-weight: 600; }
 td a { color: var(--accent); text-decoration: none; cursor: pointer; }
+/* A link to a page in a view: as the others, visited or not. */
+:where(a[data-go]) { color: var(--accent); text-decoration: none; }
 tr.group td { border-top: 2px solid var(--line); }
 #edge-table:not(.filtering) tr.again td:first-child > * { visibility: hidden; }
 /* detail */
@@ -226,7 +228,8 @@ tr.group td { border-top: 2px solid var(--line); }
   .bar:not(.open) > :not(#bar-open) { display: none !important; }
   .flows { grid-template-columns: 1fr; }
   #card { left: 12px; right: 12px; width: auto; bottom: calc(var(--bar-h, 32px) + 20px); max-height: 45%; }
-  #route { right: 12px; width: auto; max-height: 50%; }
+  /* Under the map's tools, which stay to be tapped. */
+  #route { right: 12px; top: 60px; width: auto; max-height: 50%; }
   .wrap { padding: 12px; }
   /* The table's moves in its pages' column: most are none. */
   th.kind, td.kind { display: none; }

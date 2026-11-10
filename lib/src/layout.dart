@@ -96,7 +96,8 @@ enum _Route {
 /// Each section is an island of its own. In it, columns go by distance along
 /// its arrows from where its flow comes in (the first page, an arrow from
 /// another section, a deep link), so the flow reads left to right; the pages
-/// no arrow in it reaches are a row of their own under the rest. The islands
+/// the flow does not reach from where it comes in are a row of their own
+/// under the rest. The islands
 /// are laid in rows, in the order the sheet first names them, so a large app
 /// is a map to look over rather than a long band.
 class MapLayout {
@@ -190,8 +191,9 @@ class MapLayout {
       seeds.forEach(reach);
       if (depth.isEmpty) reach([pages.first.id]);
       // The pages of one depth more than a column holds: in columns side by
-      // side, [columnRows] pages each, the first pages of a bar's tabs
-      // together in the first. One that holds them is a column as it is.
+      // side, [columnRows] pages each (or as many as the first pages of a
+      // bar's tabs there, where they are more), those first pages together
+      // in the first. One that holds them is a column as it is.
       final byDepth = <int, List<SheetPage>>{};
       for (final page in pages) {
         if (depth[page.id] case final d?) (byDepth[d] ??= []).add(page);
@@ -251,7 +253,8 @@ class MapLayout {
         columns[column] = box.bottom + labelHeight + rowGap;
       }
       var bottom = columns.values.reduce(math.max) - rowGap;
-      // The pages no arrow in the section reaches, under the rest.
+      // The pages the flow does not reach from where it comes in, under the
+      // rest.
       final rest = [
         for (final p in pages)
           if (!depth.containsKey(p.id)) p,
@@ -474,7 +477,8 @@ class MapLayout {
   final Sheet _sheet;
 
   /// The curve of [edge]; null when it goes from a page to itself, or is
-  /// drawn in a bundle.
+  /// drawn in a bundle alone. For a jump ([jumps]), its short arrow out,
+  /// the bundle it comes in by drawn too.
   Curve? curveOf(SheetEdge edge) => _curves[edge];
 
   /// The bundle [edge] is drawn in, if any.

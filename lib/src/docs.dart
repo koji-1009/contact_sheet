@@ -19,11 +19,11 @@ Do not add previews, or anything else, to the app: whether the app keeps preview
 
 ## The steps
 
-Run the commands in the app's directory. `sheet` is the command; run as `dart run contact_sheet` (from a clone of Contact Sheet, the app's directory given last), it is the same.
+Run the commands in the app's directory.
 
 1. `sheet init`: writes an empty `contact_sheet/sheet.yaml`.
 2. Look into what tells how the app works, such as its code (its router, its pages, and its `@Preview`s: search for `@Preview(`; a `@MultiPreview` subclass counts too) and its specifications.
-3. For the pages and states the app has no preview of: `sheet init --package` writes the sheet package's skeleton, then write the previews there (see "Previews in the sheet package"). In `contact_sheet/`: `flutter pub get` and `flutter analyze`.
+3. For the pages and states the app has no preview of: `sheet init --package` writes the sheet package's skeleton, then write the previews there (see "Previews in the sheet package"). In `contact_sheet/`: `flutter pub get` and `flutter analyze`. The app's own previews are shot in the app, which needs `flutter_test` in its `dev_dependencies` for that; where it has none, write those previews in the sheet package too (it has `flutter_test`), and tell the user so.
 4. Write `sheet.yaml` (see "Writing the sheet"). Then `sheet lint`: what the sheet itself shows may be missing (a page no arrow leads to, a state nothing leaves from or arrives in, unless what the page loads decides it, a condition's value nothing gives) or written twice. Hints, not errors: look at each, and fix the sheet where it is wrong; one that is right as it is (an empty cart that nothing but the back leaves) gives a key under it: add that key to `checked`, and it is not told again.
 5. `sheet export`: has shutter shoot the previews the sheet names and writes the map to `contact_sheet/map/`. A mistake in `sheet.yaml` is told with where it is. A state that could not be shot is told with shutter's error and where it points: fix the sheet package's preview, or tell the user about the app's, and export again; `--only <page id>` shoots that page's previews alone and keeps the other images, and `--strict` fails while any state has no image. With `--svg`, look at `contact_sheet/map/map-dev.svg`, the whole map as one picture: every page has its image, every transition its arrow. `map.svg` is the same for the people outside the code: an arrow's label without what only the code names.
 6. `sheet basis`: records the app as the sheet was written from it (`contact_sheet/basis.json`).
@@ -39,8 +39,8 @@ Only for what the app has no preview of, or where the app's cannot show it: a pa
 
 1. **Dependencies** (`contact_sheet/pubspec.yaml`). Add the app's own dependencies that the fakes and previews use directly (`flutter_riverpod`, `go_router`, ...), at the versions the app uses.
 2. **Fakes** (`lib/fakes/`). Implement the app's repositories / API clients with fixed data, so pages render without a network. Prefer the repository layer over HTTP. If the app's previews have fakes, use theirs.
-3. **States** (`lib/fakes/states.dart`). Public top-level functions `Widget name(Widget child)` that put the app's DI on the fakes: `ProviderScope(overrides: ...)`, `MultiProvider`, `MultiBlocProvider`, re-registering GetIt, an `InheritedWidget`, whatever the app uses. Previews do not go through the app's `main`: what `main` sets up is provided here or in the fakes. The preview function runs before its wrapper: do not read what the wrapper sets up from the function.
-4. **Previews** (`lib/preview/<page>.dart`, one page per file). A public top-level function that builds the page, with one `@Preview` (from `package:flutter/widget_previews.dart`) per state (`wrapper:` one of the states, `size:` always set, the device the map shows it on: `Size(390, 844)`, an iPhone, unless the app is for another device). States that look alike may name one preview: a state is how the page is reached, its image how it looks. In the app's own `MaterialApp`, from the library the app imports it from (its `theme`, `localizationsDelegates`, `supportedLocales`, `builder`; `debugShowCheckedModeBanner: false`). To show it as the app does, start it the way the app does:
+3. **Wrappers** (`lib/fakes/states.dart`; not the sheet's states). Public top-level functions `Widget name(Widget child)` that put the app's DI on the fakes: `ProviderScope(overrides: ...)`, `MultiProvider`, `MultiBlocProvider`, re-registering GetIt, an `InheritedWidget`, whatever the app uses. Previews do not go through the app's `main`: what `main` sets up is provided here or in the fakes. The preview function runs before its wrapper: do not read what the wrapper sets up from the function.
+4. **Previews** (`lib/preview/<page>.dart`, one page per file). A public top-level function that builds the page, with one `@Preview` (from `package:flutter/widget_previews.dart`) per state (`wrapper:` one of the wrappers, `size:` always set, the device the map shows it on: `Size(390, 844)`, an iPhone, unless the app is for another device). States that look alike may name one preview: a state is how the page is reached, its image how it looks. In the app's own `MaterialApp`, from the library the app imports it from (its `theme`, `localizationsDelegates`, `supportedLocales`, `builder`; `debugShowCheckedModeBanner: false`). To show it as the app does, start it the way the app does:
    - go_router: `MaterialApp.router(routerConfig: GoRouter(initialLocation: ..., routes: <the app's routes>, redirect: <the app's redirect>))`.
    - auto_route: `MaterialApp.router(routerConfig: AppRouter().config(deepLinkBuilder: (_) => DeepLink([ProductDetailRoute(id: 'p1')])))`.
    - Navigator 1.0: `MaterialApp(onGenerateRoute: <the app's>, initialRoute: '/item', ...)`, or the app's `routes` with `initialRoute`.
@@ -200,7 +200,7 @@ Each field, and how `preview` names a `@Preview`: `sheet manual`, "The sheet".
 - `locale` (top level, optional): the language of the map's own words, for the people who read it: `ja`, or `en` (the default). Write the sheet's labels, states, conditions and memos in that language too; a trigger stays the screen's words.
 - `kind` is what the move does to the history, and the route between two pages follows it: a `push` or a `redirect` puts `to` over `from`, and its back returns to `from`; a `replace` takes `from`'s place; a `go` starts the history again (nothing under `to`). A pop (`kind: pop`, drawn dashed) only when it tells something the back of a push does not: an action that goes back (saving, deleting: `trigger: text:Save`, with `then` for the state it lands in; without `to` when it goes back to whichever page opened it, a form opened from several), or a back that goes elsewhere than the page under it. Do not write the back to the page under it, nor a redirect's back: it goes to the page where the user tapped, which the redirect's push already says.
 - `parent`: with go_router, a route nested under another (`/explore/hotels/:id` under `/explore`) is built with the pages of its path under it when it is gone to (`context.go`) or opened by a deep link. Write the page it is nested under as its `parent`: with nothing under it, its back goes there. Pushed, it goes over the page it is pushed from, as any push. Do not write that back as a pop.
-- A dialog or a bottom sheet: judge whether it is a transition at all, not by how Flutter shows it (a route on the `Navigator` is how Flutter does it). A plain confirmation or choice that only goes on: nothing to write. One a reader should see, with outcomes that lead apart: a state of the page under it (a preview with it open), entered by an edge to itself with `then`, its buttons edges `when` that state; where the back asks first (discard changes?), that edge has `trigger: back`, and takes the back's place. Full-screen, a flow of its own, or opened alike from many pages: a page.
+- A dialog or a bottom sheet: judge whether it is a transition at all, not by how Flutter shows it (a route on the `Navigator` is how Flutter does it). A plain confirmation or choice that only goes on: nothing to write. One a reader should see, with outcomes that lead apart: a state of the page under it (a preview with it open), entered by an edge to itself with `then` and `kind: replace` (the page stays where it is in the history), its buttons edges `when` that state; where the back closes it, an edge to itself `when` that state, `trigger: back`, `then` the state it closes to, `kind: replace`. Where the back asks first (discard changes?), the edge that opens it has `trigger: back`, and takes the back's place. Full-screen, a flow of its own, or opened alike from many pages: a page.
 - Tabs that each keep their own history (go_router's `StatefulShellRoute`, a `UITabBarController` with a navigation controller per tab) are a bar in `tabs`: each branch's first route is a tab's `page`, its `trigger` the tab's words; the branch's other routes are pages with `tab:` (the tabs they are shown in); a route shown over the whole bar (its `parentNavigatorKey` the root navigator's, or outside the shell) has none. `retap: first` where tapping the tab shown goes back to its first page (`goBranch(i, initialLocation: i == currentIndex)`; iOS does). Do not write the switches between tabs as edges: the bar does them. A bar that switches pages in place and keeps no history is not one: write its tabs as edges with `kind: replace`.
 - What can happen on every page (a session that expires, a forced update) is one edge `from: '*'`, with `if` for when (not `when`): drawn once, from outside.
 - Screens outside the app (signing in through the browser, a payment sheet, sharing, the OS settings) are not pages: write the step as one edge from the button to where the app comes back, with what it gives (`set: {Login: Logged in}`), and another for each other outcome (cancelled). Nor are written: pops through several pages to one in between, the browser's back and forward; the pages a deep link builds under its page are its `parent`'s.
@@ -233,7 +233,7 @@ Each state names one `@Preview`, and its image is that preview, shot by shutter.
 - The app's own previews are shot in the app.
 - The previews the app does not have are written in the **sheet package**, `contact_sheet/`, and shot there. It is a plain Flutter package that imports the app and does not depend on Contact Sheet; `sheet init --package` writes its skeleton.
 
-shutter shoots them as a library, in `flutter test`, drawn as iOS: there is nothing else to install. Before shooting, `flutter pub get` runs in each project, unless its package config is newer than its pubspec and lock file.
+shutter shoots them as a library, in `flutter test`, drawn as iOS: there is nothing else to install. Before shooting, `flutter pub get` runs in each project, unless its package config is newer than its pubspec and lock file (and, for the sheet package, the app's pubspec) or they are as they were when it last ran.
 
 The text is drawn in the app's fonts. Cupertino text is drawn in SF Pro on macOS and in Roboto elsewhere, and the characters those fonts lack (CJK, emoji) in the machine's own fonts. So the images depend on the machine that exports them: export the map on one kind of machine, macOS for it to look as an iPhone does.
 
@@ -249,6 +249,8 @@ Each field of the sheet is there for one of four things, and each kind of inform
 | What the map tells its readers | `label`, `section`, `memo`, `variants`, `locale` | Anyone |
 | What developers read | `widget`, `route`, `source`, `path`, `dependencies`, `uses`, and the triggers `key:` and `type:` | Shown in the HTML only under "For developers" |
 | Where each page is elsewhere | `tags` | Anyone: links to the team's other tools |
+
+`path` and `source` are in two rows: Contact Sheet computes with them (a tag's `{path}`, the marks of what changed), and the HTML shows them to developers.
 
 The sheet also holds lint's hints looked at and kept as they are (`checked`).
 
@@ -336,7 +338,7 @@ Write a `pop` only where it says more than that back:
 - an action that goes back (`text:Save`), with the state it lands in (`then`) and the values it gives (`set`);
 - a back that goes elsewhere than the page under it.
 
-Anything written with `trigger: back` takes the place of the page's back where it happens: such a pop, or a confirmation shown first (an edge from the page to itself with `then`).
+Anything written with `trigger: back` takes the place of the page's back where it happens (in the states its `when` names): such a pop, a confirmation shown first, or a dialog the back closes (an edge from the page to itself with `then` and `kind: replace`).
 
 A state's name means the same on every page: the same name on two pages is taken as the same state, by an arrival and by a back alike. So a generic name (Default) is given only where that holds.
 
@@ -344,7 +346,7 @@ A state's name means the same on every page: the same name on two pages is taken
 
 - A state changing within a page (an empty cart filled) is not a transition: a page's states are how it starts.
 - An edge from a page to itself is listed, not drawn. Where a condition changes on a page without leaving it (signing out in place), such an edge says it, with `set` and `kind: replace`, for the route.
-- A dialog or a bottom sheet over a page is one of three things, as the agent judges it: nothing to write (a plain confirmation); a state of that page (its preview with the dialog open, entered by an edge to itself with `then`, its buttons edges `when` that state); or a page (full-screen, a flow of its own, or opened alike from many pages). How Flutter shows it (a route on the `Navigator`) does not decide it.
+- A dialog or a bottom sheet over a page is one of three things, as the agent judges it: nothing to write (a plain confirmation); a state of that page (its preview with the dialog open, entered by an edge to itself with `then` and `kind: replace`, its buttons edges `when` that state, and the back that closes it an edge to itself `when` that state with `trigger: back`, `then` and `kind: replace`); or a page (full-screen, a flow of its own, or opened alike from many pages). How Flutter shows it (a route on the `Navigator`) does not decide it.
 
 The sheet does not draw, and the route does not follow:
 
@@ -484,7 +486,7 @@ Three views of the same pages, and what goes with them:
   - An arrow tapped, or its label, says what it is, as a sentence, beside the map, with the pages at its ends; a label's parts read apart (what is done, the states and the values it needs, a redirect).
   - It opens where the app starts: its first page with its section at the top left, as large as its words read and no larger than drawn, or whole where the whole map reads so. ⤢ shows it whole; nothing else moves it there: a page or a route let go leaves the map where it is. From far out, the sections' names lead in.
   - A page's image is loaded once the map shows it large enough to make out, or when it is chosen, next to the page chosen, or on the route.
-- **The tree.** The pages top to bottom, as a site map draws an app: each page under the page from which the fewest steps from the app's start first reach it, by a transition forward or a tab of its bar. It goes by the transitions alone, whatever states and conditions they need: a site map, not a route. A page's children are in the sheet's order, and its branch has the words of what reaches it. A transition back, one from every page, or one from a page to itself is no branch: the map and a page's sentences tell those. The pages nothing from the start reaches are trees of their own, after it, said so. It scrolls, zooms and opens as the map does; a page tapped opens its details.
+- **The tree.** The pages top to bottom, as a site map draws an app: each page under the page from which the fewest steps from the app's start first reach it, by a transition forward or a tab of its bar. It goes by the transitions alone, whatever states and conditions they need: a site map, not a route. A page's children are its bar's other tabs, in the bar's order, then the pages its transitions reach, in the sheet's order; its branch has the words of what reaches it. A transition back, one from every page, or one from a page to itself is no branch: the map and a page's sentences tell those. The pages nothing from the start reaches are trees of their own, after it, said so, each from a page none of the others leads to. It scrolls, zooms and opens as the map does; a page tapped opens its details.
 - **The list.** One page under the other, by section, each with its states and the pages it goes to and comes from. With it, the table of every transition (by page: in which state, doing what, it leads where).
 
 And in every view:
@@ -492,7 +494,7 @@ And in every view:
 - **The route between two pages**: the fewest steps from one to the other as the app's navigator goes, each as a sentence (see "The route").
 - **A page's details**, and each image opening large.
 - **Search**: pages by their names, memo, states, tags (their names and values) and what is done on them (a button's words find its page). The table narrows as it is typed.
-- **How much the map shows**, chosen under it: the pages alone, with the arrows (the default), or with what each arrow says; and the arrows back, shown or hidden (tapping "Back" in the legend). A page chosen, or a route, shows its own arrows whatever is chosen, and beside the map says them as sentences.
+- **How much the map shows**, chosen under it: the pages alone, with the arrows (the default), or with what each arrow says; and the arrows back, hidden at first (tapping "Back" in the legend shows them). A page chosen, or a route, shows its own arrows whatever is chosen, and beside the map says them as sentences.
 - **What is shown on the pages** ("On pages"), a mark above each page that has it and beside a page chosen: its memo and each tag, each shown when chosen (none is, at first), each button with how many pages have it. Above a page, they are one row no wider than it, those past it one `+<n>`, clear of the arrows and labels there; where those take all the room above, on the top edge of its image.
 - **What the app shows while conditions keep values** ("While"), with `conditions`, chosen under the map, a value or any for each (any, at first: the whole map): only the pages, each in the first state the app shows it in, the transitions and the deep links the app shows while the values chosen stay so (what a guest sees, never signed in). It launches with them (the other conditions as at launch, changing as they do), or opens by a deep link while they are so, and nothing that would change them happens. The rest is gone where it is, the pages keeping their places; a page chosen, or a route, still brings out its own. A route starts with those values, unless it names its own. A back takes back the transition that put the page there, and a switch goes to a page as the tab was left at it, under the values another tab came to meanwhile, each in the state those give: a page the app shows is never left out, and one is shown that the app does not show only where what two tabs' histories hold goes together with no condition saying so.
 - **Variants**, chosen in the header ("Shown as"): every image follows, and the map and the tree are laid out again, each page's box its screen at the scale the first variant's is drawn at.
@@ -517,7 +519,7 @@ In a tab bar of `tabs`, a switch finds a tab as it was left, and the other tabs'
 
 ### The layout
 
-- Each section is an island of its own. In it, the flow runs left to right from where it comes in: the first page, an arrow from another section, a deep link, in that order. A column holds four pages: more as far from where the flow comes in (a page that leads to many) go on in the columns beside it. The pages nothing in the section leads to are a row under the rest. The islands are laid in rows.
+- Each section is an island of its own. In it, the flow runs left to right from where it comes in: the first page, an arrow from another section, a deep link, in that order. A column holds four pages (or the first pages of a bar's tabs there, where they are more): more as far from where the flow comes in (a page that leads to many) go on in the columns beside it. The pages the flow does not reach from where it comes in are a row under the rest. The islands are laid in rows.
 - An arrow's label goes on its arrow, or where it covers the least; one off its arrow has a thin dotted line to it.
 - Three or more arrows from other sections into one page that say the same (and all go back, dashed, or none does) are drawn as one short arrow into it, `<label> ×<n>`; those from every page always, `<label> From any page`.
 - An arrow between sections that would run through where another island's pages are is a jump: a short arrow out of its page, `<label> → <page>`, and one into the page it goes to, bundled with those that say the same (`<label> ← <page>` for one alone).
@@ -543,7 +545,7 @@ Top level: `app`, `locale`, `generatedAt`, `conditions` (`name`, `values`, `sour
   - the sheet's fields: one edge for each page a list of `from`s names (every page for `'*'`, `anywhere` true then) and, for a pop without `to`, for each page it can be over (`under` true); `item`, its place in the sheet's `edges`; `when` a list, empty for any state; `if` a list of values by condition, `{}` for none; `set`, `{}` for none; `tab` or null; `then` as written: a state, a map by the state it leaves, or null;
   - `arrive`: the states of `to` it can arrive in, from each state of `from` its `when` names (all, without one), under any values of the conditions it can happen while. One where said or kept by its name; else `to`'s first, its `data` states and its states of the conditions, those the values allow; a pop back to the page under it, in the state that page can be in there; empty for a state no values let it happen in;
   - `label` (as a developer reads it), its three parts in order (`labelCode`: what only the code names; `labelPlain`: what anyone reads; `labelKind`: `go` or `replace`), and `labelParts` (what anyone reads, part by part: `text`, and `part`, `does`, `when` or `kind`);
-  - where it is drawn: `curve` (a cubic Bézier's 4 points, flattened) and `labelAt`; or `bundle`, the bundle it is drawn in; or, for a jump (`jump` true), both: its short arrow out and the bundle it comes in by. Neither for an edge from a page to itself, which is not drawn.
+  - where it is drawn: `curve` (a cubic Bézier's 4 points, flattened) and, where it has a label, `labelAt`; or `bundle`, the bundle it is drawn in; or, for a jump (`jump` true), both: its short arrow out and the bundle it comes in by. Neither for an edge from a page to itself, which is not drawn.
 - An entry: `key` (`product_detail</products/:id`, then its `if` as an edge's), the sheet's fields (`then` or null; `if`, `{}` for none; `tab` or null), `line` (2 points, flattened) and `labelAt`.
 - A bundle: `to`, `edges` (their places in `edges`), `label`, `line` and `labelAt`.
 - The tree: `width`, `height`, `outside` (the roots of the trees nothing from the app's start reaches) and `pages`, in the sheet's order: `page`, its box, `parent` (null for a root), `depth`, what reaches it (`edge`, its place in `edges`, or `tab`, the tab's first page; both null for a root), and for one with a parent `line` (its branch's points, flattened) and, where it has words, `label` and `labelAt`.
@@ -569,9 +571,9 @@ The WebP made of each shot is kept in `contact_sheet/.dart_tool/contact_sheet/we
 | Path | In git |
 | --- | --- |
 | `contact_sheet/sheet.yaml`, `contact_sheet/basis.json` | yes |
-| The sheet package (`contact_sheet/pubspec.yaml`, `analysis_options.yaml`, `lib/`) | yes |
+| The sheet package (`contact_sheet/pubspec.yaml`, `pubspec.lock`, `analysis_options.yaml`, `lib/`) | yes |
 | `contact_sheet/map/` | as the team chooses |
-| `contact_sheet/.dart_tool/` | no (`init --package` adds it to the app's `.gitignore` unless `.dart_tool/` is ignored already) |
+| `contact_sheet/.dart_tool/` | no (`init` adds it to the app's `.gitignore` unless `.dart_tool/` is ignored already) |
 
 ## Commands
 
@@ -593,8 +595,8 @@ Each command but `agent` and `manual` runs on the app directory given last, the 
 | Code | When |
 | --- | --- |
 | 0 | Done |
-| 64 | A wrong use: the message and the usage on stderr. `export --only`: the sheet has no such page |
-| 65 | `sheet.yaml` cannot be read (said with its line and where; each mistake in the conditions, tags, dependencies and variants at once). `changed`: the basis's commit is not in the repository. `export --strict`: a state has no image. `lint --fail`: there is a hint |
+| 64 | A wrong use: the message and the usage on stderr. `export --only`: the sheet has no such page; `export --images`: not a folder for the images |
+| 65 | `sheet.yaml` cannot be read (said with its line and where; each mistake in the conditions, tags, dependencies, variants, `locale` and `checked` at once). `changed`: the basis's commit is not in the repository. `export --strict`: a state has no image. `lint --fail`: there is a hint |
 | 66 | No `pubspec.yaml` in the directory; no `sheet.yaml`. `changed`: no basis yet |
 | 69 | `export`: no `flutter` to run (`FLUTTER_ROOT`, else the PATH), `flutter pub get` failed, or shutter cannot run |
 | 70 | An unexpected error (`--verbose` tells where it came from) |
@@ -607,8 +609,8 @@ Hints, not errors: each says what to look at. `export` tells them too.
 Under each hint is its key. Once a hint is looked at and the sheet is right as it is, add the key to `checked`: lint and the export stop telling it. A key in `checked` that is no hint any more is told, to be taken out.
 
 - Pages: one no arrow leads to from the first page, and no deep link opens; the first page with no state of the conditions' first values.
-- States: one none of the page's arrows leaves from; one nothing arrives in (not `data`); two of the same values of the conditions; a page with no state of some values.
-- Edges: one written twice; one written again for other states (write one edge, `when` both's, `then` by the state it leaves); a `when` state of other values than the `if`; an `if` no way through the app meets there; a `then` that gives values of the conditions its `set` does not say; one without `then` that arrives in a state of `to` by the name of the state it leaves alone (not `to`'s first, a `data` state, nor one of the conditions).
+- States: of a page whose arrows name the states they leave from (`when`), one none of them names; one nothing arrives in (not the page's first nor `data`: no arrow, deep link, back or the launch); two of the same values of the conditions; a page with no state of some values.
+- Edges: one written twice; one written again for other states (write one edge, `when` both's, `then` by the state it leaves); a `when` state of other values than the `if`; an `if` no way through the app meets there; a `then` that gives values of the conditions its `set` (or its `if`) does not say; one without `then` that arrives in a state of `to` by the name of the state it leaves alone (not `to`'s first, a `data` state, nor one of the conditions).
 - Conditions: a value nothing names; a value nothing gives, not the first.
 - Deep links: one written twice.
 - Tags: one no page has; one that three quarters of the pages or more have, and some do not; a page's path whose parameters have no value in `params`, where a tag's url is made with `{path}`.

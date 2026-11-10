@@ -190,9 +190,10 @@ String? _labelText(SheetMap map, SheetEdge edge, {required bool plain}) {
 }
 
 /// What lies over the pages: the arrows' labels (`g.lbl`, the parts for
-/// developers in `.dev` spans; `pop` for an arrow back) and the deep links'
-/// (`g.entry`), each on a background of its estimated size, which a browser
-/// may measure again. With [plain], the labels hold only what anyone reads,
+/// developers in `.dev` spans; `pop` for an arrow back), the deep links'
+/// (`g.entry`) and the bundles' (`g.blbl`; `pop` when all in it go back),
+/// each on a background of its estimated size, which a browser may measure
+/// again. With [plain], the labels hold only what anyone reads,
 /// an arrow with nothing of that having none.
 String mapOver(SheetMap map, {bool plain = false}) {
   final out = StringBuffer();
@@ -263,7 +264,7 @@ String mapOver(SheetMap map, {bool plain = false}) {
       'blbl${pop ? ' pop' : ''}',
       i,
       fit(map.bundleLabels[bundle]!, [?first.plain, count].join(' ')),
-      text == null ? count : '$text $count',
+      text == null ? _esc(count) : '$text ${_esc(count)}',
     );
   }
   return '$out';
@@ -323,7 +324,7 @@ String exportSvg(
 }
 
 /// The thin line from a label's [box] to the nearest point of its arrow's
-/// [curve]; none where the label is on it, or touches it.
+/// [curve]; none where the label is on it, or within [_leaderFrom] of it.
 String leaderOf(Box box, Curve curve) {
   final (a, b, c, d) = curve;
   Point nearestIn(Point p) => Point(
@@ -360,5 +361,10 @@ String _n(double v) {
 
 String _p(Point p) => '${_n(p.x)},${_n(p.y)}';
 
+/// [text] as XML and HTML take it, in text and in attributes: escaped, and
+/// without the control characters XML 1.0 cannot hold.
 String _esc(String text) =>
-    const HtmlEscape(HtmlEscapeMode.attribute).convert(text);
+    const HtmlEscape(HtmlEscapeMode.attribute)
+        .convert(text.replaceAll(_notXml, ''));
+
+final _notXml = RegExp('[\x00-\x08\x0B\x0C\x0E-\x1F]');

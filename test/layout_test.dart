@@ -1,8 +1,9 @@
 import 'dart:math';
 
-import 'package:contact_sheet/contact_sheet.dart';
 import 'package:contact_sheet/src/layout.dart';
 import 'package:contact_sheet/src/map.dart';
+import 'package:contact_sheet/src/messages.g.dart';
+import 'package:contact_sheet/src/sheet.dart';
 import 'package:contact_sheet/src/svg.dart';
 import 'package:test/test.dart';
 
@@ -142,6 +143,24 @@ edges:
     expect(mapOver(map), contains('data-i="$far"'));
     expect(mapOver(map), contains(said));
     expect(mapOver(map, plain: true), contains(said));
+
+    // A jump alone in its bundle says the page it comes from, by its label
+    // as written: escaped, and without what XML cannot hold.
+    final named = Sheet.parse(
+      '$pages$edges'.replaceFirst(
+        '{id: e3, label: e3,',
+        '{id: e3, label: "R&D <e3>\\x0b",',
+      ),
+      m,
+    );
+    final namedMap = SheetMap(named, shots: const {}, m: m);
+    final alone = namedMap.layout.bundleWith(named.edges[far])!;
+    expect(alone.edges, hasLength(1));
+    expect(mapOver(namedMap), contains('← R&amp;D &lt;e3&gt;</text>'));
+    expect(
+      exportSvg(namedMap, (_) => null, plain: true),
+      isNot(contains('\x0b')),
+    );
   });
 
   test('a tab\'s first page has its bar under it, its own tab lit', () {

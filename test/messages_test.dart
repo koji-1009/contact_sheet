@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:contact_sheet/contact_sheet.dart';
+import 'package:contact_sheet/src/messages.g.dart';
 import 'package:test/test.dart';
 
 /// The ARB file of [locale], by key.
