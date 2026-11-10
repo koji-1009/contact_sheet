@@ -1,3 +1,5 @@
+# Contact Sheet
+
 Every page of a Flutter app as one map: each state of each page as an image, each transition as an arrow.
 The map is HTML and JSON (and SVG, when asked), opened without any tool, for everyone who works on the app, whether in its code or not: product managers, designers, marketing, support.
 
